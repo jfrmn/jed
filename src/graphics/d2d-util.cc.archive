@@ -1,0 +1,218 @@
+#include "d2d-util.hh"
+#include "factories.hh"
+#include "util/logging.hh"
+#include "util/defer.hh"
+
+#include <algorithm>
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <d2d1_1.h>
+#include <wincodec.h>
+#undef LoadBitmap
+
+ID2D1Bitmap* LoadBitmap(ID2D1RenderTarget* renderTarget, std::wstring_view filePath, bool alphaOnly /*= false*/) {
+
+	if (GetFileAttributesW(filePath.data()) == INVALID_FILE_ATTRIBUTES) {
+		LogError("file does not exists : '%'", filePath.data());
+		return nullptr;
+	}
+
+	IWICBitmapDecoder* decoder = nullptr;
+	if (HRESULT hr = wicFactory->CreateDecoderFromFilename(filePath.data(),	NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder); hr != S_OK) {
+		LogError("CreateDecoderFromFilename() failed");
+		return nullptr;
+	}
+	DEFER_RELEASE(decoder);
+
+	IWICBitmapFrameDecode* frameDecode = nullptr;
+	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
+		LogError("failed to decode frame. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+	DEFER_RELEASE(frameDecode);
+	
+	IWICFormatConverter* converter = nullptr;
+	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
+		LogError("CreateFormatConverter() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+	DEFER_RELEASE(converter);
+	
+	if (HRESULT hr = converter->Initialize(
+			frameDecode,
+			alphaOnly
+				? GUID_WICPixelFormat8bppAlpha
+				: GUID_WICPixelFormat32bppPRGBA,
+			WICBitmapDitherTypeNone,
+			nullptr,
+			0.0f,
+			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
+		LogError("failed to initialize converter. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+
+	IWICBitmap* wicBitmap = nullptr;
+	if (HRESULT hr = wicFactory->CreateBitmapFromSource(converter, WICBitmapCreateCacheOption::WICBitmapCacheOnDemand, &wicBitmap); hr != S_OK) {
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+	DEFER_RELEASE(wicBitmap);
+	
+	ID2D1Bitmap* bitmap = nullptr;
+	if (HRESULT hr = renderTarget->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
+		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+
+	return bitmap;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1Bitmap* CopyFromRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_POINT_2F& pos, const D2D_SIZE_F& size) {
+
+	float dpiX, dpiY;
+	renderTarget->GetDpi(&dpiX, &dpiY);
+
+	ID2D1Bitmap* bitmap = nullptr;
+	if (HRESULT hr = renderTarget->CreateBitmap(
+			D2D1_SIZE_U {
+				.width = static_cast<UINT32>(size.width),
+				.height = static_cast<UINT32>(size.height)},
+			D2D1_BITMAP_PROPERTIES {
+				.pixelFormat = renderTarget->GetPixelFormat(),
+				.dpiX = dpiX,
+				.dpiY = dpiY},
+			&bitmap); hr != S_OK) {
+		LogError("CreateBitmap() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+	
+	const D2D1_POINT_2U destination {0u, 0u};
+	const D2D1_RECT_U sourceRect {
+		.left   = static_cast<UINT32>(pos.x),
+		.top    = static_cast<UINT32>(pos.y),
+		.right  = static_cast<UINT32>(pos.x + size.width),
+		.bottom = static_cast<UINT32>(pos.y + size.height) };
+	
+	if (HRESULT hr = bitmap->CopyFromRenderTarget(&destination, renderTarget, &sourceRect); hr != S_OK) {
+		LogError("CopyFromRenderTarget failed. HRESULT: %", FHr(hr));
+		bitmap->Release();
+		return nullptr;
+	}
+	
+	return bitmap;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1BitmapRenderTarget* MakeBitmapRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_SIZE_F& desiredSize /*= nullptr*/) {
+		
+	ID2D1BitmapRenderTarget* bitmapRenderTarget = nullptr;
+	if (HRESULT hr = renderTarget->CreateCompatibleRenderTarget(desiredSize, &bitmapRenderTarget); hr != S_OK) {
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+
+	return bitmapRenderTarget;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1SolidColorBrush* MakeSolidColorBrush(ID2D1RenderTarget* renderTarget, const _D3DCOLORVALUE& color) {
+	
+	ID2D1SolidColorBrush* brush = nullptr;
+	if (HRESULT hr = renderTarget->CreateSolidColorBrush(color,&brush); hr != S_OK) {
+		LogError("CreateSolidColorBrush() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+
+	return brush;
+}
+
+ID2D1SolidColorBrush* MakeSolidColorBrush(ID2D1RenderTarget* renderTarget) {
+	return MakeSolidColorBrush(renderTarget, {0.0f, 0.0f, 0.0f, 1.0f});
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static const GUID guidTransformEffect    { 0x6AA97485, 0x6354, 0x4cfc, { 0x90, 0x8C, 0xE4, 0xA7, 0x4F, 0x62, 0xC9, 0x6C } };
+static const GUID guidBlendEffect        { 0xc80ecff0, 0x3fd5, 0x4f05, { 0x83, 0x28, 0xc5, 0xd1, 0x72, 0x4b, 0x4f, 0x0a } };
+static const GUID guidGaussianBlurEffect { 0x1feb6d69, 0x2fe6, 0x4ac9, { 0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5 } };
+static const GUID guidShadowEffect       { 0xC67EA361, 0x1863, 0x4e69, { 0x89, 0xDB, 0x69, 0x5D, 0x3E, 0x9A, 0x5B, 0x6B } };
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static ID2D1Effect* LoadEffect(ID2D1DeviceContext* deviceContext, const GUID& guid) {
+	
+	ID2D1Effect* effect = nullptr;
+	if (HRESULT hr = deviceContext->CreateEffect(guid, &effect); hr != S_OK) {
+		LogError("CreateEffect() failed. GUID: %, HRESULT: %", FGuid(guid), FHr(hr));
+		return nullptr;
+	}
+
+	return effect;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1Effect* LoadTransformEffect(ID2D1DeviceContext *deviceContext, float dx, float dy) {
+	ID2D1Effect* effect = LoadEffect(deviceContext, guidTransformEffect);
+	effect->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, D2D1::Matrix3x2F::Translation(dx, dy));
+	return effect;
+}
+
+ID2D1Effect* LoadBlendEffect(ID2D1DeviceContext* deviceContext, int mode /*= 0*/) {
+	ID2D1Effect* effect = LoadEffect(deviceContext, guidBlendEffect);
+	effect->SetValue(D2D1_BLEND_PROP_MODE, mode);
+	return effect;
+}
+
+ID2D1Effect* LoadGaussianBlurEffect(ID2D1DeviceContext* deviceContext, float stdDeviation, int quality /*= 0*/) {
+	ID2D1Effect* effect = LoadEffect(deviceContext, guidGaussianBlurEffect);
+	if (effect) {
+		effect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, stdDeviation);
+		effect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION, std::clamp<int>(quality, D2D1_SHADOW_OPTIMIZATION_SPEED, D2D1_SHADOW_OPTIMIZATION_QUALITY));
+		effect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
+	}
+	return effect;
+}
+
+ID2D1Effect* LoadDropShadowEffect(ID2D1DeviceContext* deviceContext, const _D3DCOLORVALUE& color, float stdDeviation, int quality /*= 0*/) {
+	ID2D1Effect* effect = LoadEffect(deviceContext, guidShadowEffect);
+	if (effect) {
+		effect->SetValue(D2D1_SHADOW_PROP_OPTIMIZATION, std::clamp<int>(quality, D2D1_SHADOW_OPTIMIZATION_SPEED, D2D1_SHADOW_OPTIMIZATION_QUALITY));
+		effect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, stdDeviation);
+		effect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F { color.r, color.g, color.b, color.a });
+	}
+	return effect;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void UpdateBlurEffectFromDeviceContext(ID2D1Effect* effect, ID2D1DeviceContext* deviceContext, const D2D_POINT_2F& pos, const D2D_SIZE_F& size) {
+	
+	ID2D1Bitmap* background = CopyFromRenderTarget(deviceContext, pos, size);
+	if (!background) return;
+	
+	effect->SetInput(0, background);	
+	background->Release();
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1RoundedRectangleGeometry* MakeRoundedRectGeometry(const D2D1_ROUNDED_RECT& roundedRect) {
+	
+	ID2D1RoundedRectangleGeometry* geometry = nullptr;
+	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(roundedRect, &geometry); hr != S_OK) {
+		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", FHr(hr));
+		return nullptr;
+	}
+	
+	return geometry;
+}
+
+ID2D1RoundedRectangleGeometry* MakeRoundedRectGeometry(float x, float y, float w, float h, float radius) {
+	return MakeRoundedRectGeometry(
+		D2D1_ROUNDED_RECT {
+			.rect = D2D1_RECT_F {
+				.left = x,
+				.top = y,
+				.right = x + w,
+				.bottom = y + h},
+			.radiusX = radius,
+			.radiusY = radius});
+}

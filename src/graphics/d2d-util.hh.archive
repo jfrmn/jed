@@ -1,0 +1,61 @@
+#pragma once
+#include <string_view>
+
+struct ID2D1RenderTarget;
+struct ID2D1DeviceContext;
+struct ID2D1BitmapRenderTarget;
+struct ID2D1Bitmap;
+struct ID2D1SolidColorBrush;
+struct ID2D1Effect;
+struct ID2D1RoundedRectangleGeometry;
+
+struct _D3DCOLORVALUE;
+struct D2D_SIZE_F;
+struct D2D_POINT_2F;
+struct D2D1_ROUNDED_RECT;
+
+//-----------------------------------------------------------------------------
+// Render targets
+//-----------------------------------------------------------------------------
+
+// load a bitmap from file
+ID2D1Bitmap* LoadBitmap(ID2D1RenderTarget* renderTarget, std::wstring_view filePath, bool alphaOnly = false);
+
+// copy a potion of the render target into a bitmap
+ID2D1Bitmap* CopyFromRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_POINT_2F& pos, const D2D_SIZE_F& size);
+
+// create an offscrren rendertarget for the provided rendertarget
+ID2D1BitmapRenderTarget* MakeBitmapRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_SIZE_F& desiredSize);
+
+// create a solid color brush for this render target
+ID2D1SolidColorBrush* MakeSolidColorBrush(ID2D1RenderTarget* renderTarget, const _D3DCOLORVALUE& color);
+ID2D1SolidColorBrush* MakeSolidColorBrush(ID2D1RenderTarget* renderTarget);
+
+//-----------------------------------------------------------------------------
+// Effects
+//-----------------------------------------------------------------------------
+
+#define DEFAULT_BLUR_STD_DEVIATION 10.0f
+
+// load a transform effect
+ID2D1Effect* LoadTransformEffect(ID2D1DeviceContext* deviceContext, float dx, float dy);
+
+// load a blend effect
+ID2D1Effect* LoadBlendEffect(ID2D1DeviceContext* deviceContext, int mode = 0);
+
+// load a blur effect
+ID2D1Effect* LoadGaussianBlurEffect(ID2D1DeviceContext* deviceContext, float stdDeviation = DEFAULT_BLUR_STD_DEVIATION, int quality = 0);
+
+// load a drop shadow effect
+ID2D1Effect* LoadDropShadowEffect(ID2D1DeviceContext* deviceContext, const _D3DCOLORVALUE& color, float stdDeviation, int quality = 0);
+
+// capture the background of the devicecontext and update the input of the blur effect
+void UpdateBlurEffectFromDeviceContext(ID2D1Effect* effect, ID2D1DeviceContext* deviceContext, const D2D_POINT_2F& pos, const D2D_SIZE_F& size);
+
+//-----------------------------------------------------------------------------
+// Geometries
+//-----------------------------------------------------------------------------
+
+// create a roundedrect geometry
+ID2D1RoundedRectangleGeometry* MakeRoundedRectGeometry(const D2D1_ROUNDED_RECT& roundedRect);
+ID2D1RoundedRectangleGeometry* MakeRoundedRectGeometry(float x, float y, float w, float h, float radius);

@@ -1,0 +1,91 @@
+#include "scrollarea.hh"
+#include "globals.hh"
+#include "events.hh"
+#include "ui/style.hh"
+#include "util/rect-util.hh"
+
+#include <algorithm>
+
+void Scrollarea::Init(f32 posX, f32 posY, f32 width, f32 height, f32 barWidth) {
+	vpX = vpY = 0.0f;
+	this->vpSize    = D2D_SIZE_F   {width, height};
+	this->position  = D2D_POINT_2F {posX,  posY};
+	this->totalSize = D2D_SIZE_F   {width, height};
+	this->barWidth = barWidth;
+}
+
+void Scrollarea::ResetViewport() {
+	vpX = vpY = 0.0f;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void Scrollarea::ScrollVertical(float amount) {
+	// NOTE do not use clamp here
+	// std::clamp() has an assert that min must be < max
+	// this is not necessarily true in our case
+
+	const f32 newViewportY = vpY - amount;
+	const f32 maxViewportPos = totalSize.height - vpSize.height;
+	
+	if (newViewportY < .0f || maxViewportPos < .0f) {
+		vpY = .0f;
+		return;
+	}
+	
+	if (newViewportY > maxViewportPos) {
+		vpY = maxViewportPos;
+		return;
+	}
+	
+	vpY = newViewportY;
+}
+
+f32 Scrollarea::GetMaxPositionX() const {
+	return std::max(0.0f, totalSize.width - vpSize.width);
+}
+
+f32 Scrollarea::GetMaxPositionY() const {
+	return std::max(0.0f, totalSize.height - vpSize.height);
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+void Scrollarea::OnUpdate() {
+	
+	const f32 ratio = vpSize.height / totalSize.height;
+	if (ratio >= 1.0f) return;
+
+	const D2D_RECT_F vertBar {
+		.left   = position.x + vpSize.width - barWidth,
+		.top    = position.y + (vpY * ratio),
+		.right  = position.x + vpSize.width,
+		.bottom = position.y + ((vpY + vpSize.height) * ratio) };
+	
+	deviceContext->FillRectangle(vertBar, style.GetBrushUiBackground());
+
+	const bool isHot = mouse.Hittest(vertBar, this);
+	if (isHot) {
+		if (mouse.event == Mouse::Event_Down)
+			mouse.StartDragging();
+		
+		const bool isDragging = mouse.IsDragging();
+		deviceContext->FillRectangle(vertBar, style.GetBrushHover(isDragging));
+	
+		if (isDragging) {
+			vpY = std::clamp(
+				(mouse.y - mouse.dragStartY) / ratio,
+				0.0f,
+				(totalSize.height - vpSize.height));
+		}
+	}
+}
+
+void Scrollarea::OnResize(D2D_RECT_F hostRect) {
+	position = D2D_POINT_2F {hostRect.left, hostRect.top};
+	vpSize = RectSize(hostRect);
+}
+
+f32 Scrollarea::GetRatio() {
+	const f32 ratio = vpSize.height / totalSize.height;
+	return ratio < 1.0f ? ratio : 1.0f;
+}

@@ -1,0 +1,56 @@
+{
+	"font-ui": {
+		"name": "Geist",
+		"size": 14
+	},
+	
+	"font-editor": {
+ 		"name": "Geist Mono",
+		"size": 14
+	},
+	"tools": [
+		{
+			"name": "test",			
+			"command": "pwsh.exe -c \"Write-Host 'First Parameter:' '%0' 'Second Parameter:' '%(second)' 'not a parameter' '%%'\"",
+			"parameters": [
+				{
+					"name": "first",
+					"type": "string",
+					"default": "first"
+				},
+				{
+					"name": "second",
+					"type": "string",
+					"default": "second"
+				}
+			],
+			"progress": {
+				"regex": "(.*",
+				"format": "absolute",
+				"max": 100
+			}
+		},
+		{
+			"name": "simulate-build",
+			"description": "simulate the output of build.ps1",
+			"command": "pwsh.exe -f .\\test\\simulate-build.ps1",
+			"parameters": [],
+			"open-console": "on-start",
+			"progress": {
+				"regex": "\\[(\\d+)\\/(\\d+)\\]",
+				"format": "percent",
+				"capture-group-value": 1,
+				"capture-group-max": 2
+			},
+			"diagnostics": {
+				"regex": "([A-Z]:[^<>:\"\\/\\|\\?\\*\\(\\)]*)\\((\\d+)\\):\\s(\\w+)\\s([A-Z]\\d+):(.*)",
+				"capture-group-serverity": 3,
+				"capture-group-file": 1,
+				"capture-group-line": 2,
+				"capture-group-code": 4,
+				"capture-group-message": 5
+			}
+			
+		}
+	]
+}
