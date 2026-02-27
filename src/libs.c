@@ -1,5 +1,0 @@
-#pragma comment(lib, "d2d1.lib")
-#pragma comment(lib, "dwrite.lib")
-#pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "cJSON.lib")
