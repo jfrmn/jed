@@ -1,19 +1,17 @@
 # BUGS
 
-
-
 \[ ] scrollbar hover over diagnstic not working
 \[ ] find and replace -> Missing ProcessTextChange (lsp never recieves replacements)
 
 \[ ] scrollbar click is funky
 
+\[ ] short file names don't get displayed correctly
 
 
-# 
+
+
 
 # MAJOR TASKS
-
-
 
 \[ ] repalce basic parser with regex parser
 \[ ] make settings ini files; move json to language-server stuff
@@ -24,11 +22,9 @@
 
 
 
-# 
+
 
 # MINOR TASKS
-
-
 
 \[ ] print stacktrace in ASSERTS()
 \[ ] add key-binding  to select inside brackets
@@ -38,11 +34,9 @@
 
 
 
-# 
+
 
 # BACKLOG
-
-
 
 \[ ] editorcursorattached: animation for selection just like in prompt
 \[ ] gotoline: add relatives with +/-
@@ -53,7 +47,7 @@
 
 
 
-## 
+
 
 ## COMMAND IDEAS
 

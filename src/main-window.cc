@@ -249,6 +249,10 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = false;
 		
+		// @FIXME
+		// this might become a dangling pointer!!
+		// we move the path into the editor which which by itself is not a problem
+		// except when it's a short string and SSO kicks in...
 		const std::string_view title = GetFilenameFromPath(path);
 
 		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent) {

@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 	JsonFree(settingsJson);
 
 	// @DUMMY
-	mainWindow.OpenEditor(".\\source\\main.cc", MainWindow::OpenBehavior_NewPanelLeft);
+	mainWindow.OpenEditor(".\\src\\main.cc", MainWindow::OpenBehavior_NewPanelLeft);
 	
 	LogInfo("running message loop");
 
