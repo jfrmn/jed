@@ -51,6 +51,16 @@ Logger* SetActiveLogger(Logger* logger);
 #define LogDevVar(varname)   activeLogger->LogChecked<true>(LogLevel_Dev, "%: %", #varname, varname)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#define MeasureTime(label, statment) {\
+	LARGE_INTEGER _before, _after, _freq;\
+	QueryPerformanceFrequency(&_freq);\
+	QueryPerformanceCounter(&_before);\
+	statment;\
+	QueryPerformanceCounter(&_after);\
+	LogDev("%: %ms", label, static_cast<f64>((_after.QuadPart - _before.QuadPart)) / (_freq.QuadPart / 1000.0));\
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct _GUID;
 
 FormatArgument FHr(long hResult);

@@ -13,6 +13,10 @@
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 
+// @DUMMY
+#include "graphics/glyph-run-harfbuzz.hh"
+#include "graphics/glyph-run-dwrite.hh" 
+
 #include "editor/editor-caretattached.hh"
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-diagnostics.hh"
@@ -28,6 +32,7 @@
 #define NOMINMAX
 #include <d2d1_1.h>
 #include <dwrite_1.h>
+#include <windows.h>
 //#include <guiddef.h>
 #undef DrawText
 
@@ -589,11 +594,49 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void Editor::OnUpdate() {
 
+	const TextBuffer& buffer = GetBuffer();
+
+MeasureTime("Shaping - Harfbuzz", {	
+	std::vector<GlyphRun_Harfbuzz> gylphRuns {buffer.LineCount()};
+	for (u64 i = 0; i < buffer.LineCount(); i++) {
+		
+		const TextBuffer::Line& line = buffer.lines[i];
+		GlyphRun_Harfbuzz& run_harfbuzz = gylphRuns[i];
+
+		run_harfbuzz.Shape(line.GetText(), style.fontEditor);
+		//run2.Draw(deviceContext, area.left, area.top + (i * style.fontEditor.lineHeight), style.fontEditor, style.GetBrushEditorText());
+	}
+})
+
+MeasureTime("Shaping - DirectWrite - signle", {
+	std::vector<GlyphRun_DWrite> gylphRuns {buffer.LineCount()};
+	for (u64 i = 0; i < buffer.LineCount(); i++) {
+		
+		const TextBuffer::Line& line = buffer.lines[i];
+		GlyphRun_DWrite& run_dw = gylphRuns[i];
+
+		run_dw.Shape(line.GetText(), style.fontEditor);
+		//run_dw.Draw(deviceContext, area.left, area.top + (i * style.fontEditor.lineHeight), style.fontEditor, style.GetBrushEditorText());
+	}
+})
+
+MeasureTime("Shaping - DirectWrite - batch", {
+	
+	std::vector<std::string_view> lines {buffer.LineCount()};
+	for (u64 i = 0; i < buffer.LineCount(); i++)
+		lines.push_back(buffer.lines[i].GetText());
+	
+	std::vector<GlyphRun_DWrite> gylphRuns {};
+	GlyphRun_DWrite::ShapeBatch(lines, style.fontEditor, &gylphRuns);
+})
+
+LogDev("------------");
+
 	//
 	// reshape glyphs
 	//
 	{
-		const TextBuffer &buffer = GetBuffer();
+		const TextBuffer& buffer = GetBuffer();
 		
 		glyphRuns.resize(buffer.LineCount());
 		for (u64 i = 0; i < buffer.LineCount(); i++) {
@@ -603,6 +646,7 @@ void Editor::OnUpdate() {
 
 			run.Shape(line.GetText(), style.fontEditor, &glyphRunShapingMemory);
 		}
+		return;
 
 		scrollarea.totalSize.height = glyphRuns.size() * style.fontEditor.lineHeight;
 		
@@ -825,12 +869,9 @@ void Editor::OnUpdate() {
 			// draw selection
 			if (TextPosition selFrom, selTo; caret.GetSelection(&selFrom, &selTo)) {
 				ID2D1SolidColorBrush* brush = style.GetBrushSelection();
-				brush->SetOpacity(0.5f);
-			
+				
 				HighlightTextRangeData highlightData {deviceContext, brush};
 				IterateTextRange(this, selFrom, selTo, &highlightData, HighlightTextRange);
-				
-				brush->SetOpacity(1.0f);
 			}
 			
 			// draw caret

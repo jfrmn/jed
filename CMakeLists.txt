@@ -36,6 +36,7 @@ target_link_libraries(slick-edit cjson)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+set (HB_HAVE_DIRECTWRITE ON)
 add_subdirectory("deps/harfbuzz")
 target_link_libraries(slick-edit harfbuzz)
 

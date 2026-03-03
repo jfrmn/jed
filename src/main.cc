@@ -9,6 +9,9 @@
 #include "commands/tools.hh"
 #include "json/json-basic.hh"
 
+#include "graphics/glyph-run-harfbuzz.hh" // @DUMMY
+#include "graphics/glyph-run-dwrite.hh" // @DUMMY
+
 #include "ui/style.hh"
 
 // @DUMMY
@@ -61,7 +64,17 @@ int main(int argc, char** argv) {
 		LogFatal("init directx factories failed");
 		return -1;
 	}
-
+	
+	if (!GlyphRun_Harfbuzz::InitHarfbuzz()) {
+		LogFatal("init harfbuzz failed");
+		return -1;
+	}
+	
+	if (!InitStaticTextAnalyzer()) {
+		LogFatal("init StaticTextAnalyzer failed");
+		return -1;
+	}
+	
 	u64 ticksPerMs = 0u;	
 	if (!GetPerformanceFrequency(&ticksPerMs))
 		LogError("init perforamnce counters failed");

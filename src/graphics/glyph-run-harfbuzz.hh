@@ -9,15 +9,21 @@ struct Font;
 struct ID2D1RenderTarget;
 struct ID2D1SolidColorBrush;
 
-struct GlyphRun2 {
+struct GlyphRun_Harfbuzz {
+	
+	//------------------------------------------
+	// statics
+	//------------------------------------------
+	
+	static bool InitHarfbuzz();
 	
 	//------------------------------------------
 	// data
 	//------------------------------------------
 	
 	f32* advances    = nullptr;
-	u16* indicies    = nullptr;
 	u32* mapping     = nullptr;
+	u16* indicies    = nullptr;
 	
 	f32 totalAdvanve = 0.0f;
 	u64 size = 0u;
