@@ -7,6 +7,8 @@
 
 \[ ] short file names don't get displayed correctly
 
+\[ ] delete line does not work with multiple cursors
+
 
 
 

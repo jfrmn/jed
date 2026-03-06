@@ -24,155 +24,94 @@ struct ScriptAnalysisRecord {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct ShapingBuffer {
 	
-	//------------------------------------------
-	// static
-	//------------------------------------------	
-	
-	static constexpr u32 STATIC_BUFFER_SIZE = 256u;
-	
-	// size prediction of scriptAnalysisRecords = text length / this factor
-	static constexpr u32 SCRIPT_ANALYSIS_SIZE_FACTOR = 8u;
-	
-	static WCHAR                          staticStringData[STATIC_BUFFER_SIZE];
-	static u8                             staticStringUtfMapping[STATIC_BUFFER_SIZE];
-	
-	static ScriptAnalysisRecord staticScriptAnalysisRecords[STATIC_BUFFER_SIZE / SCRIPT_ANALYSIS_SIZE_FACTOR];
-	
-	static UINT16                         staticClusterMap[STATIC_BUFFER_SIZE];
-	static DWRITE_SHAPING_TEXT_PROPERTIES staticTextProperties[STATIC_BUFFER_SIZE];
-	
-	static DWRITE_GLYPH_OFFSET             staticGlyphOffsets[STATIC_BUFFER_SIZE];
-	static DWRITE_SHAPING_GLYPH_PROPERTIES staticGlyphProperties[STATIC_BUFFER_SIZE];
-	
-	static IDWriteTextAnalyzer* staticTextAnalyzer;
+	static constexpr u64 SCRIPT_ANALYSIS_SIZE_FACTOR = 8;
 	
 	//------------------------------------------
 	// data
 	//------------------------------------------	
 	
 	// string properties
-	WCHAR* stringData         = nullptr;
-	u8*    stringUtfMapping   = nullptr;
-	u32    stringCapacity     = 0u;
-	bool   stringDataIsStatic = false;
+	std::unique_ptr<WCHAR[]> stringData        = nullptr;
+	std::unique_ptr<u8[]>    stringUtfMapping  = nullptr;
+	u32                      stringCapacity    = 0u;
 	
 	// script records
-	ScriptAnalysisRecord* scriptAnalysisRecords         = nullptr;
-	u32                   scriptAnalysisRecordCapacity  = 0u;
-	bool                  scriptAnalysisRecordsIsStatic = false;
+	std::unique_ptr<ScriptAnalysisRecord[]> scriptAnalysisRecords        = nullptr;
+	u32                                     scriptAnalysisRecordCapacity = 0u;
 	
 	// shaping text properties
-	UINT16*                         clusterMap                     = nullptr;
-	DWRITE_SHAPING_TEXT_PROPERTIES* textProperties                 = nullptr;
-	u32                             shapingTextDataCapacity  = 0u;
-	bool                            shapingTextDataIsStatic = false;
+	std::unique_ptr<UINT16[]>                         clusterMap              = nullptr;
+	std::unique_ptr<DWRITE_SHAPING_TEXT_PROPERTIES[]> textProperties          = nullptr;
+	u32                                               shapingTextDataCapacity = 0u;
 	
 	// shaping glyph properties
-	DWRITE_GLYPH_OFFSET*             glyphOffsets                    = nullptr;
-	DWRITE_SHAPING_GLYPH_PROPERTIES* glyphProperties                 = nullptr;
-	u32                              shapingGlyphDataCapacity  = 0u;
-	bool                             shapingGlyphDataIsStatic = false;
+	std::unique_ptr<DWRITE_GLYPH_OFFSET[]>             glyphOffsets             = nullptr;
+	std::unique_ptr<DWRITE_SHAPING_GLYPH_PROPERTIES[]> glyphProperties          = nullptr;
+	u32                                                shapingGlyphDataCapacity = 0u;
 	
 	// text analyzer
 	IDWriteTextAnalyzer* textAnalyzer = nullptr;
-	
 	
 	//------------------------------------------
 	// functions
 	//------------------------------------------	
 	
-	void InitStatic() {
-		stringData         = staticStringData;
-		stringUtfMapping   = staticStringUtfMapping;
-		stringCapacity     = STATIC_BUFFER_SIZE;
-		stringDataIsStatic = true;
+	bool Init(u32 initialSize) {
+		stringData.reset(      new WCHAR[initialSize]);
+		stringUtfMapping.reset(new u8[initialSize]);
+		stringCapacity = initialSize;
 		
-		clusterMap              = staticClusterMap;
-		textProperties          = staticTextProperties;
-		shapingTextDataCapacity = STATIC_BUFFER_SIZE;
-		shapingTextDataIsStatic = true;
-	
-		scriptAnalysisRecords         = staticScriptAnalysisRecords;
-		scriptAnalysisRecordCapacity  = STATIC_BUFFER_SIZE / SCRIPT_ANALYSIS_SIZE_FACTOR;
-		scriptAnalysisRecordsIsStatic = true;
-
-		glyphOffsets             = staticGlyphOffsets;
-		glyphProperties          = staticGlyphProperties;
-		shapingGlyphDataCapacity = STATIC_BUFFER_SIZE;
-		shapingGlyphDataIsStatic = true;
-		
-		textAnalyzer = staticTextAnalyzer;
-	}
-	
-	void InitDynamic(u32 initialSize, IDWriteTextAnalyzer* textAnalyz) {
-		stringData         = new WCHAR[initialSize];
-		stringUtfMapping   = new u8[initialSize];
-		stringCapacity     = initialSize;
-		stringDataIsStatic = false;				
-		
-		clusterMap              = new UINT16[initialSize];
-		textProperties          = new DWRITE_SHAPING_TEXT_PROPERTIES[initialSize];
+		clusterMap.reset(    new UINT16[initialSize]);
+		textProperties.reset(new DWRITE_SHAPING_TEXT_PROPERTIES[initialSize]);
 		shapingTextDataCapacity = initialSize;
-		shapingTextDataIsStatic = false;
 	
-		scriptAnalysisRecords         = new ScriptAnalysisRecord[initialSize / SCRIPT_ANALYSIS_SIZE_FACTOR];
-		scriptAnalysisRecordCapacity  = initialSize / SCRIPT_ANALYSIS_SIZE_FACTOR;
-		scriptAnalysisRecordsIsStatic = false;
-
-		glyphOffsets             = new DWRITE_GLYPH_OFFSET[initialSize];
-		glyphProperties          = new DWRITE_SHAPING_GLYPH_PROPERTIES[initialSize];
+		scriptAnalysisRecords.reset(new ScriptAnalysisRecord[initialSize / ShapingBuffer::SCRIPT_ANALYSIS_SIZE_FACTOR]);
+		scriptAnalysisRecordCapacity = initialSize / ShapingBuffer::SCRIPT_ANALYSIS_SIZE_FACTOR;
+	
+		glyphOffsets.reset(   new DWRITE_GLYPH_OFFSET[initialSize]);
+		glyphProperties.reset(new DWRITE_SHAPING_GLYPH_PROPERTIES[initialSize]);
 		shapingGlyphDataCapacity = initialSize;
-		shapingGlyphDataIsStatic = false;
 		
-		textAnalyzer = textAnalyz;
+		if (HRESULT hr = dwFactory->CreateTextAnalyzer(&textAnalyzer); hr != S_OK) {
+			LogError("CreateTextAnalyzer() failed. HRESULT: %", FHr(hr));
+			return false;
+		}
+		
+		return true;
 	}
 	
 	void PrepareStringCapacity(u32 capacity) {
 		if (capacity <= stringCapacity) {
-			memset(stringData,       0, sizeof(*stringData)       * stringCapacity);
-			memset(stringUtfMapping, 0, sizeof(*stringUtfMapping) * stringCapacity);
+			memset(stringData.get(),       0, sizeof(stringData[0])       * stringCapacity);
+			memset(stringUtfMapping.get(), 0, sizeof(stringUtfMapping[0]) * stringCapacity);
+		
 		} else {
-			if (!stringDataIsStatic) {
-				delete[] stringData;
-				delete[] stringUtfMapping;
-			}
-			stringData = new WCHAR[capacity];
-			stringUtfMapping = new u8[capacity];
+			stringData.reset(new WCHAR[capacity]);
+			stringUtfMapping.reset(new u8[capacity]);
 			stringCapacity = capacity;
-			stringDataIsStatic = false;
 		}
 	}
 	
 	void ClearScriptAnalysisRecord() {
-		memset(scriptAnalysisRecords, 0, sizeof(*scriptAnalysisRecords) * scriptAnalysisRecordCapacity);
+		memset(scriptAnalysisRecords.get(), 0, sizeof(scriptAnalysisRecords[0]) * scriptAnalysisRecordCapacity);
 	}
 	
 	void ReallocateScriptAnalysisRecords(u32 newCapacity) {
 		if (newCapacity <= scriptAnalysisRecordCapacity) return;
 	
 		auto newScriptAnalysisRecords = new ScriptAnalysisRecord[newCapacity];
-		memcpy(newScriptAnalysisRecords, scriptAnalysisRecords, sizeof(*scriptAnalysisRecords) * scriptAnalysisRecordCapacity);
+		memcpy(newScriptAnalysisRecords, scriptAnalysisRecords.get(), sizeof(scriptAnalysisRecords[0]) * scriptAnalysisRecordCapacity);
 			
-		if (!scriptAnalysisRecordsIsStatic) {
-			delete[] scriptAnalysisRecords;
-		}
-		
-		scriptAnalysisRecords = newScriptAnalysisRecords;
+		scriptAnalysisRecords.reset(newScriptAnalysisRecords);
 		scriptAnalysisRecordCapacity = newCapacity;
-		scriptAnalysisRecordsIsStatic = false;
 	}
 	
 	void PrepareShapingTextData(u32 capacity) {
 		if (capacity <= shapingTextDataCapacity) return;
 			
-		if (!shapingTextDataIsStatic) {
-			delete[] clusterMap;
-			delete[] textProperties;
-		}
-		clusterMap = new UINT16[capacity];
-		textProperties = new DWRITE_SHAPING_TEXT_PROPERTIES[capacity];
+		clusterMap.reset(new UINT16[capacity]);
+		textProperties.reset(new DWRITE_SHAPING_TEXT_PROPERTIES[capacity]);
 		shapingTextDataCapacity = capacity;
-		shapingTextDataIsStatic = false;
 	}
 		
 	void ReallocateShapingGlyphData(u32 newCapacity) {
@@ -181,73 +120,31 @@ struct ShapingBuffer {
 		auto newGlyphOffsets = new DWRITE_GLYPH_OFFSET[newCapacity];
 		auto newGlyphProperties  = new DWRITE_SHAPING_GLYPH_PROPERTIES[newCapacity];
 		
-		memcpy(newGlyphOffsets, glyphOffsets, sizeof(*glyphOffsets) * shapingGlyphDataCapacity);
-		memcpy(newGlyphProperties, glyphProperties, sizeof(*glyphProperties) * shapingGlyphDataCapacity);
+		memcpy(newGlyphOffsets, glyphOffsets.get(), sizeof(glyphOffsets[0]) * shapingGlyphDataCapacity);
+		memcpy(newGlyphProperties, glyphProperties.get(), sizeof(glyphProperties[0]) * shapingGlyphDataCapacity);
 		
-		if (!shapingGlyphDataIsStatic) {
-			delete[] glyphOffsets;
-			delete[] glyphProperties;
-		}
-		
-		glyphOffsets = newGlyphOffsets;
-		glyphProperties = newGlyphProperties;
+		glyphOffsets.reset(newGlyphOffsets);
+		glyphProperties.reset(newGlyphProperties);
 		
 		shapingGlyphDataCapacity = newCapacity;
-		shapingGlyphDataIsStatic = false;
 	}
 
 	void ClearShapingData() {
-		memset(clusterMap,      0, sizeof(*clusterMap)      * shapingTextDataCapacity);
-		memset(textProperties,  0, sizeof(*textProperties)  * shapingTextDataCapacity);
-		memset(glyphOffsets,    0, sizeof(*glyphOffsets)    * shapingGlyphDataCapacity);
-		memset(glyphProperties, 0, sizeof(*glyphProperties) * shapingGlyphDataCapacity);
+		memset(clusterMap.get(),      0, sizeof(clusterMap[0])      * shapingTextDataCapacity);
+		memset(textProperties.get(),  0, sizeof(textProperties[0])  * shapingTextDataCapacity);
+		memset(glyphOffsets.get(),    0, sizeof(glyphOffsets[0])    * shapingGlyphDataCapacity);
+		memset(glyphProperties.get(), 0, sizeof(glyphProperties[0]) * shapingGlyphDataCapacity);
 	}
 	
 	~ShapingBuffer() noexcept {
-		if (!stringDataIsStatic) {
-			delete[] stringData;
-			delete[] stringUtfMapping;
-		}
-		
-		if (!scriptAnalysisRecordsIsStatic) {
-			delete[] scriptAnalysisRecords;
-		}
-		
-		if (!shapingTextDataIsStatic) {
-			delete[] clusterMap;
-			delete[] textProperties;
-		}
-		
-		if (!shapingGlyphDataIsStatic) {
-			delete[] glyphOffsets;
-			delete[] glyphProperties;
+		if (textAnalyzer) {
+			textAnalyzer->Release();
+			textAnalyzer = nullptr;
 		}
 	}
 };
 
-WCHAR ShapingBuffer::staticStringData[ShapingBuffer::STATIC_BUFFER_SIZE];
-u8 ShapingBuffer::staticStringUtfMapping[ShapingBuffer::STATIC_BUFFER_SIZE];
-ScriptAnalysisRecord ShapingBuffer::staticScriptAnalysisRecords[ShapingBuffer::STATIC_BUFFER_SIZE / ShapingBuffer::SCRIPT_ANALYSIS_SIZE_FACTOR];
-DWRITE_SHAPING_TEXT_PROPERTIES ShapingBuffer::staticTextProperties[ShapingBuffer::STATIC_BUFFER_SIZE];
-UINT16 ShapingBuffer::staticClusterMap[ShapingBuffer::STATIC_BUFFER_SIZE];
-DWRITE_GLYPH_OFFSET ShapingBuffer::staticGlyphOffsets[ShapingBuffer::STATIC_BUFFER_SIZE];
-DWRITE_SHAPING_GLYPH_PROPERTIES ShapingBuffer::staticGlyphProperties[ShapingBuffer::STATIC_BUFFER_SIZE];
-IDWriteTextAnalyzer* ShapingBuffer::staticTextAnalyzer = nullptr;
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool InitStaticTextAnalyzer() {
-	if (HRESULT hr = dwFactory->CreateTextAnalyzer(&ShapingBuffer::staticTextAnalyzer); hr != S_OK) {
-		LogError("CreateTextAnalyzer() failed. HRESULT: %", FHr(hr));
-		return false;
-	}
-	
-	return true;
-}
-
-void ShutdownStaticTextAnalyzer() {
-	if (ShapingBuffer::staticTextAnalyzer)
-		ShapingBuffer::staticTextAnalyzer->Release();
-}
+static ShapingBuffer staticShapingBuffer {};
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct TextAnalysisSink : public IDWriteTextAnalysisSink {
@@ -266,8 +163,8 @@ struct TextAnalysisSink : public IDWriteTextAnalysisSink {
 	TextAnalysisSink(ShapingBuffer* shapingBuffer)
 		: shapingBuffer(shapingBuffer) {}
 		
-	const ScriptAnalysisRecord* begin() const { return shapingBuffer->scriptAnalysisRecords; }
-	const ScriptAnalysisRecord* end()   const { return shapingBuffer->scriptAnalysisRecords + recordCount; }
+	const ScriptAnalysisRecord* begin() const { return shapingBuffer->scriptAnalysisRecords.get(); }
+	const ScriptAnalysisRecord* end()   const { return shapingBuffer->scriptAnalysisRecords.get() + recordCount; }
 	
 	virtual HRESULT SetScriptAnalysis(
 			UINT32 textPosition,
@@ -342,7 +239,7 @@ struct TextAnalysisSource : IDWriteTextAnalysisSource {
 			WCHAR const** textString,
 			UINT32* remainingLength) noexcept override {
 		ASSERT(textPosition < length);
-		*textString = shapingBuffer->stringData + textPosition;
+		*textString = shapingBuffer->stringData.get() + textPosition;
 		*remainingLength = length - textPosition;
 		return S_OK;
 	}
@@ -352,7 +249,7 @@ struct TextAnalysisSource : IDWriteTextAnalysisSource {
 			WCHAR const** textString,
 			UINT32* textLength) noexcept override {
 		ASSERT(textPosition < length);
-		*textString = shapingBuffer->stringData;
+		*textString = shapingBuffer->stringData.get();
 		*textLength = textPosition;
 		return S_OK;
 	}        
@@ -516,7 +413,7 @@ static void PrepareMapping(GlyphRun_DWrite* self, u32 count) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Font& font, ShapingBuffer* shapingBuffer) {
+static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Font& font, ShapingBuffer* shapingBuffer, std::vector<u32>* lineEnds) {
 	ASSERT(text.size() <= U32_MAX);
 	
 	const u32 textSize = static_cast<u32>(text.size());
@@ -547,7 +444,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 			const u32 currentCapacity = std::min(shapingBuffer->shapingGlyphDataCapacity, self->glyphCapacity - self->glyphCount);
 			
 			HRESULT hr = shapingBuffer->textAnalyzer->GetGlyphs(
-  				/* textString */          shapingBuffer->stringData + scriptAnalysisRecord.position,
+  				/* textString */          shapingBuffer->stringData.get() + scriptAnalysisRecord.position,
   				/* textLength */          scriptAnalysisRecord.length,
   				/* fontFace */            font.fontFace,
   				/* isSideways */          FALSE,
@@ -559,10 +456,10 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
   				/* featureRangeLengths */ nullptr,
   				/* featureRanges */       0,
   				/* maxGlyphCount */       static_cast<u32>(currentCapacity),
-  				/* clusterMap */          shapingBuffer->clusterMap,
-  				/* textProps */           shapingBuffer->textProperties,
+  				/* clusterMap */          shapingBuffer->clusterMap.get(),
+  				/* textProps */           shapingBuffer->textProperties.get(),
   				/* glyphIndices */        self->glyphIndicies + self->glyphCount,
-  				/* glyphProps */          shapingBuffer->glyphProperties,
+  				/* glyphProps */          shapingBuffer->glyphProperties.get(),
   				/* actualGlyphCount */    &numGlyphsInChunk);
 	  		
 	  		if (hr == S_OK) {
@@ -587,12 +484,12 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
   		}
 	  		
   		HRESULT hr = shapingBuffer->textAnalyzer->GetGlyphPlacements(
-			/* textString */          shapingBuffer->stringData + scriptAnalysisRecord.position,
-			/* clusterMap */          shapingBuffer->clusterMap,
-			/* textProps */           shapingBuffer->textProperties,
+			/* textString */          shapingBuffer->stringData.get() + scriptAnalysisRecord.position,
+			/* clusterMap */          shapingBuffer->clusterMap.get(),
+			/* textProps */           shapingBuffer->textProperties.get(),
 			/* textLength */          scriptAnalysisRecord.length,
 			/* glyphIndices */        self->glyphIndicies + self->glyphCount,
-			/* glyphProps */          shapingBuffer->glyphProperties,
+			/* glyphProps */          shapingBuffer->glyphProperties.get(),
 			/* glyphCount */          numGlyphsInChunk,
 			/* fontFace */            font.fontFace,
 			/* fontEmSize */          font.size,
@@ -604,7 +501,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 			/* featureRangeLengths */ nullptr,
 			/* featureRanges */       0,
 			/* glyphAdvances */       self->glyphAdvances.get() + self->glyphCount,
-			/* glyphOffset */         shapingBuffer->glyphOffsets);
+			/* glyphOffset */         shapingBuffer->glyphOffsets.get());
 			
 		if (hr != S_OK) {
 			LogError("GetGlyphPlacements() failed. HRESULT: %", FHr(hr));
@@ -628,7 +525,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 				charMappingWritten += utf8SequenceLenght;
 				
 				const wchar ch = shapingBuffer->stringData[scriptAnalysisRecord.position + icharInChunk];
-				if (ch == '\t') {
+				if (ch == L'\t') {
 					self->glyphIndicies[iglyphInRun] = font.glyphIndexSpace;
 					
 					const f32 tabStopWidth = font.GetSpaceAdvance() * 4;
@@ -642,6 +539,19 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 					
 					const f32 advance = nextStopPosition - self->width;
 					self->glyphAdvances[iglyphInRun] = advance;
+				
+				} else if (ch == L'\r' || ch == L'\n') {
+					self->glyphIndicies[iglyphInRun] = font.glyphIndexSpace;
+					self->glyphAdvances[iglyphInRun] = 0.0f;
+					
+					if (lineEnds) {
+						const bool isLineFeed = ch == '\n';
+						const bool nextIsLineFeed = ((icharInChunk+1) < scriptAnalysisRecord.length)
+							&& (shapingBuffer->stringData[scriptAnalysisRecord.position + icharInChunk + 1] == L'\n');
+						
+						if (isLineFeed || !nextIsLineFeed)	
+							lineEnds->push_back(scriptAnalysisRecord.position + icharInChunk);
+					}
 				}
 			}
 		}
@@ -658,11 +568,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 }
 
 bool GlyphRun_DWrite::Shape(std::string_view text, const Font& font) {
-	
-	ShapingBuffer shapingBuffer {};
-	shapingBuffer.InitStatic();
-	
-	return ShapeInternal(this, text, font, &shapingBuffer);	
+	return ShapeInternal(this, text, font, &staticShapingBuffer, nullptr);
 }
 
 struct ShapeBatchThreadData {
@@ -675,21 +581,17 @@ struct ShapeBatchThreadData {
 static DWORD ShapeBatchThreadProc(LPVOID param) {
 	ShapeBatchThreadData* threadData = static_cast<ShapeBatchThreadData*>(param);
 	
-	IDWriteTextAnalyzer* textAnalyzer = nullptr;
-	if (HRESULT hr = dwFactory->CreateTextAnalyzer(&textAnalyzer); hr != S_OK) {
-		LogError("CreateTextAnalyzer() failed. HRESULT: %", FHr(hr));
-		return -1;
-	}
-	
 	ShapingBuffer shapingBuffer {};
-	shapingBuffer.InitDynamic(128u, textAnalyzer);
+	if (!shapingBuffer.Init(128u)) {
+		LogError("init shaping buffer failed");
+		return FALSE;
+	}
 	
 	bool allOk = true;
 	for (u64 i = 0; i < threadData->lineCount; i++)
-		allOk &= ShapeInternal(threadData->output + i, threadData->lines[i], *threadData->font, &shapingBuffer);
-
-	textAnalyzer->Release();	
-	return allOk;
+		allOk &= ShapeInternal(threadData->output + i, threadData->lines[i], *threadData->font, &shapingBuffer, nullptr);
+	
+	return (allOk ? TRUE : FALSE);
 }
 
 bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
@@ -766,6 +668,8 @@ bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const 
 //
 //#################################################################################################
 
+GlyphRun_DWrite staticGlyphRun {};
+
 void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
 	if (glyphCount == 0u) return;
 	
@@ -787,10 +691,104 @@ void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const 
 		brush);
 }
 
+void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush) const {
+	ASSERT(startChar <  glyphCount);
+	ASSERT(startChar <= U32_MAX);
+	
+	if (glyphCount == 0u) return;
+	
+	const u32 startGlyphIndex = charMapping[startChar];
+	
+	const u64 endChar = std::min(startChar + charCount, charCount - 1u);
+	const u32 endGlyphIndex = charMapping[endChar];
+	ASSERT(startGlyphIndex < endGlyphIndex);
+	
+	const DWRITE_GLYPH_RUN glyphRun {
+		.fontFace      = font.fontFace,
+		.fontEmSize    = font.size,
+		.glyphCount    = endGlyphIndex- startGlyphIndex,
+		.glyphIndices  = glyphIndicies + startGlyphIndex,
+		.glyphAdvances = glyphAdvances.get() + startGlyphIndex,
+		.glyphOffsets  = nullptr,
+		.isSideways    = FALSE,
+		.bidiLevel     = 0};
+	
+	renderTarget->DrawGlyphRun(
+		D2D_POINT_2F {
+			.x = x,
+			.y = y + font.baselineOffset},
+		&glyphRun,
+		brush);	
+}
 
+u64 GlyphRun_DWrite::HitTest(f32 offset) const {
+	
+	// find the glyph index first
+	f32 totalAdv = .0f;
+	u64 glyphIndex = 0u;
+	for (; glyphIndex < glyphCount; glyphIndex++) {
+		totalAdv += glyphAdvances[glyphIndex];
+		if (totalAdv > offset)
+			break;
+	}
+	
+	// find the char index of the glyph
+	u64 charIndex = 0u;
+	for (; charIndex < charCount; charIndex++) {
+		const u32 currentGly = charMapping[charIndex];
+		if (currentGly >= glyphIndex)
+			break;
+	}
+	
+	return charIndex;
+}
 
+f32 GlyphRun_DWrite::MeasureOffset(u64 pos) const {
+	ASSERT(pos < charCount);
+	const u32 glyphIndex = charMapping[pos];
+	
+	f32 totalAdv = 0.0f;
+	for (u32 i = 0; i < glyphIndex; i++)
+		totalAdv += glyphAdvances[i];
+		
+	return totalAdv;
+}
 
+void GlyphRun_DWrite::MeasureOffsetRange(u64 startChar, u64 endChar, /*out*/ f32* offStart, /*out*/ f32* offEnd) const {
+	ASSERT(startChar <  charCount);
+	ASSERT(startChar <= endChar);
 
+	const u32 startGlyphIndex = charMapping[startChar];
+	const u32   endGlyphIndex = (endChar < charCount)
+		? charMapping[endChar]
+		: glyphCount;
+	
+	f32 totalAdv = 0.0f;
+	u32 i = 0;
+	for (; i < startGlyphIndex; i++)
+		totalAdv += glyphAdvances[i];
+	*offStart = totalAdv;
+	
+	for (; i < endGlyphIndex; i++)
+		totalAdv += glyphAdvances[i];
+	*offEnd = totalAdv;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bool GlyphRunMultiline_DWrite::Shape(std::string_view text, const Font& font) {
+	return ShapeInternal(&glyphRun, text, font, &staticShapingBuffer, &lineEnds);
+}
+
+void GlyphRunMultiline_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
+	u32 start = 0u;
+	for (u32 end : lineEnds) {
+		const u64 amount = (end - start);
+		glyphRun.DrawPartial(renderTarget, x, y, start, amount, font, brush);
+		start = end + 1;
+	}
+	
+	glyphRun.DrawPartial(renderTarget, x, y, start, U64_MAX, font, brush);
+}
 
 
 

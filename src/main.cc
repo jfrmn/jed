@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	
-	if (!InitStaticTextAnalyzer()) {
+	if (!InitStaticShapingBuffer()) {
 		LogFatal("init StaticTextAnalyzer failed");
 		return -1;
 	}
