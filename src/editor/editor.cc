@@ -668,6 +668,13 @@ void Editor::OnUpdate() {
 	}
 	
 	//
+	// get visible line numbers
+	//	
+	u64 firstVisible, lastVisible;
+	GetVisibleLines(&firstVisible, &lastVisible);
+
+	
+	//
 	// draw line numbers
 	//
 	{
@@ -688,7 +695,7 @@ void Editor::OnUpdate() {
 		DEFER(deviceContext->PopAxisAlignedClip());
 
 		// render all line numbers
-		for (u64 i = 0u; i < glyphRuns.size(); i++) {
+		for (u64 i = firstVisible; i <= lastVisible; i++) {
 	
 			u16 glyphsToRender[LINENUMBERS_MAX_DIGITS];
 			std::fill_n(glyphsToRender, LINENUMBERS_MAX_DIGITS, style.fontEditor.glyphIndexSpace);
@@ -752,7 +759,7 @@ void Editor::OnUpdate() {
 			.width  = RectWidth(area) - lineNumbersWidth,
 			.height = RectHeight(area) };
 		const D2D1_MATRIX_3X2_F scrollTransform = D2D1::Matrix3x2F::Translation(scrollarea.vpX, -scrollarea.vpY);
-
+		
 		// render glyphs to bitmap
 		{
 			ID2D1BitmapRenderTarget* renderTargetText = CreateCompatibleRenderTarget(deviceContext, textAreaSize);
@@ -763,7 +770,7 @@ void Editor::OnUpdate() {
 			renderTargetText->Clear();
 			renderTargetText->SetTransform(scrollTransform);
 						
-			for (u64 i = 0; i < glyphRuns.size(); i++) {
+			for (u64 i = firstVisible; i <= lastVisible; i++) {
 				const GlyphRun_DWrite& glyphRun = glyphRuns[i];
 				
 				const f32 offsetY = (i * style.fontEditor.lineHeight);
@@ -795,12 +802,8 @@ void Editor::OnUpdate() {
 			renderTargetColor->Clear(style.colors[Style::Color_EditorText]);
 			renderTargetColor->SetTransform(scrollTransform);
 
-			if (language) {
-				u64 firstVisible, lastVisible;
-				GetVisibleLines(&firstVisible, &lastVisible);
-				
+			if (language)
 				language->HighlightSyntax(this, renderTargetColor, firstVisible, lastVisible);
-			}
 
 			if (HRESULT hr = renderTargetColor->EndDraw(); hr != S_OK) {
 				LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
