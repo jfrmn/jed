@@ -167,6 +167,13 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	}
 	this->path = std::move(path);
 	
+	//
+	// prepare glyph runs
+	//
+	if (!GlyphRun_DWrite::ShapeBatch(this->textController.buffer, style.fontEditor, &glyphRuns)) {
+		LogError("inital shaping failed!");
+	}
+	
 	return FileResult_Success;
 }
 
@@ -224,9 +231,43 @@ void Editor::ScrollToLine(u64 line) {
 
 void Editor::ProcessTextChange(const TextChange* change) {
 	if (!change) return;
-		
+	
 	modified = true;
 	textDocumentIdentifier.version++;
+	
+	bool needsFullReshape = false;
+	{
+		if (GetBuffer().LineCount() == glyphRuns.size())	 {
+			ASSERT(change->count > 0u);
+			const u64 line = change->operations[0].start.line;
+			for (u64 i = 1; i < change->count; i++) {
+				const TextChangeOperation& operation = change->operations[i];
+				if (operation.start.line != line) {
+					needsFullReshape = true;
+					break;
+				}
+				
+				if (!operation.insertedText.empty() && operation.insertionEnd.line != line) {
+					needsFullReshape = true;
+					break;
+				}
+				
+				if (!operation.removedText.empty() && operation.removalEnd.line != line) {
+					needsFullReshape = true;
+					break;
+				}
+			}
+		} else {
+			needsFullReshape = true;
+		}
+	}
+	
+	if (needsFullReshape) {
+		GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
+	} else {
+		const u64 line = change->operations[0].start.line;	
+		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), style.fontEditor);
+	}
 
 	if (language)
 		language->OnTextBufferChanged(this, change);
@@ -573,7 +614,7 @@ void Editor::OnUpdate() {
 	// reshape glyphs
 	//
 	{
-		GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
+		//GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
 
 		scrollarea.totalSize.height = glyphRuns.size() * style.fontEditor.lineHeight;
 		
@@ -721,15 +762,15 @@ void Editor::OnUpdate() {
 			renderTargetText->BeginDraw();
 			renderTargetText->Clear();
 			renderTargetText->SetTransform(scrollTransform);
-			
-			for (usize i = 0; i < glyphRuns.size(); i++) {
+						
+			for (u64 i = 0; i < glyphRuns.size(); i++) {
 				const GlyphRun_DWrite& glyphRun = glyphRuns[i];
 				
-				const float offsetY = (i * style.fontEditor.lineHeight);
+				const f32 offsetY = (i * style.fontEditor.lineHeight);
 
 				glyphRun.Draw(renderTargetText, 0.0f, offsetY, style.fontEditor, alphaMaskBrush);
 			}
-
+			
 			if (HRESULT hr = renderTargetText->EndDraw(); hr != S_OK) {
 				LogError("EndDraw() failed for renderTargetText. HRESULT: %", FHr(hr));
 				return;
