@@ -238,10 +238,10 @@ static float GetLineNumberWidth() {
 
 static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition& position) {
 	ASSERT(position.line < self->glyphRuns.size());
-	const GlyphRun& run = self->glyphRuns[position.line];
+	const GlyphRun_DWrite& run = self->glyphRuns[position.line];
 
 	return D2D_POINT_2F {
-		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.GetGlyphOffset(position.column),
+		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.column),
 		.y = self->area.top  - self->scrollarea.vpY + (position.line * style.fontEditor.lineHeight) };
 }
 
@@ -299,7 +299,7 @@ static void OnClickEditor(void* ud, u64 uarg, s64 sarg) {
 	
 }
 
-static void IterateTextRange(const Editor* self, TextPosition from, TextPosition to, void* userdata, void (*funcAction) (void* userdata, f32 y, f32 from, f32 to)) {
+static void IterateGlyphRange(const Editor* self, TextPosition from, TextPosition to, ID2D1SolidColorBrush* brush, void (*funcAction) (f32 y, f32 from, f32 to, ID2D1SolidColorBrush* brush)) {
 
 	const f32 x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth();
 	const f32 y = self->area.top  - self->scrollarea.vpY;
@@ -308,91 +308,66 @@ static void IterateTextRange(const Editor* self, TextPosition from, TextPosition
 	if (from.line == to.line) {
 
 		const u64 line = std::clamp<u64>(from.line, 0u, self->glyphRuns.size() - 1);
-		const GlyphRun &glyphRun = self->glyphRuns[line];
+		const GlyphRun_DWrite &glyphRun = self->glyphRuns[line];
 		
 		float offsetFrom, offsetTo;
-		glyphRun.GetGlyphOffsetRange(from.column, to.column, &offsetFrom, &offsetTo);
+		glyphRun.MeasureOffsetRange(from.column, to.column, &offsetFrom, &offsetTo);
 		
 		const float offsetY = y + (style.fontEditor.lineHeight * line);
 		
-		funcAction(userdata, offsetY, x + offsetFrom, x + offsetTo);
+		funcAction(offsetY, x + offsetFrom, x + offsetTo, brush);
 				
 	// multi-line
 	} else {
 		
 		// handle first affected line
 		{
-			const GlyphRun &glyphRun = self->glyphRuns[from.line];
+			const GlyphRun_DWrite& glyphRun = self->glyphRuns[from.line];
 
-			const float offsetFrom = x + glyphRun.GetGlyphOffset(from.column);
-			const float offsetTo   = x + std::max(glyphRun.GetTotalAdvance(), 2.0f);
+			const float offsetFrom = x + glyphRun.MeasureOffset(from.column);
+			const float offsetTo   = x + std::max(glyphRun.width, 2.0f);
 			const float offsetY    = y + (style.fontEditor.lineHeight * from.line);
 
-			funcAction(userdata, offsetY, offsetFrom, offsetTo);
+			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
 
 		// handle all lines in between
 		for (u64 i = from.line + 1u; i < to.line; i++) {
 				
-			const GlyphRun &run = self->glyphRuns[i];
+			const GlyphRun_DWrite& run = self->glyphRuns[i];
 			
 			const float offsetFrom = x + 0.0f;
-			const float offsetTo   = x + std::max(run.GetTotalAdvance(), 2.0f);
+			const float offsetTo   = x + std::max(run.width, 2.0f);
 			const float offsetY    = y + (style.fontEditor.lineHeight * i);
 			
-			funcAction(userdata, offsetY, offsetFrom, offsetTo);
+			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
 
 		// handle last line
 		{
-			const GlyphRun &glyphRun = self->glyphRuns[to.line];
+			const GlyphRun_DWrite& glyphRun = self->glyphRuns[to.line];
 
 			const float offsetFrom = x + 0.f;
-			const float offsetTo   = x + std::max(glyphRun.GetGlyphOffset(to.column), 2.0f);
+			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.column), 2.0f);
 			const float offsetY    = y + (style.fontEditor.lineHeight * to.line);
 
-			funcAction(userdata, offsetY, offsetFrom, offsetTo);
+			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
 	}
 }
 
-struct HighlightTextRangeData {
-	ID2D1DeviceContext* deviceContext = nullptr;
-	ID2D1SolidColorBrush* brush = nullptr;
-};
-
-static void HighlightTextRange(void* ud, f32 offsetY, f32 offsetFrom, f32 offsetTo) {
-	auto data = static_cast<HighlightTextRangeData*>(ud);
-		
-	data->deviceContext->FillRoundedRectangle(
+static void HighlightTextRange(f32 y, f32 from, f32 to, ID2D1SolidColorBrush* brush) {
+	deviceContext->FillRoundedRectangle(
 		D2D1_ROUNDED_RECT {
 			.rect = D2D_RECT_F {
-				.left   = offsetFrom,
-				.top    = offsetY,
-				.right  = offsetTo,
-				.bottom = offsetY + style.fontEditor.lineHeight },
+				.left   = from,
+				.top    = y,
+				.right  = to,
+				.bottom = y + style.fontEditor.lineHeight },
 			.radiusX = 2.f,
 			.radiusY = 2.f },
-		data->brush);
-}
-
-// static void HighlightTextRange(const Editor* self, HighlightTextRangeData data, TextPosition from, TextPosition to) {
-	
-// 	IterateTextRange(self, from, to, &data, [] (void* ud, f32 offsetY, f32 offsetFrom, f32 offsetTo) {
-// 		auto data = static_cast<HighlightTextRangeData*>(ud);
-			
-// 		data->deviceContext->FillRoundedRectangle(
-// 			D2D1_ROUNDED_RECT {
-// 				.rect = D2D_RECT_F {
-// 					.left   = offsetFrom,
-// 					.top    = offsetY,
-// 					.right  = offsetTo,
-// 					.bottom = offsetY + style.fontEditor.lineHeight },
-// 				.radiusX = 2.f,
-// 				.radiusY = 2.f },
-// 			data->brush);
-// 	});
-// }
+		brush);
+};
 
 static void DrawScrollbarMarker(Editor* self, ID2D1DeviceContext* deviceContext, u64 line, f32 stroke, ID2D1SolidColorBrush* brush, /*out*/ f32* posY) {
 	
@@ -544,10 +519,10 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		for (s64 i = sFrom; i <= sTo; i++) {
 			if (i < 0 || i >= static_cast<s64>(self->glyphRuns.size())) continue;
 			
-			self->glyphRuns[i].Draw(deviceContext,
-				D2D1_POINT_2F {
-					.x = position.x + PADDING,
-					.y = contextStartY + (style.fontEditor.lineHeight * (i - sFrom))},
+			self->glyphRuns[i].Draw(
+				deviceContext,
+				position.x + PADDING,
+				contextStartY + (style.fontEditor.lineHeight * (i - sFrom)),
 				style.fontEditor,
 				style.GetBrushEditorText());
 		}
@@ -555,10 +530,10 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		// draw underline in context
 		if (record->from.line == record->to.line) {
 			
-			const GlyphRun &glyphRun = self->glyphRuns[record->from.line];
+			const GlyphRun_DWrite& glyphRun = self->glyphRuns[record->from.line];
 			
 			float offsetFrom, offsetTo;
-			glyphRun.GetGlyphOffsetRange(record->from.column, record->to.column, &offsetFrom, &offsetTo);
+			glyphRun.MeasureOffsetRange(record->from.column, record->to.column, &offsetFrom, &offsetTo);
 						
 			deviceContext->DrawLine(
 				D2D1_POINT_2F {
@@ -583,8 +558,8 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 		0ull,
 		self->textController.buffer.GetMaxLine());
 
-	const GlyphRun& run = self->glyphRuns[line];
-	const u64 column = run.Hittest(absoluteX);
+	const GlyphRun_DWrite& run = self->glyphRuns[line];
+	const u64 column = run.HitTest(absoluteX);
 	
 	return TextPosition {
 		.line = line,
@@ -594,59 +569,11 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void Editor::OnUpdate() {
 
-	const TextBuffer& buffer = GetBuffer();
-
-MeasureTime("Shaping - Harfbuzz", {	
-	std::vector<GlyphRun_Harfbuzz> gylphRuns {buffer.LineCount()};
-	for (u64 i = 0; i < buffer.LineCount(); i++) {
-		
-		const TextBuffer::Line& line = buffer.lines[i];
-		GlyphRun_Harfbuzz& run_harfbuzz = gylphRuns[i];
-
-		run_harfbuzz.Shape(line.GetText(), style.fontEditor);
-		//run2.Draw(deviceContext, area.left, area.top + (i * style.fontEditor.lineHeight), style.fontEditor, style.GetBrushEditorText());
-	}
-})
-
-MeasureTime("Shaping - DirectWrite - signle", {
-	std::vector<GlyphRun_DWrite> gylphRuns {buffer.LineCount()};
-	for (u64 i = 0; i < buffer.LineCount(); i++) {
-		
-		const TextBuffer::Line& line = buffer.lines[i];
-		GlyphRun_DWrite& run_dw = gylphRuns[i];
-
-		run_dw.Shape(line.GetText(), style.fontEditor);
-		//run_dw.Draw(deviceContext, area.left, area.top + (i * style.fontEditor.lineHeight), style.fontEditor, style.GetBrushEditorText());
-	}
-})
-
-MeasureTime("Shaping - DirectWrite - batch", {
-	
-	std::vector<std::string_view> lines {buffer.LineCount()};
-	for (u64 i = 0; i < buffer.LineCount(); i++)
-		lines.push_back(buffer.lines[i].GetText());
-	
-	std::vector<GlyphRun_DWrite> gylphRuns {};
-	GlyphRun_DWrite::ShapeBatch(lines, style.fontEditor, &gylphRuns);
-})
-
-LogDev("------------");
-
 	//
 	// reshape glyphs
 	//
 	{
-		const TextBuffer& buffer = GetBuffer();
-		
-		glyphRuns.resize(buffer.LineCount());
-		for (u64 i = 0; i < buffer.LineCount(); i++) {
-			
-			const TextBuffer::Line& line = buffer.lines[i];
-			GlyphRun& run = glyphRuns[i];
-
-			run.Shape(line.GetText(), style.fontEditor, &glyphRunShapingMemory);
-		}
-		return;
+		GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
 
 		scrollarea.totalSize.height = glyphRuns.size() * style.fontEditor.lineHeight;
 		
@@ -796,11 +723,11 @@ LogDev("------------");
 			renderTargetText->SetTransform(scrollTransform);
 			
 			for (usize i = 0; i < glyphRuns.size(); i++) {
-				const GlyphRun& glyphRun = glyphRuns[i];
+				const GlyphRun_DWrite& glyphRun = glyphRuns[i];
 				
 				const float offsetY = (i * style.fontEditor.lineHeight);
 
-				glyphRun.Draw(renderTargetText, {0.0f, offsetY}, style.fontEditor, alphaMaskBrush);
+				glyphRun.Draw(renderTargetText, 0.0f, offsetY, style.fontEditor, alphaMaskBrush);
 			}
 
 			if (HRESULT hr = renderTargetText->EndDraw(); hr != S_OK) {
@@ -870,8 +797,7 @@ LogDev("------------");
 			if (TextPosition selFrom, selTo; caret.GetSelection(&selFrom, &selTo)) {
 				ID2D1SolidColorBrush* brush = style.GetBrushSelection();
 				
-				HighlightTextRangeData highlightData {deviceContext, brush};
-				IterateTextRange(this, selFrom, selTo, &highlightData, HighlightTextRange);
+				IterateGlyphRange(this, selFrom, selTo, brush, HighlightTextRange);
 			}
 			
 			// draw caret
@@ -928,13 +854,13 @@ LogDev("------------");
 	
 			for (const EditorSearch::SearchResult& result : search->threadData->results) {
 				
-				const GlyphRun& run = glyphRuns[result.from.line];
+				const GlyphRun_DWrite& run = glyphRuns[result.from.line];
 				
 				deviceContext->DrawRectangle(
 					D2D1_RECT_F {
-						.left   = offsetX + run.GetGlyphOffset(result.from.column),
+						.left   = offsetX + run.MeasureOffset(result.from.column),
 						.top    = offsetY + result.from.line * style.fontEditor.lineHeight,
-						.right  = offsetX + run.GetGlyphOffset(result.to.column),
+						.right  = offsetX + run.MeasureOffset(result.to.column),
 						.bottom = offsetY + (result.from.line + 1) * style.fontEditor.lineHeight },
 					style.GetBrushEditorText());
 			}
@@ -950,9 +876,8 @@ LogDev("------------");
 		DEFER(insertAnimBrush->SetOpacity(1.0f));
 		
 		
-		HighlightTextRangeData highlightData {deviceContext, insertAnimBrush};
 		for (const InsertAnimationData& insertData : insertAnimationData)
-			IterateTextRange(this, insertData.from, insertData.to, &highlightData, HighlightTextRange);
+			IterateGlyphRange(this, insertData.from, insertData.to, insertAnimBrush, HighlightTextRange);
 		
 		insertAnimationOpacity -= deltaTime * INSERT_ANIMATION_SPEED;
 		if (insertAnimationOpacity < .0f) {
@@ -994,18 +919,15 @@ LogDev("------------");
 			
 			// draw underlines
 
-			HighlightTextRangeData data {deviceContext, severityBrush};
-			IterateTextRange(this, record.from, record.to, &data, [] (void* ud, f32 offsetY, f32 offsetFrom, f32 offsetTo) {
-				auto data = static_cast<HighlightTextRangeData*>(ud);
-				
-				data->deviceContext->DrawLine(
+			IterateGlyphRange(this, record.from, record.to, severityBrush, [] (f32 offsetY, f32 offsetFrom, f32 offsetTo, ID2D1SolidColorBrush* brush) {
+				deviceContext->DrawLine(
 					D2D_POINT_2F {
 						.x = offsetFrom,
-						.y = offsetY + style.fontEditor.underlineOffset },
+						.y = offsetY + style.fontEditor.underlineOffset},
 					D2D_POINT_2F { 
 						.x = offsetTo,
-						.y = offsetY + style.fontEditor.underlineOffset },
-					data->brush,
+						.y = offsetY + style.fontEditor.underlineOffset},
+					brush,
 					2.0f,
 					nullptr);
 			});

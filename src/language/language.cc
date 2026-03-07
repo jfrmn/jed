@@ -8,6 +8,7 @@
 #include "editor/editor-textlocationlist.hh"
 
 #include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "text/text-buffer.hh"
 #include "ui/style.hh"
 
@@ -144,7 +145,7 @@ void Language::HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, 
 		for (u64 ln = fromLine; ln <= toLine; ln++) {
 			
 			const TextBuffer::Line& line = editor->textController.buffer.GetLineAt(ln);
-			const GlyphRun& run = editor->glyphRuns[ln];
+			const GlyphRun_DWrite& run = editor->glyphRuns[ln];
 
 			BasicParser::Tokenize(line.GetText(), &tokens);
 			BasicParser::MatchRules(tokens, syntaxHighlighting.builtinParserRules, &matches);
@@ -152,7 +153,7 @@ void Language::HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, 
 			for (const BasicParser::Match& match : matches) {
 
 				float fromOffset = .0f, toOffset = .0f;
-				run.GetGlyphOffsetRange(match.startColumn, match.endColumn, &fromOffset, &toOffset);
+				run.MeasureOffsetRange(match.startColumn, match.endColumn, &fromOffset, &toOffset);
 
 				brush->SetColor(GetColorForLabel(match.label));
 

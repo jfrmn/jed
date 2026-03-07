@@ -2,6 +2,9 @@
 #include "font.hh"
 #include "factories.hh"
 #include "util/logging.hh"
+#include "text/text-buffer.hh"
+
+#include <atomic>
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -145,6 +148,10 @@ struct ShapingBuffer {
 };
 
 static ShapingBuffer staticShapingBuffer {};
+
+bool InitStaticShapingBuffer() {
+	return staticShapingBuffer.Init(128);
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct TextAnalysisSink : public IDWriteTextAnalysisSink {
@@ -398,13 +405,15 @@ static void ReallocateGlyphs(GlyphRun_DWrite* self, u32 newCapacity) {
 static void ClearGlyphs(GlyphRun_DWrite* self) {
 	const u64 size = CalculateGlyphArraySize(self->glyphCapacity);
 	memset(self->glyphAdvances.get(), 0, size * sizeof(f32));
+	self->glyphCount = 0u;
+	self->width = 0.0f;
 }
 
 // @IMPROVE would be better to reuse old memory but we need to store the 
 // capacity somewhere. One thing we could do is make the char mapping
 // "U32_MAX-terminated" and store the length this way.
 static void PrepareMapping(GlyphRun_DWrite* self, u32 count) {
-	if (self->charCount== count) {
+	if (self->charCount == count) {
 		memset(self->charMapping.get(), 0, count * sizeof(*self->charMapping.get()));
 	} else {
 		self->charMapping.reset(new u32[count]);
@@ -441,7 +450,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 		
 		u32 numGlyphsInChunk = 0u;
 		while (true) {
-			const u32 currentCapacity = std::min(shapingBuffer->shapingGlyphDataCapacity, self->glyphCapacity - self->glyphCount);
+			const u32 effectiveCapacity = std::min(shapingBuffer->shapingGlyphDataCapacity, self->glyphCapacity - self->glyphCount);
 			
 			HRESULT hr = shapingBuffer->textAnalyzer->GetGlyphs(
   				/* textString */          shapingBuffer->stringData.get() + scriptAnalysisRecord.position,
@@ -455,7 +464,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
   				/* features */            nullptr,
   				/* featureRangeLengths */ nullptr,
   				/* featureRanges */       0,
-  				/* maxGlyphCount */       static_cast<u32>(currentCapacity),
+  				/* maxGlyphCount */       effectiveCapacity,
   				/* clusterMap */          shapingBuffer->clusterMap.get(),
   				/* textProps */           shapingBuffer->textProperties.get(),
   				/* glyphIndices */        self->glyphIndicies + self->glyphCount,
@@ -466,15 +475,18 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 		  		break;
 	  			
 	  		} else if (hr == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER)) {
-				const u32 newCapacity = static_cast<u32>(currentCapacity * 1.5f);
+				
+				const u64 newCapacity = static_cast<u64>(
+					std::min(shapingBuffer->shapingGlyphDataCapacity, self->glyphCapacity) * 1.5f) + 1u;
+				
 				if (newCapacity > U32_MAX) {
 					LogFatal("GetGlyphs() failed: exceeding maximum capacity. Aborting...");
 					return false;
 				}
 				
-				//LogDetail("Shaping buffer too small. Retrying with %", newCapacity);
-				ReallocateGlyphs(self, newCapacity);
-				shapingBuffer->ReallocateShapingGlyphData(newCapacity);
+				LogDetail("Shaping buffer too small. Retrying with %", newCapacity);
+				ReallocateGlyphs(self, static_cast<u32>(newCapacity));
+				shapingBuffer->ReallocateShapingGlyphData(static_cast<u32>(newCapacity));
 				continue; // try again
 	  		
 	  		} else {
@@ -572,14 +584,22 @@ bool GlyphRun_DWrite::Shape(std::string_view text, const Font& font) {
 }
 
 struct ShapeBatchThreadData {
-	const std::string_view* lines = nullptr;
+	std::atomic_uint64_t currentLine = 0u;
 	u64 lineCount = 0u;
+	
+	const void* lineSource = nullptr;
+	std::string_view (*funcGetLine)(const void*, u64);
+	
 	GlyphRun_DWrite* output = nullptr;
 	const Font* font = nullptr;
+	
+	std::string_view GetLine(u64 l) const {
+		return funcGetLine(lineSource, l);
+	}
 };
 
 static DWORD ShapeBatchThreadProc(LPVOID param) {
-	ShapeBatchThreadData* threadData = static_cast<ShapeBatchThreadData*>(param);
+	auto threadData = static_cast<ShapeBatchThreadData*>(param);
 	
 	ShapingBuffer shapingBuffer {};
 	if (!shapingBuffer.Init(128u)) {
@@ -588,64 +608,45 @@ static DWORD ShapeBatchThreadProc(LPVOID param) {
 	}
 	
 	bool allOk = true;
-	for (u64 i = 0; i < threadData->lineCount; i++)
-		allOk &= ShapeInternal(threadData->output + i, threadData->lines[i], *threadData->font, &shapingBuffer, nullptr);
+	while (true) {
+		const u64 line = threadData->currentLine.fetch_add(1, std::memory_order_relaxed);
+		if (line >= threadData->lineCount) break;
+		
+		allOk &= ShapeInternal(&threadData->output[line], threadData->GetLine(line), *threadData->font, &shapingBuffer, nullptr);
+	}
 	
 	return (allOk ? TRUE : FALSE);
 }
 
-bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGetLine)(const void*, u64), u64 totalLineCount, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
 	
 	SYSTEM_INFO systemInfo;
 	GetSystemInfo(&systemInfo);
 	
-	if (batch.size() >= systemInfo.dwNumberOfProcessors) {
+	if (totalLineCount >= systemInfo.dwNumberOfProcessors) {
+	//if (false) {
 		ASSERT(systemInfo.dwNumberOfProcessors > 0);
 		
-		const u32 threadCount = 7u;//std::max<u32>(systemInfo.dwNumberOfProcessors - 1u, 2u);
-		const u64 linesPerThread = static_cast<u64>(batch.size() / threadCount);
+		const u32 threadCount = systemInfo.dwNumberOfProcessors;
 		
-		auto threadData = new ShapeBatchThreadData[threadCount];
 		auto handles = new HANDLE[threadCount];
 		DEFER({
-			for (u64 i = 0; i < threadCount; i++) CloseHandle(handles[i]);
-			delete[] handles;
-			delete[] threadData; });
-		
-		runs->resize(batch.size());
-		
-		const std::string_view* lineIter = batch.data();
-		GlyphRun_DWrite* runIter = runs->data();
-		
-		for (u64 i = 0; i < threadCount - 1; i++) {
-			threadData[i] = ShapeBatchThreadData {
-				.lines = lineIter,
-				.lineCount = linesPerThread,
-				.output = runIter,
-				.font = &font};
-			handles[i] = CreateThread(nullptr, systemInfo.dwPageSize, ShapeBatchThreadProc, &threadData[i], STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
-			
-			if (handles[i] == NULL)
-				LogWarning("ShapeBatch() failed to start thread #%. Last Error: %", i, FLastErr(GetLastError()));
-		
-			lineIter += linesPerThread;		
-			runIter  += linesPerThread;		
-		}
-		
-		threadData[threadCount-1] = ShapeBatchThreadData {
-			.lines = lineIter,
-			.lineCount = static_cast<u64>(batch.data() + batch.size() - lineIter),
-			.output = runIter,
-			.font = &font};
-		handles[threadCount-1] = CreateThread(nullptr, systemInfo.dwPageSize, ShapeBatchThreadProc, &threadData[threadCount-1], STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
-		
-		// sanity check
-		{
-			u64 totalLines = 0;
 			for (u64 i = 0; i < threadCount; i++)
-				totalLines += threadData[i].lineCount;
-			ASSERT(totalLines == batch.size());
-		}
+				CloseHandle(handles[i]);
+			delete[] handles; });
+			
+		runs->resize(totalLineCount);
+		
+		ShapeBatchThreadData threadData {
+			.currentLine = 0u,
+			.lineCount = totalLineCount,
+			.lineSource = lineSource,
+			.funcGetLine = funcGetLine,
+			.output = runs->data(),
+			.font = &font};
+			
+		for (u64 i = 0; i < threadCount; i++)
+			handles[i] = CreateThread(nullptr, 0, ShapeBatchThreadProc, &threadData, 0, nullptr);
 		
 		DWORD result = WaitForMultipleObjects(threadCount, handles, TRUE, INFINITE);
 		if (result != WAIT_OBJECT_0) {
@@ -654,12 +655,32 @@ bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const 
 		}
 		
 	} else {
-		runs->resize(batch.size());
-		for (u64 i = 0u; i < batch.size(); i++)
-			runs->at(i).Shape(batch[i], font);
+		runs->resize(totalLineCount);
+		for (u64 i = 0u; i < totalLineCount; i++) {
+			const std::string_view line = funcGetLine(lineSource, i);
+			runs->at(i).Shape(line, font);
+		}
 	}
 	
-	return true;
+	return true;	
+}
+
+bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+	return ShapeBatchInternal(
+		batch.data(),
+		[] (const void* ls, u64 ln) { return static_cast<const std::string_view*>(ls)[ln]; },
+		batch.size(),
+		font,
+		runs);
+}
+
+bool GlyphRun_DWrite::ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+	return ShapeBatchInternal(
+		&textBuffer,
+		[] (const void* ls, u64 ln) { return static_cast<const TextBuffer*>(ls)->GetLineAt(ln).GetText(); },
+		textBuffer.LineCount(),
+		font,
+		runs);
 }
 
 //#################################################################################################
@@ -692,10 +713,10 @@ void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const 
 }
 
 void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush) const {
+	if (glyphCount == 0u) return;
+	
 	ASSERT(startChar <  glyphCount);
 	ASSERT(startChar <= U32_MAX);
-	
-	if (glyphCount == 0u) return;
 	
 	const u32 startGlyphIndex = charMapping[startChar];
 	
@@ -744,8 +765,13 @@ u64 GlyphRun_DWrite::HitTest(f32 offset) const {
 }
 
 f32 GlyphRun_DWrite::MeasureOffset(u64 pos) const {
-	ASSERT(pos < charCount);
-	const u32 glyphIndex = charMapping[pos];
+	ASSERT(pos <= charCount);
+	
+	if (charCount == 0) return 0.0f;
+	
+	const u32 glyphIndex = pos < charCount
+		? charMapping[pos]
+		: glyphCount;
 	
 	f32 totalAdv = 0.0f;
 	for (u32 i = 0; i < glyphIndex; i++)
@@ -755,11 +781,17 @@ f32 GlyphRun_DWrite::MeasureOffset(u64 pos) const {
 }
 
 void GlyphRun_DWrite::MeasureOffsetRange(u64 startChar, u64 endChar, /*out*/ f32* offStart, /*out*/ f32* offEnd) const {
-	ASSERT(startChar <  charCount);
 	ASSERT(startChar <= endChar);
+	
+	if (charCount == 0) {
+		*offStart = *offEnd = 0.0f;
+		return;
+	}
 
-	const u32 startGlyphIndex = charMapping[startChar];
-	const u32   endGlyphIndex = (endChar < charCount)
+	const u32 startGlyphIndex = (startChar < charCount)
+		? charMapping[startChar]
+		: glyphCount;
+	const u32 endGlyphIndex = (endChar < charCount)
 		? charMapping[endChar]
 		: glyphCount;
 	
@@ -789,9 +821,3 @@ void GlyphRunMultiline_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 
 	
 	glyphRun.DrawPartial(renderTarget, x, y, start, U64_MAX, font, brush);
 }
-
-
-
-
-
-

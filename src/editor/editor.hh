@@ -2,6 +2,7 @@
 #include "basic.hh"
 
 #include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
 
@@ -64,7 +65,7 @@ struct  Editor {
 	Language* language = nullptr;
 
 	GlyphRunShapingMemory glyphRunShapingMemory = {};
-	std::vector<GlyphRun> glyphRuns = {};
+	std::vector<GlyphRun_DWrite> glyphRuns = {};
 
 	f32 scrollTargetPosition = .0f;
 	f32 scrollSpeed          = .0f;

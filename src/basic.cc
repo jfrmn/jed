@@ -8,5 +8,5 @@ void _PrintAssertMessage(const char* expression, const char* file, int line, con
 }
 
 constexpr bool XOR(bool a, bool b) {
-	return ((a && !b) || (!a && b));
+	return (!a) != (!b);
 }

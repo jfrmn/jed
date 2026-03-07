@@ -6,6 +6,7 @@
 #include <span>
 #include <vector>
 
+struct TextBuffer;
 struct Font;
 struct ID2D1RenderTarget;
 struct ID2D1SolidColorBrush;
@@ -30,6 +31,7 @@ struct GlyphRun_DWrite {
 	//------------------------------------------	
 
 	static bool ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs);
+	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs);
 		
 	bool Shape(std::string_view text, const Font& font);
 	
