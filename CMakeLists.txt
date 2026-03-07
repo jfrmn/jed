@@ -35,14 +35,6 @@ add_subdirectory("deps/cJSON")
 target_link_libraries(slick-edit cjson)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-set (HB_HAVE_DIRECTWRITE ON)
-add_subdirectory("deps/harfbuzz")
-target_link_libraries(slick-edit harfbuzz)
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 target_link_libraries(slick-edit
     d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
 

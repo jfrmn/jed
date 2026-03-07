@@ -9,7 +9,6 @@
 #include "commands/tools.hh"
 #include "json/json-basic.hh"
 
-#include "graphics/glyph-run-harfbuzz.hh" // @DUMMY
 #include "graphics/glyph-run-dwrite.hh" // @DUMMY
 
 #include "ui/style.hh"
@@ -62,11 +61,6 @@ int main(int argc, char** argv) {
 	
 	if (!InitFactories()) {
 		LogFatal("init directx factories failed");
-		return -1;
-	}
-	
-	if (!GlyphRun_Harfbuzz::InitHarfbuzz()) {
-		LogFatal("init harfbuzz failed");
 		return -1;
 	}
 	

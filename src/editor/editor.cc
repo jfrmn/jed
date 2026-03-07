@@ -14,7 +14,6 @@
 #include "util/rect-util.hh"
 
 // @DUMMY
-#include "graphics/glyph-run-harfbuzz.hh"
 #include "graphics/glyph-run-dwrite.hh" 
 
 #include "editor/editor-caretattached.hh"
