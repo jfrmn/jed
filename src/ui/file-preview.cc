@@ -159,14 +159,13 @@ bool FilePreview::Load(const LoadArgs& args) {
 		lines.clear();
 		width = 0.0f;
 		
-		GlyphRunShapingMemory mem;
 		for (u64 i = from; i <= to; i++) {
 			GlyphRun& run = lines.emplace_back();
 			const TextBuffer::Line& line = textBuffer.GetLineAt(i);
 			
-			run.Shape(line.GetText(), style.fontEditor, &mem);
+			run.Shape(line.GetText(), style.fontEditor);
 			
-			const f32 runWidth = run.GetTotalAdvance() + PADDING_X2;
+			const f32 runWidth = run.width + PADDING_X2;
 			if (width < runWidth)
 				width = runWidth;
 		}
@@ -221,7 +220,7 @@ void FilePreview::OnUpdate() {
 	
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
-		run.Draw(deviceContext, {x + PADDING, y + (i * style.fontEditor.lineHeight) + PADDING}, style.fontEditor, style.GetBrushEditorText());
+		run.Draw(deviceContext, x + PADDING, y + (i * style.fontEditor.lineHeight) + PADDING, style.fontEditor, style.GetBrushEditorText());
 	}
 	
 	deviceContext->PopAxisAlignedClip();

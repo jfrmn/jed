@@ -8,7 +8,6 @@
 #include "util/rect-util.hh"
 #include "graphics/effects.hh"
 
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool ParameterConfigurator::Item::HasTextBox() const {
 	return parameter->type == Parameter::Type_String || parameter->type == Parameter::Type_Number;
@@ -94,9 +93,7 @@ void ParameterConfigurator::OnUpdate() {
 		BlurArea(deviceContext, area, background);
 		PopLayer(deviceContext);
 	}
-	
-	GlyphRunShapingMemory mem {};
-		
+			
 	//
 	// draw run and cancel buttons
 	//
@@ -117,7 +114,6 @@ void ParameterConfigurator::OnUpdate() {
 		const bool isButtonSelected[2] {isCancelButtonSelected, !isCancelButtonSelected};
 		const bool isEnabled[2] {true, CheckParameters(this)};
 		
-		GlyphRun run {};	
 		for (int i = 0; i < 2; i++) {
 			
 			if (selectedItem == itemCount && isButtonSelected[i]) {
@@ -127,12 +123,10 @@ void ParameterConfigurator::OnUpdate() {
 				deviceContext->FillRectangle(areaButton[i], style.GetBrushUiBackground(false));
 			}
 			
-			run.Shape(text[i], style.fontUi, &mem);
-			run.Draw(
-				deviceContext,
-				D2D_POINT_2F {
-					.x = areaButton[i].left + (RectWidth(areaButton[i]) / 2.0f) - (run.GetTotalAdvance() / 2.0f),
-					.y = areaButton[i].top + PADDING},
+			staticGlyphRun.Shape(text[i], style.fontUi);
+			staticGlyphRun.Draw(deviceContext,
+				areaButton[i].left + (RectWidth(areaButton[i]) / 2.0f) - (staticGlyphRun.width / 2.0f),
+				areaButton[i].top + PADDING,
 				style.fontUi,
 				style.GetBrushUiText(isEnabled[i]));
 		}
@@ -153,8 +147,8 @@ void ParameterConfigurator::OnUpdate() {
 			.right  = area.right,
 			.bottom = area.top + ((i+1) * itemHeight)};
 		
-		run.Shape(item.parameter->name, style.fontUi, &mem);
-		run.Draw(deviceContext, {itemArea.left + MARGIN, itemArea.top + PADDING_X2}, style.fontUi, style.GetBrushUiText());
+		run.Shape(item.parameter->name, style.fontUi);
+		run.Draw(deviceContext, itemArea.left + MARGIN, itemArea.top + PADDING_X2, style.fontUi, style.GetBrushUiText());
 		
 		const bool isSelected = (i == selectedItem);
 		
@@ -225,8 +219,7 @@ void ParameterConfigurator::OnUpdate() {
 			ASSERT(item.selectedEnumIndex < item.parameter->enumValues.size());
 			const std::string& currentValue = item.parameter->enumValues[item.selectedEnumIndex].name;
 			
-			GlyphRun runCurrentValue {};
-			runCurrentValue.Shape(currentValue, style.fontUi, &mem);
+			staticGlyphRun.Shape(currentValue, style.fontUi);
 			
 			const f32 x = itemArea.left + (RectWidth(area) / 2.0f);
 			const f32 y = itemArea.top;
@@ -239,7 +232,7 @@ void ParameterConfigurator::OnUpdate() {
 					.bottom = itemArea.bottom - PADDING},
 				style.GetBrushUiBackground(isSelected));
 				
-			runCurrentValue.Draw(deviceContext, {x + PADDING_X2, y + PADDING_X2}, style.fontUi, style.GetBrushUiText());
+			staticGlyphRun.Draw(deviceContext, x + PADDING_X2, y + PADDING_X2, style.fontUi, style.GetBrushUiText());
 			
 			if (isSelected && isDropDownOpen) {
 				const D2D_RECT_F dropdownArea {
@@ -260,8 +253,8 @@ void ParameterConfigurator::OnUpdate() {
 					if (j == item.selectedEnumIndex)
 						deviceContext->FillRectangle(dropDownItemArea, style.GetBrushSelection());
 					
-					runValue.Shape(item.parameter->enumValues[j].name, style.fontUi, &mem);
-					runValue.Draw(deviceContext, {dropDownItemArea.left + PADDING, dropDownItemArea.top}, style.fontUi, style.GetBrushUiText());
+					staticGlyphRun.Shape(item.parameter->enumValues[j].name, style.fontUi);
+					staticGlyphRun.Draw(deviceContext, dropDownItemArea.left + PADDING, dropDownItemArea.top, style.fontUi, style.GetBrushUiText());
 				}
 			}
 		}

@@ -12,14 +12,7 @@
 bool TextBox::Init(Font* fontToUse, std::string_view placeholderText /*= {}*/, std::string initalText /*= {}*/) {
 
 	this->font = fontToUse;
-
-	if (!placeholderText.empty()) {
-
-		if (!glyphRunPlaceholder.Shape(placeholderText, *fontToUse)) {
-			LogError("shaping placeholder glyph run failed");
-			return false;
-		}
-	}
+	this->placeholderText = placeholderText;
 
 	if (!textController.InitForTextbox(std::move(initalText))) {
 		LogError("init text-controller failed");
@@ -79,19 +72,18 @@ void TextBox::OnUpdate() {
 	// draw text or placeholder
 	//
 	if (const std::string_view text = GetText(); !text.empty()) {
-		glyphRun.Shape(text, *font);
-		glyphRun.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = position.x + PADDING,
-				.y = position.y + PADDING },
+		glyphRun.ShapeAndDraw(deviceContext,
+			text,
+			position.x + PADDING,
+			position.y + PADDING,
 			*font,
 			style.GetBrushUiText());
 	
 	} else {
-		glyphRunPlaceholder.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = position.x + PADDING,
-				.y = position.y + PADDING },
+		staticGlyphRun.ShapeAndDraw(deviceContext,
+			placeholderText,
+			position.x + PADDING,
+			position.y + PADDING,
 			*font,
 			style.GetBrushUiText(false));
 	}
@@ -100,7 +92,7 @@ void TextBox::OnUpdate() {
 	if (!inactive) {
 
 		ASSERT(textController.carets.front().position.line == 0);
-		const float offsetCursor = glyphRun.GetGlyphOffset(textController.carets.front().position.column);
+		const float offsetCursor = glyphRun.MeasureOffset(textController.carets.front().position.column);
 		
 		deviceContext->FillRectangle(
 			D2D_RECT_F {
@@ -117,8 +109,8 @@ void TextBox::OnUpdate() {
 		TextPosition selectionStart, selectionEnd;
 		textController.GetSelection(&selectionStart, &selectionEnd);
 
-		float offsetStart, offsetEnd;
-		glyphRun.GetGlyphOffsetRange(selectionStart.column, selectionEnd.column, &offsetStart, &offsetEnd);
+		f32 offsetStart, offsetEnd;
+		glyphRun.MeasureOffsetRange(selectionStart.column, selectionEnd.column, &offsetStart, &offsetEnd);
 
 		deviceContext->FillRectangle(
 			D2D_RECT_F {

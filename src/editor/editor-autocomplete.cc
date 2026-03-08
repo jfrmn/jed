@@ -42,7 +42,9 @@ void EditorAutocomplete::OnUpdate() {
 	
 	const D2D1_POINT_2F position = GetPosition();
 	
-	auto glyphRuns = std::make_unique<std::pair<GlyphRun, GlyphRun>[]>(itemCount);
+	auto glyphRuns = new std::pair<GlyphRun, GlyphRun>[itemCount];
+	DEFER(delete[] glyphRuns);
+	
 	f32 width = .0f;
 	f32 height = itemCount * style.fontEditor.lineHeight;
 	{
@@ -50,10 +52,10 @@ void EditorAutocomplete::OnUpdate() {
 			GlyphRun& runLabel    = glyphRuns[i].first;
 			GlyphRun& runDetails  = glyphRuns[i].second;
 			
-			runLabel.Shape(items[i].label, style.fontEditor, &owner->glyphRunShapingMemory);
-			runDetails.Shape(items[i].details, style.fontEditor, &owner->glyphRunShapingMemory);
+			runLabel.Shape(items[i].label, style.fontEditor);
+			runDetails.Shape(items[i].details, style.fontEditor);
 			
-			const f32 currentWidth = (PADDING_X2 + style.fontEditor.GetSpaceAdvance()) + runLabel.GetTotalAdvance() + runDetails.GetTotalAdvance() + PADDING_X3;
+			const f32 currentWidth = (PADDING_X2 + style.fontEditor.GetSpaceAdvance()) + runLabel.width + runDetails.width + PADDING_X3;
 			if (width < currentWidth)
 				width = currentWidth;
 		}
@@ -95,36 +97,35 @@ void EditorAutocomplete::OnUpdate() {
 				.right  = position.x + PADDING + style.fontEditor.lineHeight,
 				.bottom = position.y + offsety + style.fontEditor.lineHeight});		
 		
-		const D2D1_POINT_2F textPosition {
-			.x = position.x + PADDING_X2 + style.fontEditor.lineHeight,
-			.y = position.y + offsety};
+		const f32 textPosX = position.x + PADDING_X2 + style.fontEditor.lineHeight;
+		const f32 textPosY = position.y + offsety;
 		
 		// draw match result
 		if (item.matched) {
 			f32 offsetFrom, offsetTo;
-			runLabel.GetGlyphOffsetRange(
+			runLabel.MeasureOffsetRange(
 				item.matchResult.position,
 				item.matchResult.position + item.matchResult.length,
 				&offsetFrom, &offsetTo);
 			
 			deviceContext->FillRectangle(
 				D2D1_RECT_F {
-					.left   = textPosition.x + offsetFrom,
-				    .top    = textPosition.y,
-				    .right  = textPosition.x + offsetTo,
-				    .bottom = textPosition.y + style.fontUi.lineHeight},
+					.left   = textPosX + offsetFrom,
+				    .top    = textPosY,
+				    .right  = textPosX + offsetTo,
+				    .bottom = textPosY + style.fontUi.lineHeight},
 				style.GetBrushUiSearchResult());
 		}
 		
 		runLabel.Draw(deviceContext,
-			textPosition,
+			textPosX,
+			textPosY,
 			style.fontEditor,
 			style.GetBrushUiText());
 		
 		runDetails.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = textPosition.x + PADDING + runLabel.GetTotalAdvance(),
-				.y = textPosition.y},
+			textPosX + PADDING + runLabel.width,
+			textPosY,
 			style.fontEditor,
 			style.GetBrushUiText(false));
 	}

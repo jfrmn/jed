@@ -163,12 +163,11 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 		style.GetBrushUiText());
 	
 	GlyphRun run;
-	run.Shape(mainWindow.console.progressText, style.fontUi, &self->shapingMemory);
-	
-	run.Draw(deviceContext,
-		D2D_POINT_2F {
-			.x = area.left + RectWidth(area) / 2.0f - run.GetTotalAdvance() / 2.0f,
-			.y = area.top + PADDING},
+	run.Shape(mainWindow.console.progressText, style.fontUi);
+	run.DrawCenter(deviceContext,
+		area.left,
+		area.top + PADDING,
+		RectWidth(area),
 		style.fontUi,
 		style.GetBrushUiText());
 		
@@ -194,10 +193,10 @@ static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 	if (!focusedEditor) return posX;
 	
 	GlyphRun currentLanguageName {};
-	currentLanguageName.Shape(focusedEditor->language ? focusedEditor->language->name : "None", style.fontUi, &self->shapingMemory);
+	currentLanguageName.Shape(focusedEditor->language ? focusedEditor->language->name : "None", style.fontUi);
 	
 	const bool l2r = IsL2R(self, i);
-	const f32 width = currentLanguageName.GetTotalAdvance() + PADDING_X4 + style.fontUi.lineHeight;
+	const f32 width = currentLanguageName.width + PADDING_X4 + style.fontUi.lineHeight;
 	const D2D_RECT_F area = GetArea(posX, width, l2r);
 	
 	if (focusedEditor->language && focusedEditor->language->HasLanguageServer()) {
@@ -242,7 +241,7 @@ static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 				style.fontUi.lineHeight));
 	}
 	
-	currentLanguageName.Draw(deviceContext, {area.left + PADDING_X3 + style.fontUi.lineHeight, area.top + PADDING}, style.fontUi, style.GetBrushUiText());
+	currentLanguageName.Draw(deviceContext, area.left + PADDING_X3 + style.fontUi.lineHeight, area.top + PADDING, style.fontUi, style.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickLanguageSelector))
 		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
@@ -401,9 +400,9 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			const std::string_view text {buffer, result.ptr};
 			
 			GlyphRun& run = glyphRuns[i];
-			run.Shape(text, style.fontUi, &self->shapingMemory);
+			run.Shape(text, style.fontUi);
 			
-			totalWidth += run.GetTotalAdvance() + style.fontUi.lineHeight + PADDING_X3;
+			totalWidth += run.width + style.fontUi.lineHeight + PADDING_X3;
 		}
 	}
 	
@@ -435,9 +434,13 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			//localPenX += PADDING_X2 + style.fontUi.lineHeight;
 			
 			GlyphRun& run = glyphRuns[i];
-			run.Draw(deviceContext, {area.left + offsetX + style.fontUi.lineHeight + PADDING_X2, mainWindow.height - style.fontUi.lineHeight - PADDING}, style.fontUi, style.GetBrushUiText());
+			run.Draw(deviceContext,
+				area.left + offsetX + style.fontUi.lineHeight + PADDING_X2,
+				mainWindow.height - style.fontUi.lineHeight - PADDING,
+				style.fontUi,
+				style.GetBrushUiText());
 			
-			offsetX += run.GetTotalAdvance() + style.fontUi.lineHeight + PADDING_X3;
+			offsetX += run.width + style.fontUi.lineHeight + PADDING_X3;
 		}
 		
 		ASSERT(area.left + offsetX == area.right);
@@ -598,17 +601,17 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 	}
 	
 	GlyphRun run {};
-	run.Shape(caretInfoText.text, style.fontUi, &self->shapingMemory);
+	run.Shape(caretInfoText.text, style.fontUi);
 	
 	const bool l2r = IsL2R(self, i);
-	const D2D_RECT_F area = GetArea(posX, run.GetTotalAdvance() + PADDING_X2, l2r);
+	const D2D_RECT_F area = GetArea(posX, run.width + PADDING_X2, l2r);
 	const D2D_SIZE_F areaSize = RectSize(area);
 		
 	if (caretInfoText.bgColorRangeIndex < U64_MAX) {
 		const CaretInfoText::ColorArea& clrArea = caretInfoText.textColor[caretInfoText.bgColorRangeIndex];
 		
 		f32 offsetFrom, offsetTo;
-		run.GetGlyphOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
+		run.MeasureOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
 		
 		style.brush->SetColor(caretInfoText.bgColor);
 		deviceContext->FillRoundedRectangle(
@@ -631,7 +634,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		renderTarget->BeginDraw();
 		renderTarget->Clear();
 	
-		run.Draw(renderTarget, {PADDING, PADDING}, style.fontUi, alphaMaskBrush);
+		run.Draw(renderTarget, PADDING, PADDING, style.fontUi, alphaMaskBrush);
 		
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
 			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
@@ -650,7 +653,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 			const CaretInfoText::ColorArea& colorArea = caretInfoText.textColor[i];
 			
 			f32 offsetFrom, offsetTo;
-			run.GetGlyphOffsetRange(colorArea.from, colorArea.to, &offsetFrom, &offsetTo);
+			run.MeasureOffsetRange(colorArea.from, colorArea.to, &offsetFrom, &offsetTo);
 			
 			style.brush->SetColor(colorArea.color);
 			
@@ -684,12 +687,11 @@ static void OnClickEncodingSelector(void*, u64) {
 }
 
 static f32 UpdateEncodingSelector(StatusBar* self, f32 posX, u64 i) {
-	GlyphRun run {};
-	run.Shape("utf-8", style.fontUi, &self->shapingMemory);	
+	staticGlyphRun.Shape("utf-8", style.fontUi);	
 	
 	const bool l2r = IsL2R(self, i);
-	const D2D_RECT_F area = GetArea(posX, run.GetTotalAdvance() + PADDING_X2, l2r);
-	run.Draw(deviceContext, {area.left + PADDING, area.top + PADDING}, style.fontUi, style.GetBrushUiText());
+	const D2D_RECT_F area = GetArea(posX, staticGlyphRun.width + PADDING_X2, l2r);
+	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, style.fontUi, style.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickEncodingSelector)) {
 		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
@@ -705,12 +707,11 @@ static void OnClickLineEndingSelector(void*) {
 }
 
 static f32 UpdateLineEndingSelector(StatusBar* self, f32 posX, u64 i) {
-	GlyphRun run {};
-	run.Shape("Cr-Lf", style.fontUi, &self->shapingMemory);	
+	staticGlyphRun.Shape("Cr-Lf", style.fontUi);	
 	
 	const bool l2r = IsL2R(self, i);
-	const D2D_RECT_F area = GetArea(posX, run.GetTotalAdvance() + PADDING_X2, l2r);
-	run.Draw(deviceContext, {area.left + PADDING, area.top + PADDING}, style.fontUi, style.GetBrushUiText());
+	const D2D_RECT_F area = GetArea(posX, staticGlyphRun.width + PADDING_X2, l2r);
+	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, style.fontUi, style.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickEncodingSelector)) {
 		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));

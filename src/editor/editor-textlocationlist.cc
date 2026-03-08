@@ -7,7 +7,7 @@
 #include "ui/style.hh"
 #include "ui/constants.h"
 
-#include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "graphics/effects.hh"
 
 #include "util/logging.hh"
@@ -18,7 +18,6 @@
 #define NOMINMAX
 #include <d2d1_1.h>
 
-#include <memory>
 #include <algorithm>
 
 EditorTextLocationList* EditorTextLocationList::Make(Editor* owner) {
@@ -33,7 +32,8 @@ EditorTextLocationList* EditorTextLocationList::Make(Editor* owner) {
 void EditorTextLocationList::OnUpdate() {
 	if (DrawIncompleteState(deviceContext, "No locations found.")) return;
 	
-	auto glyphRuns = std::make_unique<std::pair<GlyphRun, GlyphRun>[]>(itemCount);
+	auto glyphRuns = new std::pair<GlyphRun, GlyphRun>[itemCount];
+	DEFER(delete[] glyphRuns);
 	
 	char currentPathBuffer[MAX_PATH + 1];
 	const u64 currentPathLength = GetCurrentDirectory(MAX_PATH, currentPathBuffer);
@@ -59,10 +59,10 @@ void EditorTextLocationList::OnUpdate() {
 		
 		const std::string_view directory = GetDirectoryFromPath(item.targetPath);
 		
-		runLabel.Shape(label, style.fontUi, &owner->glyphRunShapingMemory);
-		runFullPath.Shape(directory, style.fontUi, &owner->glyphRunShapingMemory);
+		runLabel.Shape(label, style.fontUi);
+		runFullPath.Shape(directory, style.fontUi);
 		
-		const f32 currentItemWidth = PADDING_X3 + runLabel.GetTotalAdvance() + runFullPath.GetTotalAdvance();
+		const f32 currentItemWidth = PADDING_X3 + runLabel.width + runFullPath.width;
 		if (width < currentItemWidth)
 			width = currentItemWidth;
 	}
@@ -94,8 +94,8 @@ void EditorTextLocationList::OnUpdate() {
 				style.GetBrushSelection());
 		}
 		
-		runLabel.Draw(deviceContext, {position.x + PADDING, posY}, style.fontUi, style.GetBrushUiText());
-		runFullPath.Draw(deviceContext, {position.x + PADDING_X2 + runLabel.GetTotalAdvance(), position.y + (style.fontUi.lineHeight * i)}, style.fontUi, style.GetBrushUiText(false));
+		runLabel.Draw(deviceContext, position.x + PADDING, posY, style.fontUi, style.GetBrushUiText());
+		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (style.fontUi.lineHeight * i), style.fontUi, style.GetBrushUiText(false));
 	}
 	
 	//

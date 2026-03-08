@@ -347,11 +347,9 @@ static void RenderOutput(Console* self) {
 		
 		const auto ApplyStyle = [&] (u64 ln, u64 fromCp, u64 toCp) {
 			const GlyphRun& run = self->glyphRunCache[ln];
-			
-			toCp = std::min(run.size, toCp); // @TODO(GlyphRun2)
-					
+								
 			f32 from = .0f, to = .0f;
-			run.GetGlyphOffsetRange(fromCp, toCp, &from, &to);
+			run.MeasureOffsetRange(fromCp, toCp, &from, &to);
 			
 			const D2D_RECT_F rect {
 				.left   = PADDING + from,
@@ -419,7 +417,7 @@ static void RenderOutput(Console* self) {
 		
 		for (u64 i = 0; i < self->glyphRunCache.size(); i++) {
 			const GlyphRun& run = self->glyphRunCache[i];
-			run.Draw(text, {PADDING , (i * style.fontEditor.lineHeight)}, style.fontEditor, alphaMaskBrush);
+			run.Draw(text, PADDING , (i * style.fontEditor.lineHeight), style.fontEditor, alphaMaskBrush);
 		}
 	}
 	
@@ -463,7 +461,7 @@ static void RenderOutput(Console* self) {
 			ASSERT(record.originFromColumn < record.originToColumn);
 			
 			f32 offsetFrom = .0f, offsetTo = .0f;
-			run.GetGlyphOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
+			run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
 			
 			style.brush->SetColor(record.color);
 			deviceContext->DrawRectangle(
@@ -487,11 +485,9 @@ static void RenderOutput(Console* self) {
 		
 		IterateTextRange(*from, *to, [self, toolbarHeight](u64 ln, u64 fromCp, u64 toCp) {
 			const GlyphRun& run = self->glyphRunCache[ln];
-			
-			toCp = std::min(run.size, toCp); // @TODO(GlyphRun2)
-					
+								
 			f32 offsetFrom = .0f, offsetTo = .0f;
-			run.GetGlyphOffsetRange(fromCp, toCp, &offsetFrom, &offsetTo);
+			run.MeasureOffsetRange(fromCp, toCp, &offsetFrom, &offsetTo);
 			
 			deviceContext->FillRectangle(
 				D2D_RECT_F {
@@ -521,7 +517,7 @@ static void RenderOutput(Console* self) {
 				0u,
 				self->glyphRunCache.size() - 1u);
 			const GlyphRun& hitRun = self->glyphRunCache[hitLine];
-			const u64 hitColumn    = hitRun.Hittest(relativePoistion.x);
+			const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
 			
 			if (mouse.event == Mouse::Event_Down) {
 				
@@ -587,7 +583,7 @@ static void RenderToolDiagnostics(Console* self) {
 	for (u64 i = 0; i < self->toolDiagnostics.size(); i++) {
 		const Console::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
 		
-		run.Shape(record.message, style.fontEditor, &self->mem);
+		run.Shape(record.message, style.fontEditor);
 		
 		style.brush->SetColor(Diagnostics::SEVERITY_COLORS[self->process
 			? Diagnostics::Severity_Error
@@ -597,14 +593,14 @@ static void RenderToolDiagnostics(Console* self) {
 			.x = self->area.left + PADDING,
 			.y = self->area.top + toolbarHeight + offsetTop - self->scrollarea.vpY};
 			
-		run.Draw(deviceContext, position, style.fontEditor, style.brush);
+		run.Draw(deviceContext, position.x, position.y, style.fontEditor, style.brush);
 		
 		if (!record.source.empty()) {
-			run.Shape(record.source, style.fontEditor, &self->mem);
+			run.Shape(record.source, style.fontEditor);
 			
 			if (record.position < U64_MAX) {
 				f32 from = .0f, to = .0f;
-				run.GetGlyphOffsetRange(record.position, record.position+1, &from, &to);
+				run.MeasureOffsetRange(record.position, record.position+1, &from, &to);
 				
 				deviceContext->FillRectangle(
 					D2D_RECT_F {
@@ -615,7 +611,7 @@ static void RenderToolDiagnostics(Console* self) {
 					style.brush);
 			}
 			
-			run.Draw(deviceContext, {position.x, position.y + style.fontEditor.lineHeight}, style.fontEditor, style.GetBrushEditorText());
+			run.Draw(deviceContext, position.x, position.y + style.fontEditor.lineHeight, style.fontEditor, style.GetBrushEditorText());
 			offsetTop += style.fontEditor.lineHeight;
 		}
 		
@@ -663,8 +659,8 @@ void Console::OnUpdate() {
 						
 			// draw tool name
 			{
-				run.Shape(tool->name, style.fontUi, &mem);
-				run.Draw(deviceContext, {area.left + MARGIN, area.top + MARGIN}, style.fontUi, style.GetBrushUiText());
+				run.Shape(tool->name, style.fontUi);
+				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
 				
 				// underline
 				deviceContext->DrawLine(
@@ -672,11 +668,11 @@ void Console::OnUpdate() {
 						.x = toolbarArea.left + MARGIN,
 						.y = toolbarArea.top  + MARGIN + style.fontUi.underlineOffset},
 					D2D_POINT_2F {
-						.x = toolbarArea.left + MARGIN + run.GetTotalAdvance(),
+						.x = toolbarArea.left + MARGIN + run.width,
 						.y = toolbarArea.top  + MARGIN + style.fontUi.underlineOffset},
 					style.GetBrushUiText());
 				
-				offsetX = run.GetTotalAdvance() + MARGIN_X2;
+				offsetX = run.width + MARGIN_X2;
 				
 				const D2D_RECT_F toolNameArea {
 					.left = toolbarArea.left,
@@ -746,15 +742,15 @@ void Console::OnUpdate() {
 					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), style.GetBrushHover(mouse.isDown));
 					
 					style.brush->SetColor(hoverLabelColor);
-					run.Shape(hoverLabel, style.fontUi, &mem);
+					run.Shape(hoverLabel, style.fontUi);
 				
 				} else {
 					style.brush->SetColor(labelColor);
-					run.Shape(label, style.fontUi, &mem);	
+					run.Shape(label, style.fontUi);
 				}
 				
-				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (run.GetTotalAdvance() / 2.0f);
-				run.Draw(deviceContext, {x, area.top + MARGIN}, style.fontUi, style.brush);
+				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (run.width / 2.0f);
+				run.Draw(deviceContext, x, area.top + MARGIN, style.fontUi, style.brush);
 				
 				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
 			}
@@ -782,8 +778,8 @@ void Console::OnUpdate() {
 			
 		// no tool
 		} else {
-			run.Shape("No tool run yet.", style.fontUi, &mem);
-			run.Draw(deviceContext, {area.left + MARGIN, area.top + MARGIN}, style.fontUi, style.GetBrushUiText());
+			run.Shape("No tool run yet.", style.fontUi);
+			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
 		}
 		
 		offsetTop += GetToolbarHeight();
@@ -796,7 +792,7 @@ void Console::OnUpdate() {
 		glyphRunCache.clear();
 		for (const std::string& line : lines) {
 			GlyphRun& run = glyphRunCache.emplace_back();
-			run.Shape(line, style.fontEditor, &mem);
+			run.Shape(line, style.fontEditor);
 		}
 		
 		glyphRunCacheIsValid = true;

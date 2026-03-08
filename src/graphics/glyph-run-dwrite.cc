@@ -543,13 +543,13 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 					const f32 tabStopWidth = font.GetSpaceAdvance() * 4;
 					
 					f32 currentAdvance = self->width;
-					for (u32 iadv = 0; iadv < iglyphInRun; iadv++)
+					for (u32 iadv = 0; iadv < icharInChunk; iadv++)
 						currentAdvance += self->glyphAdvances[self->glyphCount + iadv];
 					
 					const u32 currentStopIndex = static_cast<u32>(currentAdvance / tabStopWidth);
 					const f32 nextStopPosition = (currentStopIndex + 1) * tabStopWidth;
 					
-					const f32 advance = nextStopPosition - self->width;
+					const f32 advance = nextStopPosition - currentAdvance;
 					self->glyphAdvances[iglyphInRun] = advance;
 				
 				} else if (ch == L'\r' || ch == L'\n') {
@@ -582,6 +582,12 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 bool GlyphRun_DWrite::Shape(std::string_view text, const Font& font) {
 	return ShapeInternal(this, text, font, &staticShapingBuffer, nullptr);
 }
+
+//#################################################################################################
+//
+// Multithreaded shaping
+//
+//#################################################################################################
 
 struct ShapeBatchThreadData {
 	std::atomic_uint64_t currentLine = 0u;
@@ -712,7 +718,7 @@ void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const 
 		brush);
 }
 
-void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush) const {
+void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush, /*out*/ f32* drawWidth /*= nullptr*/) const {
 	if (glyphCount == 0u) return;
 	
 	ASSERT(startChar <  glyphCount);
@@ -727,7 +733,7 @@ void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y,
 	const DWRITE_GLYPH_RUN glyphRun {
 		.fontFace      = font.fontFace,
 		.fontEmSize    = font.size,
-		.glyphCount    = endGlyphIndex- startGlyphIndex,
+		.glyphCount    = endGlyphIndex - startGlyphIndex,
 		.glyphIndices  = glyphIndicies + startGlyphIndex,
 		.glyphAdvances = glyphAdvances.get() + startGlyphIndex,
 		.glyphOffsets  = nullptr,
@@ -739,7 +745,29 @@ void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y,
 			.x = x,
 			.y = y + font.baselineOffset},
 		&glyphRun,
-		brush);	
+		brush);
+	
+	if (drawWidth) {	
+		for (u32 i = startGlyphIndex; i < endGlyphIndex; i++)
+			*drawWidth += glyphAdvances[i];
+	}
+}
+
+void GlyphRun_DWrite::DrawCenter(ID2D1RenderTarget* renderTarget, f32 x, f32 y, f32 availableW, const Font& font, ID2D1SolidColorBrush* brush) const {
+	Draw(renderTarget,
+		(x + availableW / 2.0f) - (width / 2.0f),
+		y,
+		font,
+		brush);
+
+}
+
+bool GlyphRun_DWrite::ShapeAndDraw(ID2D1RenderTarget* renderTarget, std::string_view text, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) {
+	if (!ShapeInternal(this, text, font, &staticShapingBuffer, nullptr))
+		return false;
+		
+	Draw(renderTarget, x, y, font, brush);
+	return true;
 }
 
 u64 GlyphRun_DWrite::HitTest(f32 offset) const {
@@ -812,12 +840,43 @@ bool GlyphRunMultiline_DWrite::Shape(std::string_view text, const Font& font) {
 }
 
 void GlyphRunMultiline_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
+	
 	u32 start = 0u;
 	for (u32 end : lineEnds) {
 		const u64 amount = (end - start);
+		
 		glyphRun.DrawPartial(renderTarget, x, y, start, amount, font, brush);
+		
+		y += font.lineHeight;
 		start = end + 1;
 	}
 	
 	glyphRun.DrawPartial(renderTarget, x, y, start, U64_MAX, font, brush);
+}
+
+u64 GlyphRunMultiline_DWrite::LineCount() const {
+	return lineEnds.size() + 1u;
+}
+
+f32 GlyphRunMultiline_DWrite::GetWidth() const {
+	
+	f32 maxWidth = 0.0f;
+	
+	u32 start = 0u;
+	for (u32 end : lineEnds) {
+		f32 lineFrom = 0.0f, lineTo = 0.0f;
+		glyphRun.MeasureOffsetRange(start, end, &lineFrom, &lineTo);
+		const f32 currWidth = (lineTo - lineFrom);
+		if (maxWidth < currWidth)
+			maxWidth = currWidth;
+		start = end + 1;
+	}
+	
+	f32 lineFrom = 0.0f, lineTo = 0.0f;
+	glyphRun.MeasureOffsetRange(start, U64_MAX, &lineFrom, &lineTo);
+	const f32 currWidth = (lineTo - lineFrom);
+	if (maxWidth < currWidth)
+		maxWidth = currWidth;
+		
+	return maxWidth;
 }

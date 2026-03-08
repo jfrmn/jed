@@ -10,6 +10,7 @@ struct TextBuffer;
 struct Font;
 struct ID2D1RenderTarget;
 struct ID2D1SolidColorBrush;
+struct D2D_POINT_2F;
 
 struct GlyphRun_DWrite {
 	
@@ -34,7 +35,7 @@ struct GlyphRun_DWrite {
 	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs);
 		
 	bool Shape(std::string_view text, const Font& font);
-	
+		
 	// draw full run
 	void Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const;
 	
@@ -44,7 +45,10 @@ struct GlyphRun_DWrite {
 	
 	// draw only a part of the glyph run
 	// startChar is the index in the original char, not the index of the glyph!
-	void DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 amount, const Font& font, ID2D1SolidColorBrush* brush) const;
+	void DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 amount, const Font& font, ID2D1SolidColorBrush* brush, /*out*/ f32* drawWidth = nullptr) const;
+	
+	// shape and then immediatly draw
+	bool ShapeAndDraw(ID2D1RenderTarget* renderTarget, std::string_view text, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush);
 	
 	u64  HitTest(f32 offset) const;
 	f32  MeasureOffset(u64 pos) const;
@@ -56,8 +60,15 @@ struct GlyphRunMultiline_DWrite {
 	std::vector<u32> lineEnds = {};
 	
 	bool Shape(std::string_view text, const Font& font);
-	void Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const; 
+	void Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const;
+	
+	f32 GetWidth() const;
+	u64 LineCount() const; 
 };
 
 bool InitStaticShapingBuffer();
 extern GlyphRun_DWrite staticGlyphRun;
+
+ // @TODO(glyphrun) remove
+#define GlyphRun GlyphRun_DWrite
+#define GlyphRunMultiline GlyphRunMultiline_DWrite

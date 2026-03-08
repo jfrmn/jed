@@ -430,21 +430,21 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	//
 	// shape the text
 	//
-	GlyphRun runCode {};
-	GlyphRunMultiline runMessage {};
+	GlyphRun_DWrite runCode {};
+	GlyphRunMultiline_DWrite runMessage {};
 	
-	runCode.Shape(record->code, style.fontEditor, &self->glyphRunShapingMemory);
-	runMessage.Shape(record->message, style.fontUi, &self->glyphRunShapingMemory);
+	runCode.Shape(record->code, style.fontEditor);
+	runMessage.Shape(record->message, style.fontUi);
 	
 	//
 	// measure the width and height
 	//
 	const f32 width = PADDING_X2 + std::max(
-		runCode.GetTotalAdvance() + style.fontEditor.lineHeight + PADDING,
-		runMessage.GetMaxAdvance());
+		runCode.width + style.fontEditor.lineHeight + PADDING,
+		runMessage.GetWidth());
 		
 	f32 height = PADDING_X2 + style.fontEditor.lineHeight
-			   + PADDING_X2 + (style.fontUi.lineHeight * runMessage.GetLineCount());
+			   + PADDING_X2 + (style.fontUi.lineHeight * runMessage.LineCount());
 			   
 	if (isScrollbarTooltip)
 		height += PADDING_X2 + (style.fontEditor.lineHeight * 4);		
@@ -502,9 +502,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			    	style.fontEditor.lineHeight));
 				
 		runCode.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = position.x + PADDING_X2 + style.fontEditor.lineHeight,
-				.y = position.y + PADDING},
+			position.x + PADDING_X2 + style.fontEditor.lineHeight,
+			position.y + PADDING,
 			style.fontEditor,
 			style.GetBrushUiText());
 	}
@@ -528,9 +527,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	//
 	{
 		runMessage.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = position.x + PADDING,
-				.y = position.y + PADDING_X3 + style.fontEditor.lineHeight},
+			position.x + PADDING,
+			position.y + PADDING_X3 + style.fontEditor.lineHeight,
 			style.fontUi,
 			style.GetBrushUiText());
 	}
@@ -542,7 +540,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	
 		const f32 contextStartY = position.y + PADDING_X4
 			+ style.fontEditor.lineHeight
-	 		+ (style.fontUi.lineHeight * runMessage.GetLineCount());
+	 		+ (style.fontUi.lineHeight * runMessage.LineCount());
 		
 		// draw 2nd seperator
 		deviceContext->DrawLine(

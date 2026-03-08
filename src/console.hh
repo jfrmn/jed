@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "text/text-position.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "commands/parameter.hh"
 #include "ui/scrollarea.hh"
 #include "ui/file-preview.hh"
@@ -68,7 +68,6 @@ struct Console : public Process::Observer {
 	bool isOpen = false;
 	
 	std::mutex mtx = {};
-	GlyphRunShapingMemory mem = {};
 	
 	const Tool* tool = nullptr;
 	std::vector<ParameterValue> toolParameterValues = {};

@@ -118,10 +118,7 @@ void SearchBar::OnUpdate() {
 				.bottom = area.bottom},
 			D2D1_ANTIALIAS_MODE_ALIASED);
 		DEFER(deviceContext->PopAxisAlignedClip());
-		
-		GlyphRunShapingMemory mem;
-		GlyphRun run;
-	
+			
 		for (u64 i = 0u; i < itemCount; i++) {
 			ItemInfo item;
 			GetItemInfo(i, &item);
@@ -143,10 +140,10 @@ void SearchBar::OnUpdate() {
 				deviceContext->FillRectangle(itemArea, brushGlow);
 			}
 			
-			run.Shape(item.text, style.fontUi, &mem);
+			staticGlyphRun.Shape(item.text, style.fontUi);
 			
-			float offsetFrom, offsetTo;
-			run.GetGlyphOffsetRange(
+			f32 offsetFrom, offsetTo;
+			staticGlyphRun.MeasureOffsetRange(
 				item.matchedPosition,
 			    item.matchedPosition + item.matchedLength,
 			    &offsetFrom, &offsetTo);
@@ -159,18 +156,16 @@ void SearchBar::OnUpdate() {
 				    .bottom = MARGIN + itemArea.top + style.fontUi.lineHeight},
 				style.GetBrushUiSearchResult());
 
-			run.Draw(deviceContext,
-				D2D_POINT_2F {
-					MARGIN + itemArea.left,
-				    MARGIN + itemArea.top},
+			staticGlyphRun.Draw(deviceContext,
+				MARGIN + itemArea.left,
+			    MARGIN + itemArea.top,
 				style.fontUi,
 				style.GetBrushUiText());
 				
-			run.Shape(item.subText, style.fontUi, &mem);
-			run.Draw(deviceContext, 
-				D2D_POINT_2F {
-					MARGIN + itemArea.left,
-				       MARGIN + itemArea.top + style.fontUi.lineHeight},
+			staticGlyphRun.ShapeAndDraw(deviceContext, 
+				item.subText,
+				MARGIN + itemArea.left,
+			    MARGIN + itemArea.top + style.fontUi.lineHeight,
 				style.fontUi,
 				style.GetBrushUiText(false));
 			

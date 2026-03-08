@@ -31,8 +31,8 @@ void EditorSignatureHelp::OnUpdate() {
 	GlyphRun runLabel {};
 	GlyphRunMultiline runDocumentation {};
 	
-	runLabel.Shape(signature->label, style.fontEditor, &owner->glyphRunShapingMemory);
-	runDocumentation.Shape(signature->documentation, style.fontUi, &owner->glyphRunShapingMemory);
+	runLabel.Shape(signature->label, style.fontEditor);
+	runDocumentation.Shape(signature->documentation, style.fontUi);
 		
 	const Parameter* parameter = nullptr;
 	
@@ -52,12 +52,12 @@ void EditorSignatureHelp::OnUpdate() {
 	// calc size
 	//	
 	const f32 width = PADDING_X2 + std::max(
-		runLabel.GetTotalAdvance(),
-		runDocumentation.GetMaxAdvance());
+		runLabel.width,
+		runDocumentation.GetWidth());
 	
 	const f32 height = PADDING_X2 + style.fontEditor.lineHeight +
-		(runDocumentation.GetLineCount() > 0u || signatureCount > 1u
-			? style.fontUi.lineHeight * std::max<u64>(1u, runDocumentation.GetLineCount())
+		(runDocumentation.LineCount() > 0u || signatureCount > 1u
+			? style.fontUi.lineHeight * std::max<u64>(1u, runDocumentation.LineCount())
 			: 0.0f);
 	
 	//
@@ -81,12 +81,12 @@ void EditorSignatureHelp::OnUpdate() {
 	// draw signature
 	//
 	{
-		runLabel.Draw(deviceContext, {position.x + PADDING, position.y + PADDING}, style.fontEditor, style.GetBrushUiText());
+		runLabel.Draw(deviceContext, position.x + PADDING, position.y + PADDING, style.fontEditor, style.GetBrushUiText());
 		
 		if (parameter && parameter->labelIsSubstring) {
 			
 			f32 offsetFrom, offsetTo;
-			runLabel.GetGlyphOffsetRange(parameter->labelOffset, parameter->labelOffset + parameter->labelLength, &offsetFrom, &offsetTo);
+			runLabel.MeasureOffsetRange(parameter->labelOffset, parameter->labelOffset + parameter->labelLength, &offsetFrom, &offsetTo);
 		
 			deviceContext->DrawLine(
 				D2D1_POINT_2F {
@@ -98,14 +98,14 @@ void EditorSignatureHelp::OnUpdate() {
 				style.GetBrushUiText());
 		}
 				
-		runDocumentation.Draw(deviceContext, {position.x + PADDING, position.y + PADDING + style.fontEditor.lineHeight}, style.fontUi, style.GetBrushUiText(false));
+		runDocumentation.Draw(deviceContext, position.x + PADDING, position.y + PADDING + style.fontEditor.lineHeight, style.fontUi, style.GetBrushUiText(false));
 		
 		if (signatureCount > 1u) {
 			const std::string text = FormatString("%/%", activeSignature + 1u, signatureCount);
 			
 			GlyphRun runSignatureIndex {};
-			runSignatureIndex.Shape(text, style.fontUi, &owner->glyphRunShapingMemory);
-			runSignatureIndex.Draw(deviceContext, {position.x + width - PADDING - runSignatureIndex.GetTotalAdvance(), position.y + PADDING + style.fontEditor.lineHeight}, style.fontUi, style.GetBrushUiText());
+			runSignatureIndex.Shape(text, style.fontUi);
+			runSignatureIndex.Draw(deviceContext, position.x + width - PADDING - runSignatureIndex.width, position.y + PADDING + style.fontEditor.lineHeight, style.fontUi, style.GetBrushUiText());
 		}
 	}
 }

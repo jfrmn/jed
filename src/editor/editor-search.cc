@@ -11,7 +11,7 @@
 #include "util/logging.hh"
 
 #include "graphics/effects.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "editor/editor.hh"
 
 #include <algorithm>
@@ -245,9 +245,8 @@ void EditorSearch::OnUpdate() {
 	//
 	{
 		glyphRunHeadline.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = area.left + MARGIN,
-				.y = area.top  + MARGIN },
+			area.left + MARGIN,
+			area.top  + MARGIN,
 			style.fontUi,
 			style.GetBrushUiText());
 			
@@ -256,7 +255,7 @@ void EditorSearch::OnUpdate() {
 				.x = area.left + MARGIN,
 				.y = area.top  + MARGIN + style.fontUi.lineHeight },
 			D2D1_POINT_2F {
-				.x = area.left + MARGIN + glyphRunHeadline.GetTotalAdvance(),
+				.x = area.left + MARGIN + glyphRunHeadline.width,
 				.y = area.top  + MARGIN + style.fontUi.lineHeight },
 			style.GetBrushUiText());
 	}
@@ -267,8 +266,6 @@ void EditorSearch::OnUpdate() {
 		textboxReplace.OnUpdate();	
 
 	if (threadData) {
-
-		GlyphRunShapingMemory memory {};
 
 		//
 		// draw result list button
@@ -288,12 +285,10 @@ void EditorSearch::OnUpdate() {
 				? "searching..."
 				: FormatString("% results", threadData->results.size());
 			
-			GlyphRun glyphRun {};
-			glyphRun.Shape(text, style.fontUi, &memory);
-			glyphRun.Draw(deviceContext,
-				D2D_POINT_2F {
-					.x = area.left   + style.fontUi.lineHeight + PADDING_X2 + style.fontUi.GetSpaceAdvance(),
-					.y = area.bottom - style.fontUi.lineHeight - PADDING },
+			staticGlyphRun.ShapeAndDraw(deviceContext,
+				text,
+				area.left   + style.fontUi.lineHeight + PADDING_X2 + style.fontUi.GetSpaceAdvance(),
+				area.bottom - style.fontUi.lineHeight - PADDING,
 				style.fontUi,
 				style.GetBrushUiText());
 			
@@ -313,8 +308,6 @@ void EditorSearch::OnUpdate() {
 		if (isResultListVisible) {
 
 			u64 maxLocationLength = 0;
-
-			GlyphRun glyphRun {};
 			
 			// draw line number
 			for (usize i = 0; i < threadData->results.size(); i++) {
@@ -327,11 +320,10 @@ void EditorSearch::OnUpdate() {
 				if (maxLocationLength < locationBufferLen)
 					maxLocationLength = locationBufferLen;
 				
-				glyphRun.Shape(locationBuffer, style.fontEditor, &memory);
-				glyphRun.Draw(deviceContext,
-					D2D1_POINT_2F {
-						.x = area.left,
-						.y = area.bottom + (i * style.fontEditor.lineHeight) },
+				staticGlyphRun.Shape(locationBuffer, style.fontEditor);
+				staticGlyphRun.Draw(deviceContext,
+					area.left,
+					area.bottom + (i * style.fontEditor.lineHeight),
 					style.fontEditor,
 					style.GetBrushUiBackground());
 			}
@@ -363,21 +355,20 @@ void EditorSearch::OnUpdate() {
 					}
 				}
 				
-				glyphRun.Shape(lineText, style.fontEditor, &memory);
+				staticGlyphRun.Shape(lineText, style.fontEditor);
 
 				const float locationOffset = style.fontEditor.GetSpaceAdvance() * maxLocationLength;
 				deviceContext->FillRectangle(
 					D2D1_RECT_F {
-						.left   = area.left   + locationOffset + glyphRun.GetGlyphOffset(result.from.column - numSkippedCharacters),
+						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.column - numSkippedCharacters),
 						.top    = area.bottom + (style.fontEditor.lineHeight * i),
-						.right  = area.left   + locationOffset + glyphRun.GetGlyphOffset(result.to.column - numSkippedCharacters),
+						.right  = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.to.column - numSkippedCharacters),
 						.bottom = area.bottom + (style.fontEditor.lineHeight * (i+1)) },
 					style.GetBrushUiSearchResult());
 
-				glyphRun.Draw(deviceContext,
-					D2D1_POINT_2F {
-						.x = area.left + locationOffset,
-						.y = area.bottom + (i * style.fontEditor.lineHeight) },
+				staticGlyphRun.Draw(deviceContext,
+					area.left + locationOffset,
+					area.bottom + (i * style.fontEditor.lineHeight),
 					style.fontEditor,
 					style.GetBrushUiText());
 				

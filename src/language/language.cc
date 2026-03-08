@@ -7,7 +7,6 @@
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-textlocationlist.hh"
 
-#include "graphics/glyph-run.hh"
 #include "graphics/glyph-run-dwrite.hh"
 #include "text/text-buffer.hh"
 #include "ui/style.hh"

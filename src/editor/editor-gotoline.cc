@@ -77,9 +77,8 @@ void EditorGotoLine::OnUpdate() {
 	// draw headline
 	//
 	glyphRunHeadline.Draw(deviceContext,
-	    D2D1_POINT_2F {
-	    	.x = area.left + MARGIN, 
-	    	.y = area.top  + MARGIN },
+	    area.left + MARGIN, 
+	    area.top  + MARGIN,
 	    style.fontUi,
 	    style.GetBrushUiText());
 	
@@ -88,7 +87,7 @@ void EditorGotoLine::OnUpdate() {
 			.x = area.left + MARGIN,
 			.y = area.top  + MARGIN + style.fontUi.lineHeight },
 		D2D1_POINT_2F {
-			.x = area.left + MARGIN + glyphRunHeadline.GetTotalAdvance(),
+			.x = area.left + MARGIN + glyphRunHeadline.width,
 			.y = area.top  + MARGIN + style.fontUi.lineHeight },
 		style.GetBrushUiText());
 

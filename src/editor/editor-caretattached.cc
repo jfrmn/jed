@@ -47,10 +47,9 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 		ASSERT_UNREACHABLE;
 	}
 	
-	GlyphRun run;
-	run.Shape(text, style.fontEditor, &owner->glyphRunShapingMemory);
+	staticGlyphRun.Shape(text, style.fontEditor);
 	
-	const f32 width = PADDING_X3 + style.fontEditor.lineHeight + run.GetTotalAdvance();
+	const f32 width = PADDING_X3 + style.fontEditor.lineHeight + staticGlyphRun.width;
 	
 	// background
 	BlurArea(
@@ -71,10 +70,9 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 			.bottom = position.y + style.fontEditor.lineHeight});
 
 	// text
-	run.Draw(deviceContext,
-		D2D1_POINT_2F {
-			.x = position.x + PADDING_X2 + style.fontEditor.lineHeight,
-			.y = position.y},
+	staticGlyphRun.Draw(deviceContext,
+		position.x + PADDING_X2 + style.fontEditor.lineHeight,
+		position.y,
 		style.fontEditor,
 		style.GetBrushUiText());
 	

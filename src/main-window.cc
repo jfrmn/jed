@@ -23,6 +23,8 @@
 // #include <d2d1_1.h>
 #include <d2d1_3.h>
 
+#undef GlyphRun // @TODO(glyphrun) remove
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool MainWindow::Create() {
 	const bool ok = Window::Create(
@@ -363,9 +365,6 @@ void MainWindow::OnUpdate() {
 	{	
 		const float tabHeight = GetTabHeight();
 	
-		GlyphRunShapingMemory mem;
-		GlyphRun run;
-		
 		f32 offsetX = .0f;
 		u64 closedTab = U64_MAX;
 		for (u64 i = 0u; i < tabs.size(); i++) {
@@ -384,11 +383,10 @@ void MainWindow::OnUpdate() {
 				deviceContext->FillRectangle(tabRect, style.GetBrushUiBackground(false));
 			}
 			
-			run.Shape(tab.title, style.fontUi, &mem);
-			run.Draw(deviceContext,
-				D2D1_POINT_2F {
-					.x = PADDING + offsetX,
-					.y = PADDING },
+			staticGlyphRun.ShapeAndDraw(deviceContext,
+			 	tab.title,
+				PADDING + offsetX,
+				PADDING,
 				style.fontUi,
 				style.GetBrushUiText());
 						
@@ -404,7 +402,7 @@ void MainWindow::OnUpdate() {
 				else if (isHovered)                         icon = style.icons[Style::Icon_Tabs_Hovered];
 					
 				if (icon) {
-					const f32 totalGlyphAdvances = run.GetTotalAdvance();
+					const f32 totalGlyphAdvances = staticGlyphRun.width;
 					const D2D1_RECT_F iconHitbox {
 						.left   = PADDING + offsetX + totalGlyphAdvances,
 						.top    = 0.0f,

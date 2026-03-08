@@ -8,7 +8,7 @@
 #include "ui/style.hh"
 #include "ui/constants.h"
 
-#include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "graphics/effects.hh"
 
 #include "util/rect-util.hh"
@@ -92,8 +92,8 @@ void EditorDiagnosticsList::OnUpdate() {
 			
 			// shape
 			
-			item.code.Shape(record.code, style.fontEditor, &owner->glyphRunShapingMemory);
-			item.message.Shape(record.message, style.fontUi, &owner->glyphRunShapingMemory);
+			item.code.Shape(record.code, style.fontEditor);
+			item.message.Shape(record.message, style.fontUi);
 			
 			// select icon
 			item.icon = style.icons[Diagnostics::SEVERITY_ICON_INDICIES[record.severity]];
@@ -101,11 +101,11 @@ void EditorDiagnosticsList::OnUpdate() {
 			// measure the width and height
 			
 			item.size.width = std::max(
-				item.code.GetTotalAdvance() + style.fontEditor.lineHeight + PADDING_X3,
-				item.message.GetMaxAdvance() + PADDING_X2);
+				item.code.width + style.fontEditor.lineHeight + PADDING_X3,
+				item.message.GetWidth() + PADDING_X2);
 			
 			item.size.height = PADDING_X2 + style.fontEditor.lineHeight
-	             			 + (style.fontUi.lineHeight * item.message.GetLineCount());
+	             			 + (style.fontUi.lineHeight * item.message.LineCount());
 			
 			if (totalWidth < item.size.width)
 				totalWidth = item.size.width;
@@ -141,27 +141,26 @@ void EditorDiagnosticsList::OnUpdate() {
 	// draw header
 	//
 	{
-		GlyphRun runHeader {}, runRecordCount {};
-		runHeader.Shape("Diagnostics", style.fontUi, &owner->glyphRunShapingMemory);
+		staticGlyphRun.Shape("Diagnostics", style.fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
 		
-		char buffer[32] {'\0'};
-		const u64 size = FormatToBuffer(buffer, "% records", itemCount);
-		runRecordCount.Shape({buffer, size}, style.fontUi, &owner->glyphRunShapingMemory);
-		
-		runHeader.Draw(deviceContext, {area.left + MARGIN, area.top + MARGIN}, style.fontUi, style.GetBrushUiText());
-		
-		const f32 offset = PADDING + runHeader.GetTotalAdvance();
-		runRecordCount.Draw(deviceContext, {area.left + MARGIN + offset, area.top + MARGIN}, style.fontUi, style.GetBrushUiText(false));
-		
-		// underline runHeader
+		// underline
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN,
 				.y = area.top  + MARGIN + style.fontUi.underlineOffset },
 			D2D1_POINT_2F {
-				.x = area.left + MARGIN + runHeader.GetTotalAdvance(),
+				.x = area.left + MARGIN + staticGlyphRun.width,
 				.y = area.top  + MARGIN + style.fontUi.underlineOffset },
 			style.GetBrushUiText());
+		
+		
+		const f32 offset = PADDING + staticGlyphRun.width;
+		
+		char buffer[32] {'\0'};
+		const u64 size = FormatToBuffer(buffer, "% records", itemCount);
+		staticGlyphRun.Shape({buffer, size}, style.fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, style.fontUi, style.GetBrushUiText(false));
 	}
 	
 	//
@@ -193,16 +192,14 @@ void EditorDiagnosticsList::OnUpdate() {
 		    	style.fontEditor.lineHeight));
 				
 		item.code.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = itemArea.left + PADDING_X2 + style.fontEditor.lineHeight,
-				.y = itemArea.top + PADDING},
+			itemArea.left + PADDING_X2 + style.fontEditor.lineHeight,
+			itemArea.top + PADDING,
 			style.fontEditor,
 			style.GetBrushUiText());
 		
 		item.message.Draw(deviceContext,
-			D2D1_POINT_2F {
-				.x = itemArea.left + PADDING,
-				.y = itemArea.top + PADDING + style.fontEditor.lineHeight},
+			itemArea.left + PADDING,
+			itemArea.top + PADDING + style.fontEditor.lineHeight,
 			style.fontUi,
 			style.GetBrushUiText(false));
 		

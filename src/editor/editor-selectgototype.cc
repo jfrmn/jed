@@ -8,7 +8,6 @@
 #include "ui/constants.h"
 
 #include "util/rect-util.hh"
-#include "util/logging.hh"
 #include "graphics/effects.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -46,15 +45,14 @@ void EditorSelectGotoType::OnUpdate() {
 		.x = curPos.x,
 		.y = curPos.y + style.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 	
-	GlyphRun runHeader;
-	runHeader.Shape("Goto...", style.fontUi, &owner->glyphRunShapingMemory);
+	staticGlyphRun.Shape("Goto...", style.fontUi);
 	
 	f32 width = .0f;
 	GlyphRun runItems[ITEM_COUNT];
 	for (u64 i = 0u; i < ITEM_COUNT; i++) {
-		runItems[i].Shape(ITEMS[i].label, style.fontUi, &owner->glyphRunShapingMemory);
+		runItems[i].Shape(ITEMS[i].label, style.fontUi);
 		
-		const f32 currentWidth = runItems[i].GetTotalAdvance() + PADDING_X2;
+		const f32 currentWidth = runItems[i].width + PADDING_X2;
 		if (width < currentWidth)
 			width = currentWidth;
 	}
@@ -74,7 +72,7 @@ void EditorSelectGotoType::OnUpdate() {
 	//
 	{
 		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, style.fontUi.lineHeight), style.GetBrushUiBackground());
-		runHeader.Draw(deviceContext, {position.x + PADDING, position.y}, style.fontUi, style.GetBrushUiText());
+		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, style.fontUi, style.GetBrushUiText());
 	}
 	
 	//
@@ -86,7 +84,7 @@ void EditorSelectGotoType::OnUpdate() {
 		if (i == selectedItem)
 			deviceContext->FillRectangle(MakeRect(position.x, posY, width, style.fontUi.lineHeight), style.GetBrushSelection());
 	
-		runItems[i].Draw(deviceContext, {position.x + PADDING, posY}, style.fontUi, style.GetBrushUiText());
+		runItems[i].Draw(deviceContext, position.x + PADDING, posY, style.fontUi, style.GetBrushUiText());
 	}			
 }
 

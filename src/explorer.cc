@@ -1,7 +1,7 @@
 #include "explorer.hh"
 #include "main-window.hh"
 #include "globals.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics/glyph-run-dwrite.hh"
 #include "key-bindings.hh"
 
 #include "util/file-util.hh"
@@ -787,7 +787,7 @@ static void ActionClick(Explorer* self, Explorer::Panel* clickedPanel, Explorer:
 // Update
 //
 
-static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel, GlyphRun& glyphRun, GlyphRunShapingMemory& glyphRunMem) {
+static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 	const bool isActivePanel = (self->activePanel == panel);
 	
 	//
@@ -890,12 +890,10 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel, GlyphRun& glyp
 					.bottom = itemArea.bottom});
 			
 			const bool isCut = (item.flags & Explorer::Item::Flag_Cut);
-			glyphRun.Shape(item.filename, style.fontUi, &glyphRunMem);
-			glyphRun.Draw(
-				deviceContext,
-				D2D_POINT_2F {
-					.x = panel->area.left + MARGIN + style.fontUi.lineHeight + MARGIN,
-					.y = itemArea.top},
+			staticGlyphRun.Shape(item.filename, style.fontUi);
+			staticGlyphRun.Draw(deviceContext,
+				panel->area.left + MARGIN + style.fontUi.lineHeight + MARGIN,
+				itemArea.top,
 				style.fontUi,
 				style.GetBrushUiText(!isCut));
 		}
@@ -940,16 +938,13 @@ void Explorer::OnUpdate() {
 			activeItemAnimationValue = ACTIVE_ITEM_ANIMATION_MAX;
 		else needsUpdate = true;
 	}
-	
-	GlyphRunShapingMemory mem;
-	GlyphRun glyphRun;
-	
+		
 	// panels
 	{
 		for (Panel* panel = activePanel->parent; panel != nullptr; panel = panel->parent)
-			OnUpdatePanel(this, panel, glyphRun, mem);
+			OnUpdatePanel(this, panel);
 		
-		OnUpdatePanel(this, activePanel, glyphRun, mem);
+		OnUpdatePanel(this, activePanel);
 	}
 	
 	// new item panel
@@ -978,24 +973,20 @@ void Explorer::OnUpdate() {
 			PopLayer(deviceContext);
 		}
 		
-		glyphRun.Shape(labelText, style.fontUi, &mem);
-		glyphRun.Draw(
-			deviceContext,
-			D2D_POINT_2F {
-				.x = newItemDialog->area.left + MARGIN,
-				.y = newItemDialog->area.top + MARGIN},
+		staticGlyphRun.ShapeAndDraw(deviceContext,
+			labelText,
+			newItemDialog->area.left + MARGIN,
+			newItemDialog->area.top + MARGIN,
 			style.fontUi,
 			style.GetBrushUiText());
 		
 		newItemDialog->textbox.OnUpdate();
 		
 		if (!newItemDialog->errorText.empty()) {
-			glyphRun.Shape(newItemDialog->errorText, style.fontUi, &mem);
-			glyphRun.Draw(
-				deviceContext,
-				D2D_POINT_2F {
-					.x = newItemDialog->area.left + MARGIN,
-					.y = newItemDialog->textbox.position.y + newItemDialog->textbox.Height() + MARGIN},
+			staticGlyphRun.ShapeAndDraw(deviceContext,
+				newItemDialog->errorText,
+				newItemDialog->area.left + MARGIN,
+				newItemDialog->textbox.position.y + newItemDialog->textbox.Height() + MARGIN,
 				style.fontUi,
 				style.GetBrushUiText());
 		}

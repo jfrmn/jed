@@ -1,5 +1,8 @@
 #pragma once
-#include "graphics/glyph-run.hh"
+#include "basic.hh"
+
+#include <vector>
+#include <string_view>
 
 struct LayoutManager;
 
@@ -23,9 +26,7 @@ struct StatusBar {
 	};
 	
 	//-----------------------------------------
-	// data	
-		
-	GlyphRunShapingMemory shapingMemory = {};
+	// data
 	
 	std::vector<ElementType> elements = {};
 	u64 l2rElementCount = 0u;

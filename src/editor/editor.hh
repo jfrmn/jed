@@ -1,7 +1,5 @@
 #pragma once
 #include "basic.hh"
-
-#include "graphics/glyph-run.hh"
 #include "graphics/glyph-run-dwrite.hh"
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
@@ -64,7 +62,6 @@ struct  Editor {
 	TextDocumentIdentifier textDocumentIdentifier = {};	
 	Language* language = nullptr;
 
-	GlyphRunShapingMemory glyphRunShapingMemory = {};
 	std::vector<GlyphRun_DWrite> glyphRuns = {};
 
 	f32 scrollTargetPosition = .0f;
@@ -107,3 +104,4 @@ struct  Editor {
 	
 	DISALLOW_COPY_AND_ASSING(Editor)
 };
+
