@@ -7,7 +7,7 @@
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-textlocationlist.hh"
 
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "text/text-buffer.hh"
 #include "ui/style.hh"
 
@@ -144,7 +144,7 @@ void Language::HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, 
 		for (u64 ln = fromLine; ln <= toLine; ln++) {
 			
 			const TextBuffer::Line& line = editor->textController.buffer.GetLineAt(ln);
-			const GlyphRun_DWrite& run = editor->glyphRuns[ln];
+			const GlyphRun& run = editor->glyphRuns[ln];
 
 			BasicParser::Tokenize(line.GetText(), &tokens);
 			BasicParser::MatchRules(tokens, syntaxHighlighting.builtinParserRules, &matches);

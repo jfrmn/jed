@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "text/text-position.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "commands/parameter.hh"
 #include "ui/scrollarea.hh"
 #include "ui/file-preview.hh"

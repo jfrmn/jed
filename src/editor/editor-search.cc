@@ -11,7 +11,7 @@
 #include "util/logging.hh"
 
 #include "graphics/effects.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "editor/editor.hh"
 
 #include <algorithm>

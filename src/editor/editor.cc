@@ -14,7 +14,7 @@
 #include "util/rect-util.hh"
 
 // @DUMMY
-#include "graphics/glyph-run-dwrite.hh" 
+#include "graphics/glyph-run.hh" 
 
 #include "editor/editor-caretattached.hh"
 #include "editor/editor-autocomplete.hh"
@@ -169,7 +169,7 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	//
 	// prepare glyph runs
 	//
-	if (!GlyphRun_DWrite::ShapeBatch(this->textController.buffer, style.fontEditor, &glyphRuns)) {
+	if (!GlyphRun::ShapeBatch(this->textController.buffer, style.fontEditor, &glyphRuns)) {
 		LogError("inital shaping failed!");
 	}
 	
@@ -262,7 +262,7 @@ void Editor::ProcessTextChange(const TextChange* change) {
 	}
 	
 	if (needsFullReshape) {
-		GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
+		GlyphRun::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
 	} else {
 		const u64 line = change->operations[0].start.line;	
 		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), style.fontEditor);
@@ -278,7 +278,7 @@ static float GetLineNumberWidth() {
 
 static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition& position) {
 	ASSERT(position.line < self->glyphRuns.size());
-	const GlyphRun_DWrite& run = self->glyphRuns[position.line];
+	const GlyphRun& run = self->glyphRuns[position.line];
 
 	return D2D_POINT_2F {
 		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.column),
@@ -348,7 +348,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 	if (from.line == to.line) {
 
 		const u64 line = std::clamp<u64>(from.line, 0u, self->glyphRuns.size() - 1);
-		const GlyphRun_DWrite &glyphRun = self->glyphRuns[line];
+		const GlyphRun &glyphRun = self->glyphRuns[line];
 		
 		float offsetFrom, offsetTo;
 		glyphRun.MeasureOffsetRange(from.column, to.column, &offsetFrom, &offsetTo);
@@ -362,7 +362,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		
 		// handle first affected line
 		{
-			const GlyphRun_DWrite& glyphRun = self->glyphRuns[from.line];
+			const GlyphRun& glyphRun = self->glyphRuns[from.line];
 
 			const float offsetFrom = x + glyphRun.MeasureOffset(from.column);
 			const float offsetTo   = x + std::max(glyphRun.width, 2.0f);
@@ -374,7 +374,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		// handle all lines in between
 		for (u64 i = from.line + 1u; i < to.line; i++) {
 				
-			const GlyphRun_DWrite& run = self->glyphRuns[i];
+			const GlyphRun& run = self->glyphRuns[i];
 			
 			const float offsetFrom = x + 0.0f;
 			const float offsetTo   = x + std::max(run.width, 2.0f);
@@ -385,7 +385,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 
 		// handle last line
 		{
-			const GlyphRun_DWrite& glyphRun = self->glyphRuns[to.line];
+			const GlyphRun& glyphRun = self->glyphRuns[to.line];
 
 			const float offsetFrom = x + 0.f;
 			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.column), 2.0f);
@@ -430,8 +430,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	//
 	// shape the text
 	//
-	GlyphRun_DWrite runCode {};
-	GlyphRunMultiline_DWrite runMessage {};
+	GlyphRun runCode {};
+	GlyphRunMultiline runMessage {};
 	
 	runCode.Shape(record->code, style.fontEditor);
 	runMessage.Shape(record->message, style.fontUi);
@@ -568,7 +568,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		// draw underline in context
 		if (record->from.line == record->to.line) {
 			
-			const GlyphRun_DWrite& glyphRun = self->glyphRuns[record->from.line];
+			const GlyphRun& glyphRun = self->glyphRuns[record->from.line];
 			
 			float offsetFrom, offsetTo;
 			glyphRun.MeasureOffsetRange(record->from.column, record->to.column, &offsetFrom, &offsetTo);
@@ -596,7 +596,7 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 		0ull,
 		self->textController.buffer.GetMaxLine());
 
-	const GlyphRun_DWrite& run = self->glyphRuns[line];
+	const GlyphRun& run = self->glyphRuns[line];
 	const u64 column = run.HitTest(absoluteX);
 	
 	return TextPosition {
@@ -611,7 +611,7 @@ void Editor::OnUpdate() {
 	// reshape glyphs
 	//
 	{
-		//GlyphRun_DWrite::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
+		//GlyphRun::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
 
 		scrollarea.totalSize.height = glyphRuns.size() * style.fontEditor.lineHeight;
 		
@@ -768,7 +768,7 @@ void Editor::OnUpdate() {
 			renderTargetText->SetTransform(scrollTransform);
 						
 			for (u64 i = firstVisible; i <= lastVisible; i++) {
-				const GlyphRun_DWrite& glyphRun = glyphRuns[i];
+				const GlyphRun& glyphRun = glyphRuns[i];
 				
 				const f32 offsetY = (i * style.fontEditor.lineHeight);
 
@@ -895,7 +895,7 @@ void Editor::OnUpdate() {
 	
 			for (const EditorSearch::SearchResult& result : search->threadData->results) {
 				
-				const GlyphRun_DWrite& run = glyphRuns[result.from.line];
+				const GlyphRun& run = glyphRuns[result.from.line];
 				
 				deviceContext->DrawRectangle(
 					D2D1_RECT_F {

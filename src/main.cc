@@ -5,11 +5,10 @@
 
 #include "graphics/factories.hh"
 #include "graphics/effects.hh"
+#include "graphics/glyph-run.hh"
 #include "language/language.hh"
 #include "commands/tools.hh"
 #include "json/json-basic.hh"
-
-#include "graphics/glyph-run-dwrite.hh" // @DUMMY
 
 #include "ui/style.hh"
 

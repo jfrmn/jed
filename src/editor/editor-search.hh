@@ -28,8 +28,7 @@ struct EditorSearch : public EditorToolWindow {
 
 		std::atomic_bool isCanceled = false;
 		std::atomic_bool isComplete = false;
-	};
-	
+	};	
 
 	using HThread = void*;
 
@@ -57,6 +56,7 @@ struct EditorSearch : public EditorToolWindow {
 	// functions
 
 	static EditorSearch* Make(Editor* editor, bool showReplace);
+	~EditorSearch() noexcept;
 
 	bool IsSearchComplete() const;
 	void ToggleReplaceTextbox(bool show);
@@ -71,6 +71,4 @@ struct EditorSearch : public EditorToolWindow {
 	static void OnToggleCaseSensitivity(void* userdata) {}
 	static void OnToggleWholeWord(void* userdata) {}
 	static void OnToggleEscapeSequences(void* userdata) {}
-
-	DISALLOW_COPY_AND_ASSING(EditorSearch);
 };

@@ -23,8 +23,6 @@
 // #include <d2d1_1.h>
 #include <d2d1_3.h>
 
-#undef GlyphRun // @TODO(glyphrun) remove
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool MainWindow::Create() {
 	const bool ok = Window::Create(

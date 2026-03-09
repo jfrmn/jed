@@ -1,6 +1,6 @@
 #pragma once
 #include "text/text-buffer.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 
 #include <vector>
 
@@ -44,7 +44,7 @@ struct FilePreview {
 	f32 width = 0.0f;
 	
 	TextBuffer textBuffer = {};
-	std::vector<GlyphRun_DWrite> lines = {};
+	std::vector<GlyphRun> lines = {};
 	
 	bool hasError = false;
 	bool hasSelection = false;

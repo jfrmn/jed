@@ -8,7 +8,7 @@
 #include "ui/style.hh"
 #include "ui/constants.h"
 
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "graphics/effects.hh"
 
 #include "util/rect-util.hh"

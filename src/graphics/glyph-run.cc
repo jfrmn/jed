@@ -1,4 +1,4 @@
-#include "glyph-run-dwrite.hh"
+#include "glyph-run.hh"
 #include "font.hh"
 #include "factories.hh"
 #include "util/logging.hh"
@@ -388,7 +388,7 @@ static u64 CalculateGlyphArraySize(u32 capacity) {
 	return capacity + capacityForIndicies;
 }
 
-static void ReallocateGlyphs(GlyphRun_DWrite* self, u32 newCapacity) {
+static void ReallocateGlyphs(GlyphRun* self, u32 newCapacity) {
 	if (newCapacity <= self->glyphCapacity) return;
 	
 	const u64 oldArraySize = CalculateGlyphArraySize(self->glyphCapacity);
@@ -402,7 +402,7 @@ static void ReallocateGlyphs(GlyphRun_DWrite* self, u32 newCapacity) {
 	self->glyphCapacity = newCapacity;
 }
 
-static void ClearGlyphs(GlyphRun_DWrite* self) {
+static void ClearGlyphs(GlyphRun* self) {
 	const u64 size = CalculateGlyphArraySize(self->glyphCapacity);
 	memset(self->glyphAdvances.get(), 0, size * sizeof(f32));
 	self->glyphCount = 0u;
@@ -412,7 +412,7 @@ static void ClearGlyphs(GlyphRun_DWrite* self) {
 // @IMPROVE would be better to reuse old memory but we need to store the 
 // capacity somewhere. One thing we could do is make the char mapping
 // "U32_MAX-terminated" and store the length this way.
-static void PrepareMapping(GlyphRun_DWrite* self, u32 count) {
+static void PrepareMapping(GlyphRun* self, u32 count) {
 	if (self->charCount == count) {
 		memset(self->charMapping.get(), 0, count * sizeof(*self->charMapping.get()));
 	} else {
@@ -422,7 +422,7 @@ static void PrepareMapping(GlyphRun_DWrite* self, u32 count) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Font& font, ShapingBuffer* shapingBuffer, std::vector<u32>* lineEnds) {
+static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& font, ShapingBuffer* shapingBuffer, std::vector<u32>* lineEnds) {
 	ASSERT(text.size() <= U32_MAX);
 	
 	const u32 textSize = static_cast<u32>(text.size());
@@ -579,7 +579,7 @@ static bool ShapeInternal(GlyphRun_DWrite* self, std::string_view text, const Fo
 	return true;
 }
 
-bool GlyphRun_DWrite::Shape(std::string_view text, const Font& font) {
+bool GlyphRun::Shape(std::string_view text, const Font& font) {
 	return ShapeInternal(this, text, font, &staticShapingBuffer, nullptr);
 }
 
@@ -596,7 +596,7 @@ struct ShapeBatchThreadData {
 	const void* lineSource = nullptr;
 	std::string_view (*funcGetLine)(const void*, u64);
 	
-	GlyphRun_DWrite* output = nullptr;
+	GlyphRun* output = nullptr;
 	const Font* font = nullptr;
 	
 	std::string_view GetLine(u64 l) const {
@@ -624,7 +624,7 @@ static DWORD ShapeBatchThreadProc(LPVOID param) {
 	return (allOk ? TRUE : FALSE);
 }
 
-static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGetLine)(const void*, u64), u64 totalLineCount, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGetLine)(const void*, u64), u64 totalLineCount, const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
 	
 	SYSTEM_INFO systemInfo;
 	GetSystemInfo(&systemInfo);
@@ -671,7 +671,7 @@ static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGe
 	return true;	
 }
 
-bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+bool GlyphRun::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
 	return ShapeBatchInternal(
 		batch.data(),
 		[] (const void* ls, u64 ln) { return static_cast<const std::string_view*>(ls)[ln]; },
@@ -680,7 +680,7 @@ bool GlyphRun_DWrite::ShapeBatch(std::span<const std::string_view> batch, const 
 		runs);
 }
 
-bool GlyphRun_DWrite::ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs) {
+bool GlyphRun::ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
 	return ShapeBatchInternal(
 		&textBuffer,
 		[] (const void* ls, u64 ln) { return static_cast<const TextBuffer*>(ls)->GetLineAt(ln).GetText(); },
@@ -695,9 +695,9 @@ bool GlyphRun_DWrite::ShapeBatch(const TextBuffer& textBuffer , const Font& font
 //
 //#################################################################################################
 
-GlyphRun_DWrite staticGlyphRun {};
+GlyphRun staticGlyphRun {};
 
-void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
+void GlyphRun::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
 	if (glyphCount == 0u) return;
 	
 	const DWRITE_GLYPH_RUN glyphRun {
@@ -718,7 +718,7 @@ void GlyphRun_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const 
 		brush);
 }
 
-void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush, /*out*/ f32* drawWidth /*= nullptr*/) const {
+void GlyphRun::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush, /*out*/ f32* drawWidth /*= nullptr*/) const {
 	if (glyphCount == 0u) return;
 	
 	ASSERT(startChar <  glyphCount);
@@ -753,7 +753,7 @@ void GlyphRun_DWrite::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y,
 	}
 }
 
-void GlyphRun_DWrite::DrawCenter(ID2D1RenderTarget* renderTarget, f32 x, f32 y, f32 availableW, const Font& font, ID2D1SolidColorBrush* brush) const {
+void GlyphRun::DrawCenter(ID2D1RenderTarget* renderTarget, f32 x, f32 y, f32 availableW, const Font& font, ID2D1SolidColorBrush* brush) const {
 	Draw(renderTarget,
 		(x + availableW / 2.0f) - (width / 2.0f),
 		y,
@@ -762,7 +762,7 @@ void GlyphRun_DWrite::DrawCenter(ID2D1RenderTarget* renderTarget, f32 x, f32 y, 
 
 }
 
-bool GlyphRun_DWrite::ShapeAndDraw(ID2D1RenderTarget* renderTarget, std::string_view text, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) {
+bool GlyphRun::ShapeAndDraw(ID2D1RenderTarget* renderTarget, std::string_view text, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) {
 	if (!ShapeInternal(this, text, font, &staticShapingBuffer, nullptr))
 		return false;
 		
@@ -770,7 +770,7 @@ bool GlyphRun_DWrite::ShapeAndDraw(ID2D1RenderTarget* renderTarget, std::string_
 	return true;
 }
 
-u64 GlyphRun_DWrite::HitTest(f32 offset) const {
+u64 GlyphRun::HitTest(f32 offset) const {
 	
 	// find the glyph index first
 	f32 totalAdv = .0f;
@@ -792,7 +792,7 @@ u64 GlyphRun_DWrite::HitTest(f32 offset) const {
 	return charIndex;
 }
 
-f32 GlyphRun_DWrite::MeasureOffset(u64 pos) const {
+f32 GlyphRun::MeasureOffset(u64 pos) const {
 	ASSERT(pos <= charCount);
 	
 	if (charCount == 0) return 0.0f;
@@ -808,7 +808,7 @@ f32 GlyphRun_DWrite::MeasureOffset(u64 pos) const {
 	return totalAdv;
 }
 
-void GlyphRun_DWrite::MeasureOffsetRange(u64 startChar, u64 endChar, /*out*/ f32* offStart, /*out*/ f32* offEnd) const {
+void GlyphRun::MeasureOffsetRange(u64 startChar, u64 endChar, /*out*/ f32* offStart, /*out*/ f32* offEnd) const {
 	ASSERT(startChar <= endChar);
 	
 	if (charCount == 0) {
@@ -835,11 +835,11 @@ void GlyphRun_DWrite::MeasureOffsetRange(u64 startChar, u64 endChar, /*out*/ f32
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool GlyphRunMultiline_DWrite::Shape(std::string_view text, const Font& font) {
+bool GlyphRunMultiline::Shape(std::string_view text, const Font& font) {
 	return ShapeInternal(&glyphRun, text, font, &staticShapingBuffer, &lineEnds);
 }
 
-void GlyphRunMultiline_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
+void GlyphRunMultiline::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& font, ID2D1SolidColorBrush* brush) const {
 	
 	u32 start = 0u;
 	for (u32 end : lineEnds) {
@@ -854,11 +854,11 @@ void GlyphRunMultiline_DWrite::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 
 	glyphRun.DrawPartial(renderTarget, x, y, start, U64_MAX, font, brush);
 }
 
-u64 GlyphRunMultiline_DWrite::LineCount() const {
+u64 GlyphRunMultiline::LineCount() const {
 	return lineEnds.size() + 1u;
 }
 
-f32 GlyphRunMultiline_DWrite::GetWidth() const {
+f32 GlyphRunMultiline::GetWidth() const {
 	
 	f32 maxWidth = 0.0f;
 	

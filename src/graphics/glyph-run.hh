@@ -12,7 +12,7 @@ struct ID2D1RenderTarget;
 struct ID2D1SolidColorBrush;
 struct D2D_POINT_2F;
 
-struct GlyphRun_DWrite {
+struct GlyphRun {
 	
 	//------------------------------------------
 	// data
@@ -31,8 +31,8 @@ struct GlyphRun_DWrite {
 	// functions
 	//------------------------------------------	
 
-	static bool ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs);
-	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun_DWrite>* runs);
+	static bool ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun>* runs);
+	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun>* runs);
 		
 	bool Shape(std::string_view text, const Font& font);
 		
@@ -55,8 +55,8 @@ struct GlyphRun_DWrite {
 	void MeasureOffsetRange(u64 startChar, u64 endChar, f32* offFrom, f32* offTo) const;
 };
 
-struct GlyphRunMultiline_DWrite {
-	GlyphRun_DWrite glyphRun = {};
+struct GlyphRunMultiline {
+	GlyphRun glyphRun = {};
 	std::vector<u32> lineEnds = {};
 	
 	bool Shape(std::string_view text, const Font& font);
@@ -67,8 +67,4 @@ struct GlyphRunMultiline_DWrite {
 };
 
 bool InitStaticShapingBuffer();
-extern GlyphRun_DWrite staticGlyphRun;
-
- // @TODO(glyphrun) remove
-#define GlyphRun GlyphRun_DWrite
-#define GlyphRunMultiline GlyphRunMultiline_DWrite
+extern GlyphRun staticGlyphRun;

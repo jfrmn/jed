@@ -1,6 +1,6 @@
 #pragma once
 #include "basic.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
 
@@ -62,7 +62,7 @@ struct  Editor {
 	TextDocumentIdentifier textDocumentIdentifier = {};	
 	Language* language = nullptr;
 
-	std::vector<GlyphRun_DWrite> glyphRuns = {};
+	std::vector<GlyphRun> glyphRuns = {};
 
 	f32 scrollTargetPosition = .0f;
 	f32 scrollSpeed          = .0f;
@@ -79,6 +79,7 @@ struct  Editor {
 	// functions
 
 	bool Init();
+	~Editor() noexcept;
 	
 	FileResult OpenFile(std::string path);
 	FileResult CloseFile();
@@ -100,8 +101,6 @@ struct  Editor {
 	void OnMouseWheel(f32 scrollValue);
 	void OnKeyDown(KeyEvent event);
 	void OnResize(D2D1_RECT_F newArea);
-	bool OnClose();
-	
-	DISALLOW_COPY_AND_ASSING(Editor)
+	bool OnClose();	
 };
 

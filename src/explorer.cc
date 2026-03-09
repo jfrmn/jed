@@ -1,7 +1,7 @@
 #include "explorer.hh"
 #include "main-window.hh"
 #include "globals.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "key-bindings.hh"
 
 #include "util/file-util.hh"

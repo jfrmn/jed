@@ -1,6 +1,6 @@
 #pragma once
 #include "text/text-controller.hh"
-#include "graphics/glyph-run-dwrite.hh"
+#include "graphics/glyph-run.hh"
 #include "graphics/font.hh"
 
 #include <string>
@@ -23,7 +23,7 @@ struct TextBox {
 	float width = .0f;
 
 	TextController textController = {};	
-	GlyphRun_DWrite glyphRun = {};
+	GlyphRun glyphRun = {};
 	
 	std::string_view placeholderText = {};
 
