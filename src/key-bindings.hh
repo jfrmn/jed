@@ -65,6 +65,7 @@ union KeyBindings {
 		KeyEvent selectPageDown;
 		KeyEvent selectAll;
 		KeyEvent selectLine;
+		KeyEvent selectInBrackets;
 		KeyEvent selectWord;
 		
 		KeyEvent deletePrevChar;

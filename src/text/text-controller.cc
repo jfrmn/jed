@@ -516,6 +516,39 @@ static void ActionSelectLine(TextController* self) {
 	}
 }
 
+static void ActionSelectInBrackets(TextController* self) {
+	for (TextController::Caret& caret : self->carets) {
+		
+		const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
+		s64 start = static_cast<s64>(caret.position.column);
+		char bracket = '\0';
+		for (; start >= 0u; start--) {
+			if (line.data[start] == '(' || line.data[start] == '{' || line.data[start] == '[') {
+				bracket = line.data[start];
+				goto found_bracket;
+			}
+		}
+		start = GetIndentationEnd(self, caret.position.line);
+		
+	found_bracket:
+		start++;
+		ASSERT(start >= 0u);
+		
+		u64 end = caret.position.column;
+		for (; end < line.length; end++) {
+			if (bracket == '\0' && (line.data[end] == ')' || line.data[end] == '}' || line.data[end] == ']')) break;
+			else if (bracket == '(' && line.data[end] == ')') break;
+			else if (bracket == '{' && line.data[end] == '}') break;
+			else if (bracket == '[' && line.data[end] == ']') break;
+		}
+		
+		caret.hasSelection = true;
+		caret.selection.column = start;
+		caret.selection.line = caret.position.line;
+		caret.position.column = end;		
+	}
+}
+
 static void ActionSelectWord(TextController* self) {
 	for (TextController::Caret& caret : self->carets) {
 		caret.hasSelection = true;
@@ -1624,6 +1657,7 @@ bool TextController::OnKeyDown(KeyEvent event, /*out*/ TextChange** change) {
 	else if (event == keybinds.actions.selectPageDown) ActionSelect(this, MovePageDown);
 	else if (event == keybinds.actions.selectAll) ActionSelectAll(this);
 	else if (event == keybinds.actions.selectLine) ActionSelectLine(this);
+	else if (event == keybinds.actions.selectInBrackets) ActionSelectInBrackets(this);
 	else if (event == keybinds.actions.selectWord) ActionSelectWord(this);
 	else if (event == keybinds.actions.deletePrevChar) ActionDeleteLeft(this, change, MoveBackward);
 	else if (event == keybinds.actions.deleteNextChar) ActionDeleteRight(this, change, MoveForward);

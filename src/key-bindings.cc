@@ -250,6 +250,7 @@ static constexpr std::string_view actionNames[] = {
 	"select-page-down",
 	"select-all",
 	"select-line",
+	"select-in-brackets",
 	"select-word",
 	"delete-prev-char",
 	"delete-prev-word",
@@ -342,6 +343,7 @@ KeyBindings keybinds {
 		.selectPageDown       = {.vkeycode = VK_NEXT,                    .shift = true},
 		.selectAll            = {.vkeycode = 'A',          .ctrl = true},
 		.selectLine           = {.vkeycode = 'L',          .ctrl = true, .shift = true},
+		.selectInBrackets     = {.vkeycode = 'B',          .ctrl = true, .shift = true},
 		.selectWord           = {.vkeycode = 'W',          .ctrl = true},
 
 		.deletePrevChar       = {.vkeycode = VK_BACK},
