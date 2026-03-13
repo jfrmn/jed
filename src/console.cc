@@ -2,15 +2,14 @@
 #include "globals.hh"
 #include "main-window.hh"
 #include "key-bindings.hh"
+#include "theme.hh"
 
 #include "util/rect-util.hh"
 #include "util/logging.hh"
 #include "util/string-util.hh"
 #include "util/diagnostics.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
-
 #include "graphics/effects.hh"
 #include "commands/tools.hh"
 
@@ -260,7 +259,7 @@ bool Console::StartProcess() {
 //#################################################################################################
 
 static f32 GetToolbarHeight() {
-	return MARGIN_X2 + style.fontUi.lineHeight;
+	return MARGIN_X2 + theme.fontUi.lineHeight;
 }
 
 static void UpdateFilePreview(Console* self, const Console::EditorDiagnosticsRecord& record) {
@@ -312,7 +311,7 @@ static void RenderOutput(Console* self) {
 	ID2D1RenderTarget* background = deviceContext;
 	
 	foreground->BeginDraw();
-	foreground->Clear(style.colors[Style::Color_EditorText]);
+	foreground->Clear(theme.colors.editorText);
 
 	text->BeginDraw();
 	text->Clear();
@@ -328,7 +327,7 @@ static void RenderOutput(Console* self) {
 		foreground->SetTransform(D2D1::Matrix3x2F::Translation(self->scrollarea.vpX, -self->scrollarea.vpY));
 		
 		ID2D1SolidColorBrush* brushForeground = nullptr;
-		foreground->CreateSolidColorBrush(style.colors[Style::Color_EditorText], &brushForeground);
+		foreground->CreateSolidColorBrush(theme.colors.editorText, &brushForeground);
 		if (!brushForeground) return;
 		DEFER(brushForeground->Release());
 		
@@ -353,9 +352,9 @@ static void RenderOutput(Console* self) {
 			
 			const D2D_RECT_F rect {
 				.left   = PADDING + from,
-				.top    = ln * style.fontEditor.lineHeight,
+				.top    = ln * theme.fontEditor.lineHeight,
 				.right  = PADDING + to,
-				.bottom = (ln+1) * style.fontEditor.lineHeight};
+				.bottom = (ln+1) * theme.fontEditor.lineHeight};
 		
 			if (state.hasBackgroundColor)
 				background->FillRectangle(rect, (state.hasNegative ? brushForeground : brushBackground));
@@ -365,8 +364,8 @@ static void RenderOutput(Console* self) {
 				
 			if (state.hasUnderline)
 				text->DrawLine(
-					D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + style.fontEditor.baselineOffset},
-					D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + style.fontEditor.baselineOffset},
+					D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + theme.fontEditor.baselineOffset},
+					D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + theme.fontEditor.baselineOffset},
 					alphaMaskBrush);
 		};
 		
@@ -417,7 +416,7 @@ static void RenderOutput(Console* self) {
 		
 		for (u64 i = 0; i < self->glyphRunCache.size(); i++) {
 			const GlyphRun& run = self->glyphRunCache[i];
-			run.Draw(text, PADDING , (i * style.fontEditor.lineHeight), style.fontEditor, alphaMaskBrush);
+			run.Draw(text, PADDING , (i * theme.fontEditor.lineHeight), theme.fontEditor, alphaMaskBrush);
 		}
 	}
 	
@@ -463,14 +462,13 @@ static void RenderOutput(Console* self) {
 			f32 offsetFrom = .0f, offsetTo = .0f;
 			run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
 			
-			style.brush->SetColor(record.color);
 			deviceContext->DrawRectangle(
 				D2D_RECT_F {
 					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + ( record.originLine    * style.fontEditor.lineHeight) - self->scrollarea.vpY,
+					.top    = self->area.top  + toolbarHeight + ( record.originLine    * theme.fontEditor.lineHeight) - self->scrollarea.vpY,
 					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * style.fontEditor.lineHeight) - self->scrollarea.vpY},
-				style.brush);
+					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * theme.fontEditor.lineHeight) - self->scrollarea.vpY},
+				GetBrush(record.color));
 		}
 	}
 	
@@ -492,10 +490,10 @@ static void RenderOutput(Console* self) {
 			deviceContext->FillRectangle(
 				D2D_RECT_F {
 					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + (style.fontEditor.lineHeight * ln)     - self->scrollarea.vpY,
+					.top    = self->area.top  + toolbarHeight + (theme.fontEditor.lineHeight * ln)     - self->scrollarea.vpY,
 					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + (style.fontEditor.lineHeight * (ln+1)) - self->scrollarea.vpY},
-				style.GetBrushSelection());
+					.bottom = self->area.top  + toolbarHeight + (theme.fontEditor.lineHeight * (ln+1)) - self->scrollarea.vpY},
+				theme.GetBrushSelection());
 		});
 	}
 	
@@ -513,7 +511,7 @@ static void RenderOutput(Console* self) {
 			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
 			
 			const u64 hitLine = std::clamp<u64>(
-				static_cast<u64>((relativePoistion.y + self->scrollarea.vpY) / style.fontEditor.lineHeight),
+				static_cast<u64>((relativePoistion.y + self->scrollarea.vpY) / theme.fontEditor.lineHeight),
 				0u,
 				self->glyphRunCache.size() - 1u);
 			const GlyphRun& hitRun = self->glyphRunCache[hitLine];
@@ -555,11 +553,10 @@ static void RenderOutput(Console* self) {
 		const Console::EditorDiagnosticsRecord& record = self->diagnosticsRecords[self->selectedDiagnosticsRecord];
 	
 		self->filePreview.x = self->area.left - self->filePreview.width;
-		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * style.fontEditor.lineHeight) - self->scrollarea.vpY;
+		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * theme.fontEditor.lineHeight) - self->scrollarea.vpY;
 		self->filePreview.OnUpdate();
 			
-		style.brush->SetColor(record.color);
-		deviceContext->DrawRectangle(self->filePreview.GetArea(), style.brush);
+		deviceContext->DrawRectangle(self->filePreview.GetArea(), GetBrush(record.color));
 	}
 		
 }
@@ -583,20 +580,20 @@ static void RenderToolDiagnostics(Console* self) {
 	for (u64 i = 0; i < self->toolDiagnostics.size(); i++) {
 		const Console::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
 		
-		run.Shape(record.message, style.fontEditor);
+		run.Shape(record.message, theme.fontEditor);
 		
-		style.brush->SetColor(Diagnostics::SEVERITY_COLORS[self->process
-			? Diagnostics::Severity_Error
-			: Diagnostics::Severity_Warning]);
-			
 		const D2D_POINT_2F position {
 			.x = self->area.left + PADDING,
 			.y = self->area.top + toolbarHeight + offsetTop - self->scrollarea.vpY};
-			
-		run.Draw(deviceContext, position.x, position.y, style.fontEditor, style.brush);
+
+		brush->SetColor(Diagnostics::SEVERITY_COLORS[self->process
+			? Diagnostics::Severity_Error
+			: Diagnostics::Severity_Warning]);
+
+		run.Draw(deviceContext, position.x, position.y, theme.fontEditor, brush);
 		
 		if (!record.source.empty()) {
-			run.Shape(record.source, style.fontEditor);
+			run.Shape(record.source, theme.fontEditor);
 			
 			if (record.position < U64_MAX) {
 				f32 from = .0f, to = .0f;
@@ -607,15 +604,15 @@ static void RenderToolDiagnostics(Console* self) {
 						.left   = position.x + from,
 						.top    = position.y,
 						.right  = position.x + to,
-						.bottom = position.y + style.fontEditor.lineHeight},
-					style.brush);
+						.bottom = position.y + theme.fontEditor.lineHeight},
+					brush);
 			}
 			
-			run.Draw(deviceContext, position.x, position.y + style.fontEditor.lineHeight, style.fontEditor, style.GetBrushEditorText());
-			offsetTop += style.fontEditor.lineHeight;
+			run.Draw(deviceContext, position.x, position.y + theme.fontEditor.lineHeight, theme.fontEditor, theme.GetBrushEditorText());
+			offsetTop += theme.fontEditor.lineHeight;
 		}
 		
-		offsetTop += style.fontEditor.lineHeight + PADDING;
+		offsetTop += theme.fontEditor.lineHeight + PADDING;
 	}
 }
 
@@ -652,25 +649,25 @@ void Console::OnUpdate() {
 			.right = area.right,
 			.bottom = area.top + GetToolbarHeight()};
 		
-		deviceContext->FillRectangle(toolbarArea, style.GetBrushUiBackground());
+		deviceContext->FillRectangle(toolbarArea, theme.GetBrushUiBackground());
 	
 		if (tool) {
 			f32 offsetX = 0.0f;
 						
 			// draw tool name
 			{
-				run.Shape(tool->name, style.fontUi);
-				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
+				run.Shape(tool->name, theme.fontUi);
+				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText());
 				
 				// underline
 				deviceContext->DrawLine(
 					D2D_POINT_2F {
 						.x = toolbarArea.left + MARGIN,
-						.y = toolbarArea.top  + MARGIN + style.fontUi.underlineOffset},
+						.y = toolbarArea.top  + MARGIN + theme.fontUi.underlineOffset},
 					D2D_POINT_2F {
 						.x = toolbarArea.left + MARGIN + run.width,
-						.y = toolbarArea.top  + MARGIN + style.fontUi.underlineOffset},
-					style.GetBrushUiText());
+						.y = toolbarArea.top  + MARGIN + theme.fontUi.underlineOffset},
+					theme.GetBrushUiText());
 				
 				offsetX = run.width + MARGIN_X2;
 				
@@ -691,18 +688,17 @@ void Console::OnUpdate() {
 			// draw progress bar
 			if (progressRegex.IsOk()) {
 				
-				style.brush->SetColor(D2D1::ColorF(D2D1::ColorF::Green));
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea), RADIUS),
-					style.brush);
+					GetBrush(D2D1::ColorF(D2D1::ColorF::Green)));
 				
 				deviceContext->DrawRoundedRectangle(
 					MakeRoundedRect(progressArea, RADIUS),	
-					style.GetBrushUiText());
+					theme.GetBrushUiText());
 			} else {
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea, RADIUS),
-					style.GetBrushUiBackground(false));
+					theme.GetBrushUiBackground(false));
 			}
 				
 			// draw prgress text
@@ -721,36 +717,36 @@ void Console::OnUpdate() {
  					label = "Error";
  					hoverLabel = "Retry";
  					labelColor = D2D1::ColorF(D2D1::ColorF::Red);
- 					hoverLabelColor = style.colors[Style::Color_UiText];
+ 					hoverLabelColor = theme.colors.uiText;
 				
 				} else if (exitCode == STILL_ACTIVE) {
 					onClickFunc = OnClickedKillProcess;
- 					labelColor = style.colors[Style::Color_UiText];
+ 					labelColor = theme.colors.uiText;
  					hoverLabel = "Terminate";
  					hoverLabelColor = D2D1::ColorF(D2D1::ColorF::Crimson);
 				
 				} else {
 					onClickFunc = OnRerunProcess;
  					labelColor = (exitCode == 0)
-	 					? style.colors[Style::Color_UiText]
+	 					? theme.colors.uiText
 	 					: D2D1::ColorF(D2D1::ColorF::Crimson);
  					hoverLabel = "Restart";
- 					hoverLabelColor = style.colors[Style::Color_UiText];
+ 					hoverLabelColor = theme.colors.uiText;
 				}
 				
 				if (mouse.Hittest(progressArea, this, onClickFunc)) {
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), style.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), theme.GetBrushHover(mouse.isDown));
 					
-					style.brush->SetColor(hoverLabelColor);
-					run.Shape(hoverLabel, style.fontUi);
+					brush->SetColor(hoverLabelColor);
+					run.Shape(hoverLabel, theme.fontUi);
 				
 				} else {
-					style.brush->SetColor(labelColor);
-					run.Shape(label, style.fontUi);
+					brush->SetColor(labelColor);
+					run.Shape(label, theme.fontUi);
 				}
 				
 				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (run.width / 2.0f);
-				run.Draw(deviceContext, x, area.top + MARGIN, style.fontUi, style.brush);
+				run.Draw(deviceContext, x, area.top + MARGIN, theme.fontUi, brush);
 				
 				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
 			}
@@ -760,26 +756,26 @@ void Console::OnUpdate() {
 				D2D_RECT_F areaBothIcons {
 					.left  = toolbarArea.left + offsetX,
 					.top   = toolbarArea.top + MARGIN - PADDING,
-					.right = toolbarArea.left + offsetX + style.fontUi.lineHeight + PADDING_X2,
+					.right = toolbarArea.left + offsetX + theme.fontUi.lineHeight + PADDING_X2,
 					.bottom = toolbarArea.bottom - MARGIN + PADDING};
 				
 				if (showToolDiagnostics)
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), style.GetBrushUiBackground(false));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), theme.GetBrushUiBackground(false));
 					
 				if (mouse.Hittest(areaBothIcons, this, OnClickToggleShowToolDiagnostics))
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), style.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), theme.GetBrushHover(mouse.isDown));
 				
 				deviceContext->DrawBitmap(
-					style.icons[Style::Icon_EditorDiagnostics_Warning],
-					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, style.fontUi.lineHeight, style.fontUi.lineHeight));
+					theme.icons.editorDiagnosticsWarning,
+					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, theme.fontUi.lineHeight, theme.fontUi.lineHeight));
 				
-				offsetX += style.fontUi.lineHeight + PADDING_X2;
+				offsetX += theme.fontUi.lineHeight + PADDING_X2;
 			}
 			
 		// no tool
 		} else {
-			run.Shape("No tool run yet.", style.fontUi);
-			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
+			run.Shape("No tool run yet.", theme.fontUi);
+			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText());
 		}
 		
 		offsetTop += GetToolbarHeight();
@@ -792,7 +788,7 @@ void Console::OnUpdate() {
 		glyphRunCache.clear();
 		for (const std::string& line : lines) {
 			GlyphRun& run = glyphRunCache.emplace_back();
-			run.Shape(line, style.fontEditor);
+			run.Shape(line, theme.fontEditor);
 		}
 		
 		glyphRunCacheIsValid = true;
@@ -804,11 +800,11 @@ void Console::OnUpdate() {
 	{
 		f32 height = 0.0f;
 		if (showToolDiagnostics) {
-			height = toolDiagnostics.size() * style.fontEditor.lineHeight;
+			height = toolDiagnostics.size() * theme.fontEditor.lineHeight;
 			for (const ToolDiagnosticsRecord& rec : toolDiagnostics)
-				if (rec.source.empty()) height += style.fontEditor.lineHeight;
+				if (rec.source.empty()) height += theme.fontEditor.lineHeight;
 		} else {
-			height = glyphRunCache.size() * style.fontEditor.lineHeight;
+			height = glyphRunCache.size() * theme.fontEditor.lineHeight;
 		}
 		
 		scrollarea.totalSize = D2D_SIZE_F {
@@ -837,9 +833,9 @@ void Console::OnUpdate() {
 void Console::OnResize(f32 newWidth, f32 newHeight) {
 	area = D2D_RECT_F {
 		.left = std::floor(mainWindow.width * 0.6f),
-		.top = PADDING_X2 + style.fontUi.lineHeight,
+		.top = PADDING_X2 + theme.fontUi.lineHeight,
 		.right = mainWindow.width,
-		.bottom = mainWindow.height - PADDING_X2 - style.fontUi.lineHeight};
+		.bottom = mainWindow.height - PADDING_X2 - theme.fontUi.lineHeight};
 	
 	scrollarea.position = D2D_POINT_2F {
 		.x = area.left,
@@ -851,7 +847,7 @@ void Console::OnResize(f32 newWidth, f32 newHeight) {
 
 void Console::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
-	scrollarea.ScrollVertical(distance * style.fontEditor.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * theme.fontEditor.lineHeight * 5);
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
@@ -1024,7 +1020,7 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 
 	Console::EditorDiagnosticsRecord record {};
 	
-	record.color = style.colors[Style::Color_EditorText];
+	record.color = theme.colors.editorText;
 	record.originLine = self->lines.size() - 1u;
 	record.originFromColumn = matchResult.groups.front().begin - line->data();
 	record.originToColumn = matchResult.groups.front().end - line->data();
@@ -1274,7 +1270,7 @@ Console::StyleChange GetStyleChange(int value) {
 			
 		case 39: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = style.colors[Style::Color_EditorText]}; // default
+			.color = theme.colors.editorText}; // default
 			
 		// background
 		case 40: return Console::StyleChange {

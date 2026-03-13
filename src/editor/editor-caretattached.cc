@@ -1,7 +1,7 @@
 #include "editor-caretattached.hh"
 #include "editor.hh"
+#include "theme.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
 
 #include "graphics/effects.hh"
@@ -26,30 +26,30 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 	const D2D_POINT_2F position = GetPosition();
 		
 	std::string_view text;
-	Style::Icon icon;
+	ID2D1Bitmap* icon = nullptr;
 	if (state == State_Unknown)  {
 		text = "<unknown>";
-		icon = Style::Icon_Unknown;
+		icon = theme.icons.unknown;
 	
 	} else if (state == State_Fetching) {
 		text = "fectching...";
-		icon = Style::Icon_Waiting;
+		icon = theme.icons.waiting;
 	
 	} else if (state == State_Errored) {
 		text = error;
-		icon = Style::Icon_Error;
+		icon = theme.icons.error;
 	
 	} else if (state == State_NoItems) {
 		text = noItemsText;
-		icon = Style::Icon_NoItems;
+		icon = theme.icons.noItems;
 	
 	} else {
 		ASSERT_UNREACHABLE;
 	}
 	
-	staticGlyphRun.Shape(text, style.fontEditor);
+	staticGlyphRun.Shape(text, theme.fontEditor);
 	
-	const f32 width = PADDING_X3 + style.fontEditor.lineHeight + staticGlyphRun.width;
+	const f32 width = PADDING_X3 + theme.fontEditor.lineHeight + staticGlyphRun.width;
 	
 	// background
 	BlurArea(
@@ -58,23 +58,23 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 			.left   = position.x,
 			.top    = position.y,
 			.right  = position.x + width,
-			.bottom = position.y + style.fontEditor.lineHeight});
+			.bottom = position.y + theme.fontEditor.lineHeight});
 
 	// icon
 	deviceContext->DrawBitmap(
-		style.icons[icon],
+		icon,
 		D2D_RECT_F {
 			.left   = position.x + PADDING,
 			.top    = position.y,
-			.right  = position.x + PADDING + style.fontEditor.lineHeight,
-			.bottom = position.y + style.fontEditor.lineHeight});
+			.right  = position.x + PADDING + theme.fontEditor.lineHeight,
+			.bottom = position.y + theme.fontEditor.lineHeight});
 
 	// text
 	staticGlyphRun.Draw(deviceContext,
-		position.x + PADDING_X2 + style.fontEditor.lineHeight,
+		position.x + PADDING_X2 + theme.fontEditor.lineHeight,
 		position.y,
-		style.fontEditor,
-		style.GetBrushUiText());
+		theme.fontEditor,
+		theme.GetBrushUiText());
 	
 	return true;
 }
@@ -83,5 +83,5 @@ D2D_POINT_2F EditorCaretAttached::GetPosition() const {
 	const D2D1_POINT_2F cursorPosition = owner->GetCaretLocation();
 	return D2D_POINT_2F {
 		.x = cursorPosition.x,
-		.y = cursorPosition.y + style.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+		.y = cursorPosition.y + theme.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 }

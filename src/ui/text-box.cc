@@ -2,9 +2,9 @@
 #include "basic.hh"
 #include "globals.hh"
 #include "events.hh"
+#include "theme.hh"
 
 #include "ui/constants.h"
-#include "ui/style.hh"
 
 #include "util/logging.hh"
 #include "util/rect-util.hh"
@@ -60,9 +60,9 @@ void TextBox::OnUpdate() {
 	//
 	{
 		ID2D1SolidColorBrush* brush = nullptr;
-		if      (invalid)  brush = style.GetBrushUiBackgroundInvalid();
-		else if (inactive) brush = style.GetBrushUiBackground(false);
-		else               brush = style.GetBrushUiBackground(true);
+		if      (invalid)  brush = theme.GetBrushUiBackgroundInvalid();
+		else if (inactive) brush = theme.GetBrushUiBackground(false);
+		else               brush = theme.GetBrushUiBackground(true);
 		
 		const D2D1_ROUNDED_RECT roundedArea = MakeRoundedRect(area, RADIUS);
 		deviceContext->FillRoundedRectangle(roundedArea, brush);
@@ -77,7 +77,7 @@ void TextBox::OnUpdate() {
 			position.x + PADDING,
 			position.y + PADDING,
 			*font,
-			style.GetBrushUiText());
+			theme.GetBrushUiText());
 	
 	} else {
 		staticGlyphRun.ShapeAndDraw(deviceContext,
@@ -85,7 +85,7 @@ void TextBox::OnUpdate() {
 			position.x + PADDING,
 			position.y + PADDING,
 			*font,
-			style.GetBrushUiText(false));
+			theme.GetBrushUiText(false));
 	}
 
 	// draw cursor
@@ -100,7 +100,7 @@ void TextBox::OnUpdate() {
 				.top    = position.y + PADDING,
 				.right  = position.x + PADDING + offsetCursor + 2.0f,
 				.bottom = position.y + PADDING + font->lineHeight},
-			style.GetBrushUiText());
+			theme.GetBrushUiText());
 	}
 
 	// draw selection
@@ -118,7 +118,7 @@ void TextBox::OnUpdate() {
 				.top    = position.y + PADDING,
 				.right  = position.x + PADDING + offsetEnd,
 				.bottom = position.y + PADDING + font->lineHeight},
-			style.GetBrushSelection(!inactive));
+			theme.GetBrushSelection(!inactive));
 	}	
 }
 

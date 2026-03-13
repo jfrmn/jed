@@ -1,14 +1,13 @@
 #include "status-bar.hh"
 #include "globals.hh"
 #include "main-window.hh"
+#include "theme.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
 #include "editor/editor-diagnosticslist.hh"
 
 #include "ui/constants.h"
-#include "ui/style.hh"
-
 #include "util/rect-util.hh"
 #include "language/language.hh"
 #include "graphics/effects.hh"
@@ -50,7 +49,7 @@ static D2D_RECT_F GetArea(const f32 posX, const f32 width, bool l2r) {
 	
 	return D2D_RECT_F {
 		.left   = left,
-		.top    = mainWindow.height - PADDING_X2 - style.fontUi.lineHeight,
+		.top    = mainWindow.height - PADDING_X2 - theme.fontUi.lineHeight,
 		.right  = right,
 		.bottom = mainWindow.height};
 }
@@ -96,18 +95,21 @@ static void OnClickExplorerItem(void*, u64) {
 static f32 UpdateExplorerButton(StatusBar* self, f32 posX, u64 i) {
 	
 	const bool l2r = IsL2R(self, i);	
-	const f32 width = PADDING_X2 + style.fontUi.lineHeight;
+	const f32 width = PADDING_X2 + theme.fontUi.lineHeight;
 	const D2D_RECT_F area = GetArea(posX, width, l2r);
 		
-	Style::Icon icon = mainWindow.explorer ? Style::Icon_Explorer_FolderOpen : Style::Icon_Explorer_FolderClosed;
-	deviceContext->DrawBitmap(style.icons[icon], D2D_RECT_F {
-		.left   = area.left + PADDING,
-		.top    = mainWindow.height - style.fontUi.lineHeight - PADDING,
-		.right  = area.right - PADDING,
-		.bottom = mainWindow.height - PADDING});
+	deviceContext->DrawBitmap(
+		mainWindow.explorer
+			? theme.icons.explorerFolderOpen
+			: theme.icons.explorerFolderClosed,
+		D2D_RECT_F {
+			.left   = area.left + PADDING,
+			.top    = mainWindow.height - theme.fontUi.lineHeight - PADDING,
+			.right  = area.right - PADDING,
+			.bottom = mainWindow.height - PADDING});
 	
 	if (mouse.Hittest(area, self, OnClickExplorerItem)) {
-		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(area, theme.GetBrushHover(mouse.isDown));
 	}
 	
 	return l2r ? area.right : area.left;
@@ -143,33 +145,32 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 	
 	const std::scoped_lock lock {mainWindow.console.mtx};
 	
-	style.brush->SetColor(D2D1::ColorF(D2D1::ColorF::Green));
 	deviceContext->FillRoundedRectangle(
 		MakeRoundedRect(
 			area.left,
 			area.top + PADDING,
 			PROGRESS_BAR_WIDTH * mainWindow.console.progressValue,
-			style.fontUi.lineHeight,
+			theme.fontUi.lineHeight,
 			RADIUS),
-		style.brush);
+		GetBrush(D2D1::ColorF(D2D1::ColorF::Green)));
 	
 	deviceContext->DrawRoundedRectangle(
 		MakeRoundedRect(
 			area.left,
 			area.top + PADDING,
 			PROGRESS_BAR_WIDTH,
-			style.fontUi.lineHeight,
+			theme.fontUi.lineHeight,
 			RADIUS),
-		style.GetBrushUiText());
+		theme.GetBrushUiText());
 	
 	GlyphRun run;
-	run.Shape(mainWindow.console.progressText, style.fontUi);
+	run.Shape(mainWindow.console.progressText, theme.fontUi);
 	run.DrawCenter(deviceContext,
 		area.left,
 		area.top + PADDING,
 		RectWidth(area),
-		style.fontUi,
-		style.GetBrushUiText());
+		theme.fontUi,
+		theme.GetBrushUiText());
 		
 	return posX;		
 }
@@ -193,58 +194,56 @@ static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 	if (!focusedEditor) return posX;
 	
 	GlyphRun currentLanguageName {};
-	currentLanguageName.Shape(focusedEditor->language ? focusedEditor->language->name : "None", style.fontUi);
+	currentLanguageName.Shape(focusedEditor->language ? focusedEditor->language->name : "None", theme.fontUi);
 	
 	const bool l2r = IsL2R(self, i);
-	const f32 width = currentLanguageName.width + PADDING_X4 + style.fontUi.lineHeight;
+	const f32 width = currentLanguageName.width + PADDING_X4 + theme.fontUi.lineHeight;
 	const D2D_RECT_F area = GetArea(posX, width, l2r);
 	
 	if (focusedEditor->language && focusedEditor->language->HasLanguageServer()) {
-		Style::Icon icon = Style::Icon_Unknown;
+		ID2D1Bitmap* icon = theme.icons.unknown;
 		D2D_COLOR_F color {};
 		if (focusedEditor->language->server.state == LanguageServer::State_Standby) {
-			icon = Style::Icon_Lsp_Standby;
+			icon = theme.icons.lspStandby;
 			color = D2D1::ColorF(D2D1::ColorF::Black);
 		} else if (focusedEditor->language->server.state == LanguageServer::State_Initializing) {
-			icon = Style::Icon_Lsp_Initializing;
+			icon = theme.icons.lspInitializing;
 			color = D2D1::ColorF(D2D1::ColorF::DarkGreen);
 		} else if (focusedEditor->language->server.state == LanguageServer::State_Running) {
-			icon = Style::Icon_Lsp_Running;
+			icon = theme.icons.lspRunning;
 			color = D2D1::ColorF(D2D1::ColorF::Green);
 		} else if (focusedEditor->language->server.state == LanguageServer::State_ShuttingDown) {
-			icon = Style::Icon_Lsp_ShuttingDown;
+			icon = theme.icons.lspShuttingDown;
 			color = D2D1::ColorF(D2D1::ColorF::LightGreen);
 		} else if (focusedEditor->language->server.state == LanguageServer::State_Exited) {
-			icon = Style::Icon_Lsp_Exited;
+			icon = theme.icons.lspExited;
 			color = D2D1::ColorF(D2D1::ColorF::Gray);
 		} else if (focusedEditor->language->server.state == LanguageServer::State_Crashed) {
-			icon = Style::Icon_Lsp_Crashed;
+			icon = theme.icons.lspCrashed;
 			color = D2D1::ColorF(D2D1::ColorF::Red);
 		} else ASSERT_UNREACHABLE;
 	
-		style.brush->SetColor(color);
-		
 		deviceContext->FillRectangle(
 			MakeRect(
 				area.left,
 				area.top,
-				style.fontUi.lineHeight + PADDING_X2,
-				style.fontUi.lineHeight + PADDING_X2),
-			style.brush);
+				theme.fontUi.lineHeight + PADDING_X2,
+				theme.fontUi.lineHeight + PADDING_X2),
+			GetBrush(color));
 	
 		deviceContext->DrawBitmap(
-			style.icons[icon],
+			icon,
 			MakeRect(
 				area.left + PADDING,
 				area.top + PADDING,
-				style.fontUi.lineHeight,
-				style.fontUi.lineHeight));
+				theme.fontUi.lineHeight,
+				theme.fontUi.lineHeight));
 	}
 	
-	currentLanguageName.Draw(deviceContext, area.left + PADDING_X3 + style.fontUi.lineHeight, area.top + PADDING, style.fontUi, style.GetBrushUiText());
+	currentLanguageName.Draw(deviceContext, area.left + PADDING_X3 + theme.fontUi.lineHeight, area.top + PADDING, theme.fontUi, theme.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickLanguageSelector))
-		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(area, theme.GetBrushHover(mouse.isDown));
 	
 	return l2r ? area.right : area.left;
 		
@@ -400,9 +399,9 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			const std::string_view text {buffer, result.ptr};
 			
 			GlyphRun& run = glyphRuns[i];
-			run.Shape(text, style.fontUi);
+			run.Shape(text, theme.fontUi);
 			
-			totalWidth += run.width + style.fontUi.lineHeight + PADDING_X3;
+			totalWidth += run.width + theme.fontUi.lineHeight + PADDING_X3;
 		}
 	}
 	
@@ -411,7 +410,7 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 	
 	const bool diagnosticsListIsCurrentlyOpen = focusedEditor->toolWindow && focusedEditor->toolWindow->IsDiagnosticsList();
 	if (diagnosticsListIsCurrentlyOpen)
-		deviceContext->FillRectangle(area, style.GetBrushToggled());
+		deviceContext->FillRectangle(area, theme.GetBrushToggled());
 	
 	//
 	// draw
@@ -424,23 +423,23 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			if (recordCount == 0u) continue;
 			
 			deviceContext->DrawBitmap(
-				style.icons[Diagnostics::SEVERITY_ICON_INDICIES[i]],
+				theme.iconArray[Diagnostics::SEVERITY_ICON_INDICIES[i]],
 				MakeRect(
 					area.left + offsetX + PADDING,
-					mainWindow.height - style.fontUi.lineHeight - PADDING,
-					style.fontUi.lineHeight,
-					style.fontUi.lineHeight));
+					mainWindow.height - theme.fontUi.lineHeight - PADDING,
+					theme.fontUi.lineHeight,
+					theme.fontUi.lineHeight));
 			
 			//localPenX += PADDING_X2 + style.fontUi.lineHeight;
 			
 			GlyphRun& run = glyphRuns[i];
 			run.Draw(deviceContext,
-				area.left + offsetX + style.fontUi.lineHeight + PADDING_X2,
-				mainWindow.height - style.fontUi.lineHeight - PADDING,
-				style.fontUi,
-				style.GetBrushUiText());
+				area.left + offsetX + theme.fontUi.lineHeight + PADDING_X2,
+				mainWindow.height - theme.fontUi.lineHeight - PADDING,
+				theme.fontUi,
+				theme.GetBrushUiText());
 			
-			offsetX += run.width + style.fontUi.lineHeight + PADDING_X3;
+			offsetX += run.width + theme.fontUi.lineHeight + PADDING_X3;
 		}
 		
 		ASSERT(area.left + offsetX == area.right);
@@ -449,7 +448,7 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 	// @FIXME we pass the editor as the hotElement, check if this interferes in any way with the editor mouse logic
 	// if not remove this FIXME 
 	if (mouse.Hittest(area, focusedEditor, OnClickDiagnostics, diagnosticsListIsCurrentlyOpen)) {
-		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(area, theme.GetBrushHover(mouse.isDown));
 	}
 	
 	return l2r ? area.left : area.right;
@@ -534,15 +533,15 @@ static void GetCaretInfoTextNormal(StatusBar* self, const TextController& contro
 		info->textColor[0].color = D2D_COLOR_F {0.0f, 0.0f, 0.0f, 1.0f};
 		
 		info->bgColorRangeIndex = 0u;
-		info->bgColor = style.colors[Style::Color_Selection];
+		info->bgColor = theme.colors.selection;
 		
 		info->text.push_back(' ');
 	}
 		
-	AppendWithColor(info, "Line ", style.colors[Style::Color_UiTextInactive]);
+	AppendWithColor(info, "Line ", theme.colors.uiTextInactive);
 	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
 	
-	AppendWithColor(info, " Char ", style.colors[Style::Color_UiTextInactive]);
+	AppendWithColor(info, " Char ", theme.colors.uiTextInactive);
 	AppendNumber(numberBuffer, info, controller.carets.front().position.column);
 	
 }
@@ -565,14 +564,14 @@ static void GetCaretInfoTextEditCarets(StatusBar* self, const TextController& co
 	info->textColor[0].color = D2D_COLOR_F {0.0f, 0.0f, 0.0f, 1.0f};
 	
 	info->bgColorRangeIndex = 0u;
-	info->bgColor = style.colors[Style::Color_EditorMultiCaretEdit];
+	info->bgColor = theme.colors.editorMultiCaretEdit;
 	
 	info->text.push_back(' ');
 	
-	AppendWithColor(info, "Line ", style.colors[Style::Color_UiTextInactive]);
+	AppendWithColor(info, "Line ", theme.colors.uiTextInactive);
 	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
 	
-	AppendWithColor(info, " Char ", style.colors[Style::Color_UiTextInactive]);
+	AppendWithColor(info, " Char ", theme.colors.uiTextInactive);
 	AppendNumber(numberBuffer, info, controller.carets.front().position.column);
 }
 
@@ -581,7 +580,7 @@ static void GetCaretInfoTextMultiCarets(StatusBar* self, const TextController& c
 	char numberBuffer[NUMBER_BUFFER_SIZE];
 	
 	AppendNumber(numberBuffer, info, controller.carets.size());
-	AppendWithColor(info, " carets ", style.colors[Style::Color_UiTextInactive]);
+	AppendWithColor(info, " carets ", theme.colors.uiTextInactive);
 }
 
 static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
@@ -601,7 +600,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 	}
 	
 	GlyphRun run {};
-	run.Shape(caretInfoText.text, style.fontUi);
+	run.Shape(caretInfoText.text, theme.fontUi);
 	
 	const bool l2r = IsL2R(self, i);
 	const D2D_RECT_F area = GetArea(posX, run.width + PADDING_X2, l2r);
@@ -613,7 +612,6 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		f32 offsetFrom, offsetTo;
 		run.MeasureOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
 		
-		style.brush->SetColor(caretInfoText.bgColor);
 		deviceContext->FillRoundedRectangle(
 			MakeRoundedRect(
 				D2D_RECT_F {
@@ -622,7 +620,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 					.right = area.left + PADDING + offsetTo,
 					.bottom = area.bottom - PADDING},
 				RADIUS),
-			style.brush);
+			GetBrush(caretInfoText.bgColor));
 	}
 	
 	ID2D1Bitmap* bitmapText = nullptr, *bitmapColor = nullptr;
@@ -634,7 +632,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		renderTarget->BeginDraw();
 		renderTarget->Clear();
 	
-		run.Draw(renderTarget, PADDING, PADDING, style.fontUi, alphaMaskBrush);
+		run.Draw(renderTarget, PADDING, PADDING, theme.fontUi, alphaMaskBrush);
 		
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
 			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
@@ -646,7 +644,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		if (!renderTarget) return posX;
 	
 		renderTarget->BeginDraw();
-		renderTarget->Clear(style.colors[Style::Color_UiText]);
+		renderTarget->Clear(theme.colors.uiText);
 		DEFER(renderTarget->Release());
 			
 		for (u64 i = 0u; i < caretInfoText.textColorCount; i++) {
@@ -654,16 +652,14 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 			
 			f32 offsetFrom, offsetTo;
 			run.MeasureOffsetRange(colorArea.from, colorArea.to, &offsetFrom, &offsetTo);
-			
-			style.brush->SetColor(colorArea.color);
-			
+						
 			renderTarget->FillRectangle(
 				D2D_RECT_F {
 					.left = PADDING + offsetFrom,
 					.top = 0u,
 					.right = PADDING + offsetTo,
 					.bottom = areaSize.height},
-				style.brush);
+				GetBrush(colorArea.color));
 		}
 			
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
@@ -687,14 +683,14 @@ static void OnClickEncodingSelector(void*, u64) {
 }
 
 static f32 UpdateEncodingSelector(StatusBar* self, f32 posX, u64 i) {
-	staticGlyphRun.Shape("utf-8", style.fontUi);	
+	staticGlyphRun.Shape("utf-8", theme.fontUi);	
 	
 	const bool l2r = IsL2R(self, i);
 	const D2D_RECT_F area = GetArea(posX, staticGlyphRun.width + PADDING_X2, l2r);
-	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, style.fontUi, style.GetBrushUiText());
+	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, theme.fontUi, theme.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickEncodingSelector)) {
-		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(area, theme.GetBrushHover(mouse.isDown));
 	}
 	
 	return l2r ? area.right : area.left;
@@ -707,14 +703,14 @@ static void OnClickLineEndingSelector(void*) {
 }
 
 static f32 UpdateLineEndingSelector(StatusBar* self, f32 posX, u64 i) {
-	staticGlyphRun.Shape("Cr-Lf", style.fontUi);	
+	staticGlyphRun.Shape("Cr-Lf", theme.fontUi);	
 	
 	const bool l2r = IsL2R(self, i);
 	const D2D_RECT_F area = GetArea(posX, staticGlyphRun.width + PADDING_X2, l2r);
-	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, style.fontUi, style.GetBrushUiText());
+	staticGlyphRun.Draw(deviceContext, area.left + PADDING, area.top + PADDING, theme.fontUi, theme.GetBrushUiText());
 	
 	if (mouse.Hittest(area, self, OnClickEncodingSelector)) {
-		deviceContext->FillRectangle(area, style.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(area, theme.GetBrushHover(mouse.isDown));
 	}
 	
 	return l2r ? area.right : area.left;
@@ -795,7 +791,7 @@ void StatusBar::OnUpdate() {
 	deviceContext->FillRectangle(
 		D2D1_RECT_F {
 			.left = 0,
-			.top = mainWindow.height - style.fontUi.lineHeight - PADDING_X2,
+			.top = mainWindow.height - theme.fontUi.lineHeight - PADDING_X2,
 			.right = mainWindow.width,
 			.bottom = mainWindow.height},
 		brushBg);
@@ -827,8 +823,8 @@ void StatusBar::OnUpdate() {
 					.y = mainWindow.height - PADDING},
 				D2D_POINT_2F {
 					.x = posX,
-					.y = mainWindow.height - PADDING - style.fontUi.lineHeight},
-				style.GetBrushUiText(false));
+					.y = mainWindow.height - PADDING - theme.fontUi.lineHeight},
+				theme.GetBrushUiText(false));
 				
 			posX = l2r
 				? posX + PADDING

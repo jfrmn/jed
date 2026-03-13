@@ -110,11 +110,14 @@ struct ShapingBuffer {
 	}
 	
 	void PrepareShapingTextData(u32 capacity) {
-		if (capacity <= shapingTextDataCapacity) return;
-			
-		clusterMap.reset(new UINT16[capacity]);
-		textProperties.reset(new DWRITE_SHAPING_TEXT_PROPERTIES[capacity]);
-		shapingTextDataCapacity = capacity;
+		if (capacity <= shapingTextDataCapacity) {
+			memset(clusterMap.get(), 0, sizeof(clusterMap[0]) * shapingTextDataCapacity);
+			memset(textProperties.get(), 0, sizeof(textProperties[0]) * shapingTextDataCapacity);
+		} else {
+			clusterMap.reset(new UINT16[capacity]);
+			textProperties.reset(new DWRITE_SHAPING_TEXT_PROPERTIES[capacity]);
+			shapingTextDataCapacity = capacity;
+		}
 	}
 		
 	void ReallocateShapingGlyphData(u32 newCapacity) {
@@ -132,9 +135,7 @@ struct ShapingBuffer {
 		shapingGlyphDataCapacity = newCapacity;
 	}
 
-	void ClearShapingData() {
-		memset(clusterMap.get(),      0, sizeof(clusterMap[0])      * shapingTextDataCapacity);
-		memset(textProperties.get(),  0, sizeof(textProperties[0])  * shapingTextDataCapacity);
+	void ClearShapingGlyphData() {
 		memset(glyphOffsets.get(),    0, sizeof(glyphOffsets[0])    * shapingGlyphDataCapacity);
 		memset(glyphProperties.get(), 0, sizeof(glyphProperties[0]) * shapingGlyphDataCapacity);
 	}
@@ -391,11 +392,10 @@ static u64 CalculateGlyphArraySize(u32 capacity) {
 static void ReallocateGlyphs(GlyphRun* self, u32 newCapacity) {
 	if (newCapacity <= self->glyphCapacity) return;
 	
-	const u64 oldArraySize = CalculateGlyphArraySize(self->glyphCapacity);
 	const u64 newArraySize = CalculateGlyphArraySize(newCapacity);
-	
 	f32* newMemory = new f32[newArraySize];
-	memcpy(self->glyphAdvances.get(), newMemory, oldArraySize * sizeof(f32));
+	memcpy(newMemory,               self->glyphAdvances.get(), self->glyphCount * sizeof(f32));
+	memcpy(newMemory + newCapacity, self->glyphIndicies,       self->glyphCount * sizeof(u16));
 	
 	self->glyphAdvances.reset(newMemory);
 	self->glyphIndicies = reinterpret_cast<u16*>(self->glyphAdvances.get() + newCapacity);
@@ -442,11 +442,10 @@ static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& fon
 		return false;
 	}
 	
-	shapingBuffer->PrepareShapingTextData(utf16Length);
-	
 	u32 charMappingWritten = 0u;
 	for (const ScriptAnalysisRecord& scriptAnalysisRecord : textAnalysisSink) {		
-		shapingBuffer->ClearShapingData();
+		shapingBuffer->PrepareShapingTextData(scriptAnalysisRecord.length);
+		shapingBuffer->ClearShapingGlyphData();
 		
 		u32 numGlyphsInChunk = 0u;
 		while (true) {
@@ -633,7 +632,7 @@ static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGe
 	//if (false) {
 		ASSERT(systemInfo.dwNumberOfProcessors > 0);
 		
-		const u32 threadCount = systemInfo.dwNumberOfProcessors;
+		const u32 threadCount = 1;//systemInfo.dwNumberOfProcessors;
 		
 		auto handles = new HANDLE[threadCount];
 		DEFER({
@@ -720,20 +719,24 @@ void GlyphRun::Draw(ID2D1RenderTarget* renderTarget, f32 x, f32 y, const Font& f
 
 void GlyphRun::DrawPartial(ID2D1RenderTarget* renderTarget, f32 x, f32 y, u64 startChar, u64 charCount, const Font& font, ID2D1SolidColorBrush* brush, /*out*/ f32* drawWidth /*= nullptr*/) const {
 	if (glyphCount == 0u) return;
+	if (charCount == 0u) return;
 	
-	ASSERT(startChar <  glyphCount);
+	ASSERT(startChar <  this->charCount);
 	ASSERT(startChar <= U32_MAX);
 	
 	const u32 startGlyphIndex = charMapping[startChar];
 	
-	const u64 endChar = std::min(startChar + charCount, charCount - 1u);
+	if (charCount > this->charCount - startChar - 1u)
+		charCount = this->charCount - startChar - 1u;
+
+	const u64 endChar = startChar + charCount;
 	const u32 endGlyphIndex = charMapping[endChar];
 	ASSERT(startGlyphIndex < endGlyphIndex);
 	
 	const DWRITE_GLYPH_RUN glyphRun {
 		.fontFace      = font.fontFace,
 		.fontEmSize    = font.size,
-		.glyphCount    = endGlyphIndex - startGlyphIndex,
+		.glyphCount    = endGlyphIndex - startGlyphIndex + 1u,
 		.glyphIndices  = glyphIndicies + startGlyphIndex,
 		.glyphAdvances = glyphAdvances.get() + startGlyphIndex,
 		.glyphOffsets  = nullptr,

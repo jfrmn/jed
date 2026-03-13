@@ -2,21 +2,20 @@
 #include "basic.hh"
 #include "key-bindings.hh"
 #include "globals.hh"
+#include "theme.hh"
 
 #include "file-search-bar.hh"
 #include "explorer.hh"
 #include "console.hh"
 #include "commands/tool-search-bar.hh"
 
-#include "editor/editor.hh"
-#include "ui/constants.h"
-#include "ui/style.hh"
-
 #include "util/logging.hh"
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 
 #include "graphics/effects.hh"
+#include "editor/editor.hh"
+#include "ui/constants.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -164,11 +163,11 @@ static void RelinkPanelsAndTabs(MainWindow* self) {
 }
 
 static float GetTabHeight() {
-	return style.fontUi.lineHeight + PADDING_X2;
+	return theme.fontUi.lineHeight + PADDING_X2;
 }
 
 static float GetStatusBarHeight() {
-	return style.fontUi.lineHeight + PADDING_X2;
+	return theme.fontUi.lineHeight + PADDING_X2;
 }
 
 static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
@@ -267,7 +266,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			}
 			
 			currentTab.title = title;
-			currentTab.tabWidth = style.fontUi.MeasureText(title) + style.fontUi.lineHeight + PADDING_X3;
+			currentTab.tabWidth = theme.fontUi.MeasureText(title) + theme.fontUi.lineHeight + PADDING_X3;
 			return currentTab.editor;
 		
 		} else {
@@ -281,7 +280,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			
 			MainWindow::Tab& newTab = tabs.emplace_back();
 			newTab.title = title,
-			newTab.tabWidth = style.fontUi.MeasureText(title) + style.fontUi.lineHeight + PADDING_X3,
+			newTab.tabWidth = theme.fontUi.MeasureText(title) + theme.fontUi.lineHeight + PADDING_X3,
 			newTab.editor = editor.release();
 			
 			if (openBehavior == MainWindow::OpenBehavior_Default) {
@@ -349,10 +348,10 @@ void MainWindow::OnUpdate() {
 				borderRect.right -= 1.0f;
 						
 				if (drawFocusedPanelBorder)
-					deviceContext->DrawRectangle(borderRect, style.GetBrushSelection(), 2.0f);
+					deviceContext->DrawRectangle(borderRect, theme.GetBrushSelection(), 2.0f);
 							
 				if (drawHoverPanelBorder)
-					deviceContext->DrawRectangle(borderRect, style.GetBrushHover(), 2.0f);
+					deviceContext->DrawRectangle(borderRect, theme.GetBrushHover(), 2.0f);
 			}
 		}
 	}
@@ -375,18 +374,18 @@ void MainWindow::OnUpdate() {
 				.bottom = tabHeight };
 						
 			if (tab.panelIndex == focusedPanelIndex) {
-				deviceContext->FillRectangle(tabRect, style.GetBrushGlow());
+				deviceContext->FillRectangle(tabRect, theme.GetBrushGlow());
 			
 			} else if (tab.panelIndex != U64_MAX) {
-				deviceContext->FillRectangle(tabRect, style.GetBrushUiBackground(false));
+				deviceContext->FillRectangle(tabRect, theme.GetBrushUiBackground(false));
 			}
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
 			 	tab.title,
 				PADDING + offsetX,
 				PADDING,
-				style.fontUi,
-				style.GetBrushUiText());
+				theme.fontUi,
+				theme.GetBrushUiText());
 						
 			const bool isHovered = mouse.Hittest(tabRect, this, OnClickTab, i);
 			
@@ -395,34 +394,34 @@ void MainWindow::OnUpdate() {
 			// draw tab icon
 			{
 				ID2D1Bitmap* icon = nullptr;
-				if      (tab.editor->modified && isHovered) icon = style.icons[Style::Icon_Tabs_ModifiedHovered];
-				else if (tab.editor->modified)              icon = style.icons[Style::Icon_Tabs_Modified];
-				else if (isHovered)                         icon = style.icons[Style::Icon_Tabs_Hovered];
+				if      (tab.editor->modified && isHovered) icon = theme.icons.tabsModifiedHovered;
+				else if (tab.editor->modified)              icon = theme.icons.tabsModified;
+				else if (isHovered)                         icon = theme.icons.tabsHovered;
 					
 				if (icon) {
 					const f32 totalGlyphAdvances = staticGlyphRun.width;
 					const D2D1_RECT_F iconHitbox {
 						.left   = PADDING + offsetX + totalGlyphAdvances,
 						.top    = 0.0f,
-						.right  = PADDING + offsetX + totalGlyphAdvances + style.fontUi.lineHeight + PADDING_X2,
-						.bottom = PADDING_X2 + style.fontUi.lineHeight};
+						.right  = PADDING + offsetX + totalGlyphAdvances + theme.fontUi.lineHeight + PADDING_X2,
+						.bottom = PADDING_X2 + theme.fontUi.lineHeight};
 					
 					const D2D1_RECT_F iconTargetRect {
-						.left   = iconHitbox.left + PADDING,
-						.top    = iconHitbox.top + PADDING,
-						.right  = iconHitbox.right - PADDING,
+						.left   = iconHitbox.left   + PADDING,
+						.top    = iconHitbox.top    + PADDING,
+						.right  = iconHitbox.right  - PADDING,
 						.bottom = iconHitbox.bottom - PADDING};
-					deviceContext->FillOpacityMask(icon, style.GetBrushUiText(), &iconTargetRect, nullptr);
+					deviceContext->FillOpacityMask(icon, theme.GetBrushUiText(), &iconTargetRect, nullptr);
 					
 					if (RectContains(iconHitbox, mouse.x, mouse.y)) {
-						deviceContext->FillRectangle(iconHitbox, style.GetBrushHover(mouse.isDown));
+						deviceContext->FillRectangle(iconHitbox, theme.GetBrushHover(mouse.isDown));
 						isCloseIconHovered = true;
 					}
 				}
 			}
 			
 			if (isHovered && !isCloseIconHovered)
-				deviceContext->FillRectangle(tabRect, style.GetBrushHover(mouse.isDown));
+				deviceContext->FillRectangle(tabRect, theme.GetBrushHover(mouse.isDown));
 			
 			offsetX += tab.tabWidth;
 		}
@@ -510,7 +509,7 @@ static void Hittest(const MainWindow* self, float mx, float my, u64* hitPanel, u
 			
 			offsetX += tab.tabWidth;
 			if (mx < offsetX) {
-				*hitCloseButton = (mx >= (offsetX - style.fontUi.lineHeight - PADDING_X2));
+				*hitCloseButton = (mx >= (offsetX - theme.fontUi.lineHeight - PADDING_X2));
 				*hitTab = i;
 				*hitPanel = U64_MAX;
 				return;

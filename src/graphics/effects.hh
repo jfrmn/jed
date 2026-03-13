@@ -10,6 +10,7 @@ struct D2D_RECT_F;
 struct D2D_POINT_2F;
 struct D2D_SIZE_F;
 struct D2D1_ROUNDED_RECT;
+struct _D3DCOLORVALUE;
 
 //-----------------------------------------------------------------------------
 // Init & Shutdown
@@ -39,3 +40,10 @@ extern ID2D1SolidColorBrush* alphaMaskBrush;
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D1_ROUNDED_RECT& area);
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& area);
 void PopLayer(ID2D1DeviceContext* deviceContext);
+
+//-----------------------------------------------------------------------------
+// global Brush
+//-----------------------------------------------------------------------------
+ID2D1SolidColorBrush* GetBrush(const _D3DCOLORVALUE& clr);
+
+extern ID2D1SolidColorBrush* brush;

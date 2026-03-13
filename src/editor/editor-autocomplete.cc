@@ -3,10 +3,9 @@
 #include "editor/editor-signaturehelp.hh"
 #include "globals.hh"
 #include "events.hh"
+#include "theme.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
-
 #include "util/rect-util.hh"
 #include "text/text-position.hh"
 #include "graphics/effects.hh"
@@ -46,16 +45,16 @@ void EditorAutocomplete::OnUpdate() {
 	DEFER(delete[] glyphRuns);
 	
 	f32 width = .0f;
-	f32 height = itemCount * style.fontEditor.lineHeight;
+	f32 height = itemCount * theme.fontEditor.lineHeight;
 	{
 		for (u64 i = 0u; i < itemCount; i++) {
 			GlyphRun& runLabel    = glyphRuns[i].first;
 			GlyphRun& runDetails  = glyphRuns[i].second;
 			
-			runLabel.Shape(items[i].label, style.fontEditor);
-			runDetails.Shape(items[i].details, style.fontEditor);
+			runLabel.Shape(items[i].label, theme.fontEditor);
+			runDetails.Shape(items[i].details, theme.fontEditor);
 			
-			const f32 currentWidth = (PADDING_X2 + style.fontEditor.GetSpaceAdvance()) + runLabel.width + runDetails.width + PADDING_X3;
+			const f32 currentWidth = (PADDING_X2 + theme.fontEditor.GetSpaceAdvance()) + runLabel.width + runDetails.width + PADDING_X3;
 			if (width < currentWidth)
 				width = currentWidth;
 		}
@@ -77,27 +76,27 @@ void EditorAutocomplete::OnUpdate() {
 		const GlyphRun& runLabel = glyphRuns[i].first;
 		const GlyphRun& runDetails  = glyphRuns[i].second;
 		
-		const f32 offsety = (style.fontEditor.lineHeight * i);
+		const f32 offsety = (theme.fontEditor.lineHeight * i);
 		
 		if (i == selectedItem) {
 			deviceContext->FillRectangle(
-				MakeRect(position.x, position.y + offsety, width, style.fontEditor.lineHeight),
-				style.GetBrushSelection());
+				MakeRect(position.x, position.y + offsety, width, theme.fontEditor.lineHeight),
+				theme.GetBrushSelection());
 		}
 		
 		// draw iocn
-		const u64 iconIndex = item.type == Item::Type_Unknown
-			? Style::Icon_Unknown
-			: static_cast<u64>(Style::Icon_EditorAutocomplete_Text - 1) + item.type;
+		ID2D1Bitmap* icon = item.type == Item::Type_Unknown
+			? theme.icons.unknown
+			: theme.icons.editorAutocompleteText + (item.type - 1);
 		
-		deviceContext->DrawBitmap(style.icons[iconIndex],
+		deviceContext->DrawBitmap(icon,
 			D2D1_RECT_F {
 				.left   = position.x + PADDING,
 				.top    = position.y + offsety,
-				.right  = position.x + PADDING + style.fontEditor.lineHeight,
-				.bottom = position.y + offsety + style.fontEditor.lineHeight});		
+				.right  = position.x + PADDING + theme.fontEditor.lineHeight,
+				.bottom = position.y + offsety + theme.fontEditor.lineHeight});		
 		
-		const f32 textPosX = position.x + PADDING_X2 + style.fontEditor.lineHeight;
+		const f32 textPosX = position.x + PADDING_X2 + theme.fontEditor.lineHeight;
 		const f32 textPosY = position.y + offsety;
 		
 		// draw match result
@@ -113,21 +112,21 @@ void EditorAutocomplete::OnUpdate() {
 					.left   = textPosX + offsetFrom,
 				    .top    = textPosY,
 				    .right  = textPosX + offsetTo,
-				    .bottom = textPosY + style.fontUi.lineHeight},
-				style.GetBrushUiSearchResult());
+				    .bottom = textPosY + theme.fontUi.lineHeight},
+				theme.GetBrushUiSearchResult());
 		}
 		
 		runLabel.Draw(deviceContext,
 			textPosX,
 			textPosY,
-			style.fontEditor,
-			style.GetBrushUiText());
+			theme.fontEditor,
+			theme.GetBrushUiText());
 		
 		runDetails.Draw(deviceContext,
 			textPosX + PADDING + runLabel.width,
 			textPosY,
-			style.fontEditor,
-			style.GetBrushUiText(false));
+			theme.fontEditor,
+			theme.GetBrushUiText(false));
 	}
 	
 	// draw signature help if active

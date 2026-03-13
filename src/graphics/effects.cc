@@ -1,8 +1,7 @@
 #include "effects.hh"
-
+#include "theme.hh"
 #include "util/logging.hh"
 #include "util/rect-util.hh"
-#include "ui/style.hh"
 #include "ui/constants.h"
 #include "graphics/factories.hh"
 
@@ -29,6 +28,9 @@ ID2D1Effect* blendEffect = nullptr;
 // because we use CreateCompatibleRenderTarget.
 // See: https://learn.microsoft.com/en-us/windows/win32/direct2d/resources-and-resource-domains#compatible-render-targets-and-shared-bitmaps
 ID2D1SolidColorBrush* alphaMaskBrush = nullptr;
+
+// global brush to use everywhere
+ID2D1SolidColorBrush* brush = nullptr;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool InitEffects(ID2D1DeviceContext* deviceContext) {
@@ -57,6 +59,11 @@ bool InitEffects(ID2D1DeviceContext* deviceContext) {
 	
 	blendEffect->SetValue(D2D1_BLEND_PROP_MODE, D2D1_BLEND_MODE_MULTIPLY);
 	
+	if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {0.0f, 0.0f, 0.0f, 1.0f}, &brush); hr != S_OK) {
+		LogError("CreateSolidColorBrush() failed for global brush. HRESULT: %", FHr(hr));
+		return false;
+	}
+
 	if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {1.0f, 1.0f, 1.0f, 1.0f}, &alphaMaskBrush); hr != S_OK) {
 		LogError("CreateSolidColorBrush() failed for alpha-mask-brush. HRESULT: %", FHr(hr));
 		return false;
@@ -85,6 +92,11 @@ void ShutdownEffects() {
 	if (alphaMaskBrush) {
 		alphaMaskBrush->Release();
 		alphaMaskBrush = nullptr;
+	}
+
+	if (brush) {
+		brush->Release();
+		brush = nullptr;
 	}
 }
 
@@ -140,10 +152,8 @@ void BlurArea(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& area, ID2D1Bi
 }
 
 void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area) {
-	const D2D_COLOR_F glowColor = style.colors[Style::Color_Glow];
-	
 	shadowEffect->SetInput(0, background);
-	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {glowColor.r, glowColor.g, glowColor.b, glowColor.a});
+	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {theme.colors.dropShadow.r, theme.colors.dropShadow.g, theme.colors.dropShadow.b, theme.colors.dropShadow.a});
 	deviceContext->DrawImage(shadowEffect, D2D1_POINT_2F {area.left, area.top});
 }
 
@@ -191,4 +201,10 @@ void PushLayer(ID2D1DeviceContext* deviceContext, const D2D1_ROUNDED_RECT& bound
 
 void PopLayer(ID2D1DeviceContext* deviceContext) {
 	deviceContext->PopLayer();
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1SolidColorBrush* GetBrush(const _D3DCOLORVALUE& clr) {
+	brush->SetColor(clr);
+	return brush;
 }

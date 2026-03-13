@@ -1,7 +1,7 @@
 #include "file-preview.hh"
 #include "globals.hh"
+#include "theme.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
 #include "graphics/effects.hh"
 
@@ -163,7 +163,7 @@ bool FilePreview::Load(const LoadArgs& args) {
 			GlyphRun& run = lines.emplace_back();
 			const TextBuffer::Line& line = textBuffer.GetLineAt(i);
 			
-			run.Shape(line.GetText(), style.fontEditor);
+			run.Shape(line.GetText(), theme.fontEditor);
 			
 			const f32 runWidth = run.width + PADDING_X2;
 			if (width < runWidth)
@@ -220,7 +220,7 @@ void FilePreview::OnUpdate() {
 	
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
-		run.Draw(deviceContext, x + PADDING, y + (i * style.fontEditor.lineHeight) + PADDING, style.fontEditor, style.GetBrushEditorText());
+		run.Draw(deviceContext, x + PADDING, y + (i * theme.fontEditor.lineHeight) + PADDING, theme.fontEditor, theme.GetBrushEditorText());
 	}
 	
 	deviceContext->PopAxisAlignedClip();
@@ -228,6 +228,6 @@ void FilePreview::OnUpdate() {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 D2D_RECT_F FilePreview::GetArea() const {
-	const f32 height = lines.size() * style.fontEditor.lineHeight + PADDING_X2;
+	const f32 height = lines.size() * theme.fontEditor.lineHeight + PADDING_X2;
 	return MakeRect(x, y, width, height);
 }

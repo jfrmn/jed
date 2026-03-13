@@ -3,8 +3,8 @@
 #include "globals.hh"
 #include "editor.hh"
 #include "main-window.hh"
+#include "theme.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
 
 #include "graphics/glyph-run.hh"
@@ -59,15 +59,15 @@ void EditorTextLocationList::OnUpdate() {
 		
 		const std::string_view directory = GetDirectoryFromPath(item.targetPath);
 		
-		runLabel.Shape(label, style.fontUi);
-		runFullPath.Shape(directory, style.fontUi);
+		runLabel.Shape(label, theme.fontUi);
+		runFullPath.Shape(directory, theme.fontUi);
 		
 		const f32 currentItemWidth = PADDING_X3 + runLabel.width + runFullPath.width;
 		if (width < currentItemWidth)
 			width = currentItemWidth;
 	}
 	
-	const f32 height = style.fontUi.lineHeight * itemCount;
+	const f32 height = theme.fontUi.lineHeight * itemCount;
 	const D2D_POINT_2F position = GetPosition();	
 	
 	//
@@ -82,7 +82,7 @@ void EditorTextLocationList::OnUpdate() {
 		GlyphRun& runLabel    = glyphRuns[i].first;
 		GlyphRun& runFullPath = glyphRuns[i].second;
 		
-		const f32 posY = position.y + (style.fontUi.lineHeight * i);
+		const f32 posY = position.y + (theme.fontUi.lineHeight * i);
 		
 		if (i == selectedItem) {
 			deviceContext->FillRectangle(
@@ -90,12 +90,12 @@ void EditorTextLocationList::OnUpdate() {
 					.left   = position.x,
 					.top    = posY,
 					.right  = position.x + width, //runLabel.GetTotalAdvance() + runFullPath.GetTotalAdvance() + PADDING_X3,
-					.bottom = position.y + style.fontUi.lineHeight},
-				style.GetBrushSelection());
+					.bottom = position.y + theme.fontUi.lineHeight},
+				theme.GetBrushSelection());
 		}
 		
-		runLabel.Draw(deviceContext, position.x + PADDING, posY, style.fontUi, style.GetBrushUiText());
-		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (style.fontUi.lineHeight * i), style.fontUi, style.GetBrushUiText(false));
+		runLabel.Draw(deviceContext, position.x + PADDING, posY, theme.fontUi, theme.GetBrushUiText());
+		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (theme.fontUi.lineHeight * i), theme.fontUi, theme.GetBrushUiText(false));
 	}
 	
 	//
@@ -103,9 +103,9 @@ void EditorTextLocationList::OnUpdate() {
 	//
 	{
 		filePreview.x = position.x + width;
-		filePreview.y = position.y + (selectedItem * style.fontUi.lineHeight);
+		filePreview.y = position.y + (selectedItem * theme.fontUi.lineHeight);
 		filePreview.OnUpdate();
-		deviceContext->DrawRectangle(filePreview.GetArea(), style.GetBrushSelection());	
+		deviceContext->DrawRectangle(filePreview.GetArea(), theme.GetBrushSelection());	
 	}
 }
 
@@ -165,8 +165,8 @@ bool EditorTextLocationList::OnKeyDown(KeyEvent event) {
 			} else {
 				// The scrollarea.totalSize is not set yet. Right now, it gets updated every frame but no frame has been rendered yet
 				// Therefore scrollarea.GetMaxPositionY() does not work correctly and we need to calc the max. position manually here
-				const f32 maxPosition = (openedEditor->textController.buffer.LineCount() * style.fontEditor.lineHeight) - openedEditor->scrollarea.vpSize.height;
-				const f32 targetPostion = (style.fontEditor.lineHeight * item.selectionRange.start.line) - (openedEditor->scrollarea.vpSize.height * 0.4f);
+				const f32 maxPosition = (openedEditor->textController.buffer.LineCount() * theme.fontEditor.lineHeight) - openedEditor->scrollarea.vpSize.height;
+				const f32 targetPostion = (theme.fontEditor.lineHeight * item.selectionRange.start.line) - (openedEditor->scrollarea.vpSize.height * 0.4f);
 				
 				openedEditor->scrollarea.vpY = std::clamp(targetPostion, 0.0f, maxPosition);
 			}

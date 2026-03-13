@@ -3,10 +3,9 @@
 #include "main-window.hh"
 #include "globals.hh"
 #include "events.hh"
+#include "theme.hh"
 
 #include "ui/constants.h"
-#include "ui/style.hh"
-
 #include "util/rect-util.hh"
 #include "graphics/effects.hh"
 #include "commands/parameter-configurator.hh"
@@ -19,7 +18,7 @@ static constexpr float ITEM_HIGHLIGHT_OPACITY_SPEED = 0.004f;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static float GetItemHeight() {
-	return MARGIN_X2 + (style.fontUi.lineHeight * 2);
+	return MARGIN_X2 + (theme.fontUi.lineHeight * 2);
 }
 
 static void UpdateItems(SearchBar* self) {
@@ -36,7 +35,7 @@ static void UpdateItems(SearchBar* self) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool SearchBar::Init(std::string_view placeholderText, bool updateItemsImmediately) {
 	
-	if (!textBox.Init(&style.fontUi, placeholderText))
+	if (!textBox.Init(&theme.fontUi, placeholderText))
 		return false;
 	
 	scrollarea.vpX = 0.0f;	
@@ -130,7 +129,7 @@ void SearchBar::OnUpdate() {
 				.bottom = itemAreaTop - scrollarea.vpY + (itemHeight * (i+1))};
 				
 			if (selectedItem == i) {
-				ID2D1SolidColorBrush* brushGlow = style.GetBrushGlow();
+				ID2D1SolidColorBrush* brushGlow = theme.GetBrushGlow();
 				const f32 opacityBefore = brushGlow->GetOpacity();
 				DEFER(brushGlow->SetOpacity(opacityBefore));
 				
@@ -140,7 +139,7 @@ void SearchBar::OnUpdate() {
 				deviceContext->FillRectangle(itemArea, brushGlow);
 			}
 			
-			staticGlyphRun.Shape(item.text, style.fontUi);
+			staticGlyphRun.Shape(item.text, theme.fontUi);
 			
 			f32 offsetFrom, offsetTo;
 			staticGlyphRun.MeasureOffsetRange(
@@ -153,24 +152,24 @@ void SearchBar::OnUpdate() {
 					.left   = MARGIN + itemArea.left + offsetFrom,
 				    .top    = MARGIN + itemArea.top,
 				    .right  = MARGIN + itemArea.left + offsetTo,
-				    .bottom = MARGIN + itemArea.top + style.fontUi.lineHeight},
-				style.GetBrushUiSearchResult());
+				    .bottom = MARGIN + itemArea.top + theme.fontUi.lineHeight},
+				theme.GetBrushUiSearchResult());
 
 			staticGlyphRun.Draw(deviceContext,
 				MARGIN + itemArea.left,
 			    MARGIN + itemArea.top,
-				style.fontUi,
-				style.GetBrushUiText());
+				theme.fontUi,
+				theme.GetBrushUiText());
 				
 			staticGlyphRun.ShapeAndDraw(deviceContext, 
 				item.subText,
 				MARGIN + itemArea.left,
-			    MARGIN + itemArea.top + style.fontUi.lineHeight,
-				style.fontUi,
-				style.GetBrushUiText(false));
+			    MARGIN + itemArea.top + theme.fontUi.lineHeight,
+				theme.fontUi,
+				theme.GetBrushUiText(false));
 			
 			if (mouse.Hittest(itemArea, this, OnClickItem)) {
-				deviceContext->FillRectangle(itemArea, style.GetBrushHover(mouse.isDown));
+				deviceContext->FillRectangle(itemArea, theme.GetBrushHover(mouse.isDown));
 			}
 		}
 	}
@@ -183,7 +182,7 @@ void SearchBar::OnUpdate() {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBar::OnResize() {
- 	const f32 offsetFromTop = (PADDING_X2 + style.fontUi.lineHeight) + MARGIN;
+ 	const f32 offsetFromTop = (PADDING_X2 + theme.fontUi.lineHeight) + MARGIN;
  	const f32 itemAreaTop = offsetFromTop + MARGIN_X2 + textBox.Height();
 	 	
  	area = D2D_RECT_F {
@@ -251,5 +250,5 @@ void SearchBar::OnChar(const char* data, u64 len) {
 
 void SearchBar::OnMouseWheel(f32 distance) {
 	if (parameterConfigurator) return;
-	scrollarea.ScrollVertical(distance * style.fontUi.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * theme.fontUi.lineHeight * 5);
 }

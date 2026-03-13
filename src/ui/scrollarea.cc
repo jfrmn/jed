@@ -1,7 +1,7 @@
 #include "scrollarea.hh"
 #include "globals.hh"
 #include "events.hh"
-#include "ui/style.hh"
+#include "theme.hh"
 #include "util/rect-util.hh"
 
 #include <algorithm>
@@ -61,7 +61,7 @@ void Scrollarea::OnUpdate() {
 		.right  = position.x + vpSize.width,
 		.bottom = position.y + ((vpY + vpSize.height) * ratio) };
 	
-	deviceContext->FillRectangle(vertBar, style.GetBrushUiBackground());
+	deviceContext->FillRectangle(vertBar, theme.GetBrushUiBackground());
 
 	const bool isHot = mouse.Hittest(vertBar, this);
 	if (isHot) {
@@ -69,7 +69,7 @@ void Scrollarea::OnUpdate() {
 			mouse.StartDragging();
 		
 		const bool isDragging = mouse.IsDragging();
-		deviceContext->FillRectangle(vertBar, style.GetBrushHover(isDragging));
+		deviceContext->FillRectangle(vertBar, theme.GetBrushHover(isDragging));
 	
 		if (isDragging) {
 			vpY = std::clamp(

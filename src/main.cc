@@ -1,16 +1,16 @@
 #include "main-window.hh"
 #include "globals.hh"
 #include "key-bindings.hh"
-#include "util/logging.hh"
+#include "theme.hh"
 
 #include "graphics/factories.hh"
 #include "graphics/effects.hh"
 #include "graphics/glyph-run.hh"
+
 #include "language/language.hh"
 #include "commands/tools.hh"
 #include "json/json-basic.hh"
-
-#include "ui/style.hh"
+#include "util/logging.hh"
 
 // @DUMMY
 #include "editor/editor.hh"
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	if (!style.Init(settingsJson, mainWindow.deviceContext)) {
+	if (!theme.Init(settingsJson, mainWindow.deviceContext)) {
 		LogFatal("failed to load theme");
 		return -1;
 	}

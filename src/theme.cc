@@ -1,4 +1,4 @@
-#include "style.hh"
+#include "theme.hh"
 #include "basic.hh"
 #include "main-window.hh"
 
@@ -6,6 +6,7 @@
 
 #include "graphics/font.hh"
 #include "graphics/factories.hh"
+#include "graphics/effects.hh"
 
 #include "json/json-mapping.hh"
 #include "json/json-mapping-stl.h"
@@ -16,12 +17,12 @@
 #undef LoadBitmap
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Style style = {};
+Theme theme = {};
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static constexpr std::string_view colorNames[] {
 	"unknown",
-	"glow",
+	"drop-shadow",
 	"active-panel-frame",
 	"selection",
 	"selection-inactive",
@@ -39,11 +40,12 @@ static constexpr std::string_view colorNames[] {
 	"ui-background-invalid"
 };
 
-static_assert(STATIC_ARRAY_SIZE(colorNames) == Style::Color_MAX);
+static_assert(STATIC_ARRAY_SIZE(colorNames) == Theme::NUM_COLORS);
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static constexpr D2D1_COLOR_F defaultColors[] {
 	{1.0f, 0.0f, 0.1f, 1.0f},  // unknown
-	{0.2f, 0.3f, 0.6f, 1.0f},  // glow
+	{0.2f, 0.3f, 0.6f, 1.0f},  // drop-shadow
 	{0.2f, 0.3f, 0.6f, 1.0f},  // active-panel-frame
 	{0.0f, 1.0f, 1.0f, 0.3f},  // selection
 	{1.0f, 1.0f, 1.0f, 0.3f},  // selection-inactive
@@ -60,8 +62,9 @@ static constexpr D2D1_COLOR_F defaultColors[] {
 	{0.2f, 0.2f, 0.2f, 1.0f},  // ui-background-inactive
 	{0.4f, 0.0f, 0.0f, 1.0f}}; // ui-background-invalid 
 
-static_assert(STATIC_ARRAY_SIZE(defaultColors) == Style::Color_MAX);
+static_assert(STATIC_ARRAY_SIZE(defaultColors) == Theme::NUM_COLORS);
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static constexpr std::wstring_view iconFilenames[] {
 	L"unknown.png",
 	L"waiting.png",
@@ -112,31 +115,7 @@ static constexpr std::wstring_view iconFilenames[] {
 	L"lsp-crashed.png"
 };
 
-static_assert(STATIC_ARRAY_SIZE(iconFilenames) == Style::Icon_MAX);
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static JSON_TO_ENUM_BEGIN(Style::BrushType)
-	JSON_TO_ENUM_MEMBER("none", Style::BrushType_None)
-	JSON_TO_ENUM_MEMBER("solid", Style::BrushType_SolidColor)
-	JSON_TO_ENUM_MEMBER("linear", Style::BrushType_LinearGradient)
-	JSON_TO_ENUM_MEMBER("radial", Style::BrushType_RadialGradient)
-JSON_TO_ENUM_END
-
-static JSON_TO_VALUE_BEGIN(D2D1_GRADIENT_STOP)
-	JSON_TO_VALUE_PROPERTY_REQUIRED(position)
-	JSON_TO_VALUE_PROPERTY_REQUIRED(color)
-JSON_TO_VALUE_END
-
-static JSON_TO_UNION_BEGIN(Style::BrushDescription, Style::BrushDescription::type)
-	JSON_TO_UNION_PROPERTIES_FOR_TAG(Style::BrushType_SolidColor)
-		JSON_TO_VALUE_PROPERTY_REQUIRED(color)
-	JSON_TO_UNION_PROPERTIES_FOR_TAG(Style::BrushType_LinearGradient)
-		JSON_TO_VALUE_PROPERTY_REQUIRED(stops)
-		JSON_TO_VALUE_PROPERTY(repeatMirrored)
-	JSON_TO_UNION_PROPERTIES_FOR_TAG(Style::BrushType_LinearGradient)
-		ASSERT_NOT_IMPLEMENTED
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED
-JSON_TO_UNION_END
+static_assert(STATIC_ARRAY_SIZE(iconFilenames) == Theme::NUM_ICONS);
 
 // @TODO respect weight, stretch and so on
 // also use JSON_TO_VALUE_CHECK_UNRECOGNIZED
@@ -145,9 +124,8 @@ static JSON_TO_VALUE_BEGIN(Font::Description)
 	JSON_TO_VALUE_PROPERTY(size)
 JSON_TO_VALUE_END
 
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool LoadColors(Style* self, const cJSON* json) {
+bool LoadColors(Theme* self, const cJSON* json) {
 	
 	std::unordered_map<std::string_view, cJSON*> userColors {};
 	
@@ -156,16 +134,16 @@ bool LoadColors(Style* self, const cJSON* json) {
 		JsonObjectToMap(&trace, jsonColor, &userColors);
 	}
 		
-	for (int i = 0; i < Style::Color_MAX; i++) {
+	for (int i = 0; i < Theme::NUM_COLORS; i++) {
 				
 		bool ok = false;
 		if (auto node = userColors.extract(colorNames[i]); !node.empty()) {
 			const JsonTrace traceColor {&trace, colorNames[i]};
 			
-			ok = JsonToValue(&traceColor, node.mapped(), &self->colors[i]);
+			ok = JsonToValue(&traceColor, node.mapped(), &self->colorArray[i]);
 		}
 
-		if (!ok) self->colors[i] = defaultColors[i];
+		if (!ok) self->colorArray[i] = defaultColors[i];
 	}
 	
 	for (auto it = userColors.begin(); it != userColors.end(); ++it) {
@@ -256,7 +234,7 @@ static ID2D1Bitmap* LoadBitmap(ID2D1DeviceContext* deviceContext, std::wstring_v
 	return bitmap;
 }
 
-static bool LoadIcons(Style* self, const cJSON* json, ID2D1DeviceContext* deviceContext) {
+static bool LoadIcons(Theme* self, const cJSON* json, ID2D1DeviceContext* deviceContext) {
 
 	
 #ifdef _DEBUG
@@ -278,7 +256,7 @@ static bool LoadIcons(Style* self, const cJSON* json, ID2D1DeviceContext* device
 	
 	std::wstring fullIconPath {};
 	ID2D1Bitmap* dummyIcon = nullptr;
-	for (int i = 0; i < Style::Icon_MAX; i++) {
+	for (int i = 0; i < Theme::NUM_ICONS; i++) {
 		
 		LogDetail("loading icon: '%'", iconFilenames[i].data());
 		
@@ -287,10 +265,10 @@ static bool LoadIcons(Style* self, const cJSON* json, ID2D1DeviceContext* device
 		fullIconPath.append(iconsDir.begin(), iconsDir.end());
 		fullIconPath.append(iconFilenames[i]);
 		
-		self->icons[i] = LoadBitmap(deviceContext, fullIconPath, false);
+		self->iconArray[i] = LoadBitmap(deviceContext, fullIconPath, false);
 		
 		// loading successfull - next icon
-		if (!self->icons[i]) {
+		if (!self->iconArray[i]) {
 				
 			// dummy icon not load yet
 			if (!dummyIcon) {
@@ -317,7 +295,7 @@ static bool LoadIcons(Style* self, const cJSON* json, ID2D1DeviceContext* device
 			}
 					
 			ASSERT(dummyIcon)
-			self->icons[i] = dummyIcon;
+			self->iconArray[i] = dummyIcon;
 			dummyIcon->AddRef();
 		}
 	}
@@ -328,207 +306,81 @@ static bool LoadIcons(Style* self, const cJSON* json, ID2D1DeviceContext* device
 	return true;
 }
 
-static bool LoadAccentBrush(Style* self, const cJSON* json) {
-	
-	self->accentBrushDescription = Style::BrushDescription {
-		.type = Style::BrushType_LinearGradient,
-		.repeatMirrored = true,
-		.stops = {
-			D2D1_GRADIENT_STOP {
-				.position = 0.0f,
-				//.color = {0.57f, 0.43f, 0.85f, 1.00f}}, // 145, 109, 216
-				.color = {0.39f, 0.13f, 0.90f, 1.00f}}, // 100, 34, 230
-			D2D1_GRADIENT_STOP {
-				.position = 1.0f,
-				.color = {0.00f, 0.80f, 0.80f, 1.00f}}}};
-	
-	if (const cJSON* jsonAccent = cJSON_GetObjectItem(json, "accent-brush")) {
-		const JsonTrace trace {nullptr, "accent-brush"};
-		
-		// Use an extra copy here!
-		// If JsonToValue fails somewhere deep in the callstack 
-		// it has already overwritten half of the properties
-		Style::BrushDescription brushDescriptionFromJson {};
-		if (JsonToValue(&trace, jsonAccent, &brushDescriptionFromJson))
-			self->accentBrushDescription = std::move(brushDescriptionFromJson);
-	}
-	
-	if (self->accentBrushDescription.type == Style::BrushType_SolidColor) {
-		ID2D1SolidColorBrush* solidBrush = nullptr;
-		const HRESULT hr = mainWindow.deviceContext->CreateSolidColorBrush(self->accentBrushDescription.color, &solidBrush);
-		
-		if (hr != S_OK) {
-			LogError("CreateSolidColorBrush() failed. HRESULT: %", FHr(hr));
-			return false;
-		}
-		
-		self->accentBrush = solidBrush;
-	
-	} else if (self->accentBrushDescription.type == Style::BrushType_LinearGradient) {
-		
-		ID2D1GradientStopCollection* gradientStopCollection = nullptr;
-		const HRESULT hr = mainWindow.deviceContext->CreateGradientStopCollection(
-			self->accentBrushDescription.stops.data(),
-			static_cast<UINT32>(self->accentBrushDescription.stops.size()),
-			D2D1_GAMMA_2_2,
-			(self->accentBrushDescription.repeatMirrored
-				? D2D1_EXTEND_MODE_MIRROR
-				: D2D1_EXTEND_MODE_WRAP),
-			&gradientStopCollection);
-	
-		if (hr != S_OK) {
-			LogError("CreateGradientStopCollection() failed. HRESULT: %", FHr(hr));
-			return false;
-		}
-		
-		DEFER(gradientStopCollection->Release());
-		
-		ID2D1LinearGradientBrush* gradientBrush = nullptr;
-		if (HRESULT hr = mainWindow.deviceContext->CreateLinearGradientBrush(
-				D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {},
-				gradientStopCollection,
-				&gradientBrush); hr != S_OK) {
-			LogError("CreateLinearGradientBrush() failed. HRESULT: %", FHr(hr));
-			return false;
-		}
-
-		self->accentBrush = gradientBrush;
-		return true;
-	
-	} else if (self->accentBrushDescription.type == Style::BrushType_RadialGradient) {
-		ASSERT_NOT_IMPLEMENTED
-		return false;
-	
-	} else {
-		ASSERT_UNREACHABLE
-		return false;
-	}
-
-	return true;
-}
-
-bool Style::Init(const cJSON* json, ID2D1DeviceContext* deviceContext) {
+bool Theme::Init(const cJSON* json, ID2D1DeviceContext* deviceContext) {
 	if (!LoadColors(this, json)) return false;
 	if (!LoadFont(&this->fontEditor, json, "font-editor", Font::Description {"Consolas", 14})) return false;
 	if (!LoadFont(&this->fontUi,     json, "font-ui",     Font::Description {"Microsoft Sans Serif", 14})) return false;
 	if (!LoadIcons(this, json, deviceContext)) return false;
-	if (!LoadAccentBrush(this, json)) return false;
-	
-	if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {}, &brush); hr != S_OK) {
-		LogError("CreateSolidColorBrush() failed. HRESULT: %", FHr(hr));
-		return false;
-	}
 	
 	return true;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ID2D1Brush* Style::GetAccentBrush(const D2D1_RECT_F* area /*= nullptr*/, f32 animationValue /*= 0.0f*/) {
-	if (accentBrushDescription.type == BrushType_SolidColor) {
-		return accentBrush;
-	
-	} else if (accentBrushDescription.type == BrushType_LinearGradient) {
-		
-		if (area) {
-						
-			const D2D_VECTOR_2F vector {(area->right - area->left) * 2, (area->bottom - area->top) * 2};
-			const f32 vectorLength = std::sqrt(
-				(vector.x * vector.x) +
-				(vector.y * vector.y));
-			
-			const f32 offsetFactor = std::cos(animationValue + F32_PI) + 1.0f;
-			
-			auto linearGradientBrush = static_cast<ID2D1LinearGradientBrush*>(accentBrush);
-			linearGradientBrush->SetStartPoint(D2D1_POINT_2F {
-				.x = area->left + (vector.x * offsetFactor),
-				.y = area->top  + (vector.y * offsetFactor)});
-			linearGradientBrush->SetEndPoint(D2D1_POINT_2F {
-				.x = area->right   + (vector.x * offsetFactor),
-				.y = area->bottom  + (vector.y * offsetFactor)});
-		}
-		return accentBrush;
-		
-	} else if (accentBrushDescription.type == BrushType_RadialGradient) {
-		ASSERT_NOT_IMPLEMENTED;
-		return nullptr;
-	
-	} else {
-		ASSERT_UNREACHABLE;
-		return nullptr;
-	}
-}
-	
-ID2D1SolidColorBrush* Style::GetBrushGlow() {
-	brush->SetColor(colors[Color_Glow]);
+ID2D1SolidColorBrush* Theme::GetBrushGlow() {
+	brush->SetColor(colors.dropShadow);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushSelection(bool active /*= true*/) {
-	brush->SetColor(colors[active
-		? Color_Selection
-		: Color_SelectionInactive]);
+ID2D1SolidColorBrush* Theme::GetBrushSelection(bool active /*= true*/) {
+	brush->SetColor(active
+		? colors.selection
+		: colors.selectionInactive);
 	
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushUiSearchResult() {
-	brush->SetColor(colors[Color_UiSearchResult]);	
+ID2D1SolidColorBrush* Theme::GetBrushUiSearchResult() {
+	brush->SetColor(colors.uiSearchResult);	
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushEditorText() {
-	brush->SetColor(colors[Color_EditorText]);
+ID2D1SolidColorBrush* Theme::GetBrushEditorText() {
+	brush->SetColor(colors.editorText);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushEditorBackground() {
-	brush->SetColor(colors[Color_EditorBackground]);
+ID2D1SolidColorBrush* Theme::GetBrushEditorBackground() {
+	brush->SetColor(colors.editorBackground);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushEditorMultiCaretEdit() {
-	brush->SetColor(colors[Color_EditorMultiCaretEdit]);
+ID2D1SolidColorBrush* Theme::GetBrushEditorMultiCaretEdit() {
+	brush->SetColor(colors.editorMultiCaretEdit);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushUiText(bool active /*= true*/) {
-	brush->SetColor(colors[active
-		? Color_UiText
-		: Color_UiTextInactive]);
+ID2D1SolidColorBrush* Theme::GetBrushUiText(bool active /*= true*/) {
+	brush->SetColor(active
+		? colors.uiText
+		: colors.uiTextInactive);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushUiBackground(bool active /*= true*/) {
-	brush->SetColor(colors[active
-		? Color_UiBackground
-		: Color_UiBackgroundInactive]);
+ID2D1SolidColorBrush* Theme::GetBrushUiBackground(bool active /*= true*/) {
+	brush->SetColor(active
+		? colors.uiBackground
+		: colors.uiBackgroundInactive);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushUiBackgroundInvalid() {
-	brush->SetColor(colors[Color_UiBackgroundInvalid]);
+ID2D1SolidColorBrush* Theme::GetBrushUiBackgroundInvalid() {
+	brush->SetColor(colors.uiBackgroundInvalid);
 	return brush;
 }
 
-ID2D1SolidColorBrush* Style::GetBrushHover(bool pressed /*= false*/) {
-	brush->SetColor(colors[pressed
-		? Color_Pressed
-		: Color_Hover]);
+ID2D1SolidColorBrush* Theme::GetBrushHover(bool pressed /*= false*/) {
+	brush->SetColor(pressed
+		? colors.pressed
+		: colors.hover);
 	return brush;
 }
 	
-ID2D1SolidColorBrush* Style::GetBrushToggled() {
-	brush->SetColor(colors[Color_Toggled]);
+ID2D1SolidColorBrush* Theme::GetBrushToggled() {
+	brush->SetColor(colors.toggled);
 	return brush;
 }
 	
-Style::~Style() noexcept {
-	for (int i = 0; i < Icon_MAX; i++)
-		icons[i]->Release();
-	
-	if (brush)
-		brush->Release();
-		
-	if (accentBrush)
-		accentBrush->Release();
+Theme::~Theme() noexcept {
+	for (int i = 0; i < NUM_ICONS; i++)
+		iconArray[i]->Release();
 }

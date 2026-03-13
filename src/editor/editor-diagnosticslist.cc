@@ -1,11 +1,11 @@
 #include "editor-diagnosticslist.hh"
 #include "globals.hh"
 #include "events.hh"
+#include "theme.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
 
 #include "graphics/glyph-run.hh"
@@ -72,7 +72,7 @@ void EditorDiagnosticsList::OnUpdate() {
 	}
 	
 	f32 totalWidth = RectWidth(owner->area) * 0.3f + PADDING + MARGIN_X2;
-	f32 totalHeight = style.fontUi.lineHeight + MARGIN_X2;
+	f32 totalHeight = theme.fontUi.lineHeight + MARGIN_X2;
 	
 	Item* items = nullptr;
 	DEFER(delete[] items);
@@ -92,20 +92,20 @@ void EditorDiagnosticsList::OnUpdate() {
 			
 			// shape
 			
-			item.code.Shape(record.code, style.fontEditor);
-			item.message.Shape(record.message, style.fontUi);
+			item.code.Shape(record.code, theme.fontEditor);
+			item.message.Shape(record.message, theme.fontUi);
 			
 			// select icon
-			item.icon = style.icons[Diagnostics::SEVERITY_ICON_INDICIES[record.severity]];
+			item.icon = theme.iconArray[Diagnostics::SEVERITY_ICON_INDICIES[record.severity]];
 			
 			// measure the width and height
 			
 			item.size.width = std::max(
-				item.code.width + style.fontEditor.lineHeight + PADDING_X3,
+				item.code.width + theme.fontEditor.lineHeight + PADDING_X3,
 				item.message.GetWidth() + PADDING_X2);
 			
-			item.size.height = PADDING_X2 + style.fontEditor.lineHeight
-	             			 + (style.fontUi.lineHeight * item.message.LineCount());
+			item.size.height = PADDING_X2 + theme.fontEditor.lineHeight
+	             			 + (theme.fontUi.lineHeight * item.message.LineCount());
 			
 			if (totalWidth < item.size.width)
 				totalWidth = item.size.width;
@@ -141,39 +141,39 @@ void EditorDiagnosticsList::OnUpdate() {
 	// draw header
 	//
 	{
-		staticGlyphRun.Shape("Diagnostics", style.fontUi);
-		staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, style.fontUi, style.GetBrushUiText());
+		staticGlyphRun.Shape("Diagnostics", theme.fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText());
 		
 		// underline
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN,
-				.y = area.top  + MARGIN + style.fontUi.underlineOffset },
+				.y = area.top  + MARGIN + theme.fontUi.underlineOffset },
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN + staticGlyphRun.width,
-				.y = area.top  + MARGIN + style.fontUi.underlineOffset },
-			style.GetBrushUiText());
+				.y = area.top  + MARGIN + theme.fontUi.underlineOffset },
+			theme.GetBrushUiText());
 		
 		
 		const f32 offset = PADDING + staticGlyphRun.width;
 		
 		char buffer[32] {'\0'};
 		const u64 size = FormatToBuffer(buffer, "% records", itemCount);
-		staticGlyphRun.Shape({buffer, size}, style.fontUi);
-		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, style.fontUi, style.GetBrushUiText(false));
+		staticGlyphRun.Shape({buffer, size}, theme.fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText(false));
 	}
 	
 	//
 	// draw records
 	//
-	f32 posY = area.top + style.fontUi.lineHeight + MARGIN_X2;
+	f32 posY = area.top + theme.fontUi.lineHeight + MARGIN_X2;
 	for (u64 i = 0u; i < itemCount; i++) {
 		
 		Item& item = items[i];
 		const D2D_RECT_F itemArea = MakeRect(area.left, posY, totalWidth, item.size.height);
 		
 		if (i == selectedItem) {
-			ID2D1SolidColorBrush* brushGlow = style.GetBrushGlow();
+			ID2D1SolidColorBrush* brushGlow = theme.GetBrushGlow();
 			const f32 opacityBefore = brushGlow->GetOpacity();
 			DEFER(brushGlow->SetOpacity(opacityBefore));
 			
@@ -188,23 +188,23 @@ void EditorDiagnosticsList::OnUpdate() {
 			MakeRect(
 				itemArea.left + PADDING,
 				itemArea.top + PADDING,
-		    	style.fontEditor.lineHeight,
-		    	style.fontEditor.lineHeight));
+		    	theme.fontEditor.lineHeight,
+		    	theme.fontEditor.lineHeight));
 				
 		item.code.Draw(deviceContext,
-			itemArea.left + PADDING_X2 + style.fontEditor.lineHeight,
+			itemArea.left + PADDING_X2 + theme.fontEditor.lineHeight,
 			itemArea.top + PADDING,
-			style.fontEditor,
-			style.GetBrushUiText());
+			theme.fontEditor,
+			theme.GetBrushUiText());
 		
 		item.message.Draw(deviceContext,
 			itemArea.left + PADDING,
-			itemArea.top + PADDING + style.fontEditor.lineHeight,
-			style.fontUi,
-			style.GetBrushUiText(false));
+			itemArea.top + PADDING + theme.fontEditor.lineHeight,
+			theme.fontUi,
+			theme.GetBrushUiText(false));
 		
 		if (mouse.Hittest(itemArea, this, OnClickItem, i)) {
-			deviceContext->FillRectangle(itemArea, style.GetBrushHover(mouse.isDown));	
+			deviceContext->FillRectangle(itemArea, theme.GetBrushHover(mouse.isDown));	
 		}
 			
 		posY += item.size.height;

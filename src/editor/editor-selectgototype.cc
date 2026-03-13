@@ -2,9 +2,9 @@
 #include "editor.hh"
 #include "globals.hh"
 #include "events.hh"
+#include "theme.hh"
 #include "editor-textlocationlist.hh"
 
-#include "ui/style.hh"
 #include "ui/constants.h"
 
 #include "util/rect-util.hh"
@@ -43,21 +43,21 @@ void EditorSelectGotoType::OnUpdate() {
 	const D2D1_POINT_2F curPos = owner->GetCaretLocation();
 	const D2D1_POINT_2F position {
 		.x = curPos.x,
-		.y = curPos.y + style.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+		.y = curPos.y + theme.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 	
-	staticGlyphRun.Shape("Goto...", style.fontUi);
+	staticGlyphRun.Shape("Goto...", theme.fontUi);
 	
 	f32 width = .0f;
 	GlyphRun runItems[ITEM_COUNT];
 	for (u64 i = 0u; i < ITEM_COUNT; i++) {
-		runItems[i].Shape(ITEMS[i].label, style.fontUi);
+		runItems[i].Shape(ITEMS[i].label, theme.fontUi);
 		
 		const f32 currentWidth = runItems[i].width + PADDING_X2;
 		if (width < currentWidth)
 			width = currentWidth;
 	}
 	
-	const f32 height = (ITEM_COUNT + 1) * style.fontUi.lineHeight;
+	const f32 height = (ITEM_COUNT + 1) * theme.fontUi.lineHeight;
 	
 	//
 	// draw background
@@ -71,8 +71,8 @@ void EditorSelectGotoType::OnUpdate() {
 	// draw header
 	//
 	{
-		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, style.fontUi.lineHeight), style.GetBrushUiBackground());
-		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, style.fontUi, style.GetBrushUiText());
+		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, theme.fontUi.lineHeight), theme.GetBrushUiBackground());
+		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, theme.fontUi, theme.GetBrushUiText());
 	}
 	
 	//
@@ -80,11 +80,11 @@ void EditorSelectGotoType::OnUpdate() {
 	//
 	for (u64 i = 0u; i < ITEM_COUNT; i++) {
 		
-		const f32 posY = position.y + (style.fontUi.lineHeight * (i + 1));
+		const f32 posY = position.y + (theme.fontUi.lineHeight * (i + 1));
 		if (i == selectedItem)
-			deviceContext->FillRectangle(MakeRect(position.x, posY, width, style.fontUi.lineHeight), style.GetBrushSelection());
+			deviceContext->FillRectangle(MakeRect(position.x, posY, width, theme.fontUi.lineHeight), theme.GetBrushSelection());
 	
-		runItems[i].Draw(deviceContext, position.x + PADDING, posY, style.fontUi, style.GetBrushUiText());
+		runItems[i].Draw(deviceContext, position.x + PADDING, posY, theme.fontUi, theme.GetBrushUiText());
 	}			
 }
 

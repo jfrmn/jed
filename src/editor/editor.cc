@@ -2,19 +2,15 @@
 #include "globals.hh"
 #include "main-window.hh"
 #include "key-bindings.hh"
+#include "theme.hh"
 
 #include "graphics/effects.hh"
 #include "language/language.hh"
-
 #include "ui/constants.h"
-#include "ui/style.hh"
 
 #include "util/logging.hh"
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
-
-// @DUMMY
-#include "graphics/glyph-run.hh" 
 
 #include "editor/editor-caretattached.hh"
 #include "editor/editor-autocomplete.hh"
@@ -169,7 +165,7 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	//
 	// prepare glyph runs
 	//
-	if (!GlyphRun::ShapeBatch(this->textController.buffer, style.fontEditor, &glyphRuns)) {
+	if (!GlyphRun::ShapeBatch(this->textController.buffer, theme.fontEditor, &glyphRuns)) {
 		LogError("inital shaping failed!");
 	}
 	
@@ -221,7 +217,7 @@ void Editor::ScrollToLine(u64 line) {
 	}
 
 	// scroll so that the target line roughly in the middle
-	scrollTargetPosition = (style.fontEditor.lineHeight * line) - (scrollarea.vpSize.height * 0.4f);
+	scrollTargetPosition = (theme.fontEditor.lineHeight * line) - (scrollarea.vpSize.height * 0.4f);
 	scrollTargetPosition = std::clamp(scrollTargetPosition, 0.0f, scrollarea.GetMaxPositionY());
 	
 	scrollSpeed = (scrollTargetPosition - scrollarea.vpY) / 30.0f;
@@ -262,10 +258,10 @@ void Editor::ProcessTextChange(const TextChange* change) {
 	}
 	
 	if (needsFullReshape) {
-		GlyphRun::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
+		GlyphRun::ShapeBatch(GetBuffer(), theme.fontEditor, &glyphRuns);
 	} else {
 		const u64 line = change->operations[0].start.line;	
-		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), style.fontEditor);
+		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), theme.fontEditor);
 	}
 
 	if (language)
@@ -273,7 +269,7 @@ void Editor::ProcessTextChange(const TextChange* change) {
 }
 
 static float GetLineNumberWidth() {
-	return std::ceil((style.fontEditor.GetSpaceAdvance() * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
+	return std::ceil((theme.fontEditor.GetSpaceAdvance() * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
 }
 
 static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition& position) {
@@ -282,7 +278,7 @@ static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition
 
 	return D2D_POINT_2F {
 		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.column),
-		.y = self->area.top  - self->scrollarea.vpY + (position.line * style.fontEditor.lineHeight) };
+		.y = self->area.top  - self->scrollarea.vpY + (position.line * theme.fontEditor.lineHeight) };
 }
 
 D2D_POINT_2F Editor::GetCaretLocation() const {
@@ -296,12 +292,12 @@ TextBuffer& Editor::GetBuffer() {
 void Editor::GetVisibleLines(/*out*/ u64* pfirst, /*out*/ u64* plast) const {
 	
 	if (pfirst) {
-		const auto first = static_cast<u64>((scrollarea.vpY) / style.fontEditor.lineHeight);
+		const auto first = static_cast<u64>((scrollarea.vpY) / theme.fontEditor.lineHeight);
 		*pfirst = std::max<u64>(0, first);
 	}
 
 	if (plast) {
-		const auto last = static_cast<u64>((scrollarea.vpY + scrollarea.vpSize.height) / style.fontEditor.lineHeight);
+		const auto last = static_cast<u64>((scrollarea.vpY + scrollarea.vpSize.height) / theme.fontEditor.lineHeight);
 		*plast = std::min<u64>(textController.buffer.GetMaxLine(), last);
 	}
 }
@@ -353,7 +349,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		float offsetFrom, offsetTo;
 		glyphRun.MeasureOffsetRange(from.column, to.column, &offsetFrom, &offsetTo);
 		
-		const float offsetY = y + (style.fontEditor.lineHeight * line);
+		const float offsetY = y + (theme.fontEditor.lineHeight * line);
 		
 		funcAction(offsetY, x + offsetFrom, x + offsetTo, brush);
 				
@@ -366,7 +362,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 
 			const float offsetFrom = x + glyphRun.MeasureOffset(from.column);
 			const float offsetTo   = x + std::max(glyphRun.width, 2.0f);
-			const float offsetY    = y + (style.fontEditor.lineHeight * from.line);
+			const float offsetY    = y + (theme.fontEditor.lineHeight * from.line);
 
 			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
@@ -378,7 +374,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 			
 			const float offsetFrom = x + 0.0f;
 			const float offsetTo   = x + std::max(run.width, 2.0f);
-			const float offsetY    = y + (style.fontEditor.lineHeight * i);
+			const float offsetY    = y + (theme.fontEditor.lineHeight * i);
 			
 			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
@@ -389,7 +385,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 
 			const float offsetFrom = x + 0.f;
 			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.column), 2.0f);
-			const float offsetY    = y + (style.fontEditor.lineHeight * to.line);
+			const float offsetY    = y + (theme.fontEditor.lineHeight * to.line);
 
 			funcAction(offsetY, offsetFrom, offsetTo, brush);
 		}
@@ -403,7 +399,7 @@ static void HighlightTextRange(f32 y, f32 from, f32 to, ID2D1SolidColorBrush* br
 				.left   = from,
 				.top    = y,
 				.right  = to,
-				.bottom = y + style.fontEditor.lineHeight },
+				.bottom = y + theme.fontEditor.lineHeight },
 			.radiusX = 2.f,
 			.radiusY = 2.f },
 		brush);
@@ -411,7 +407,7 @@ static void HighlightTextRange(f32 y, f32 from, f32 to, ID2D1SolidColorBrush* br
 
 static void DrawScrollbarMarker(Editor* self, ID2D1DeviceContext* deviceContext, u64 line, f32 stroke, ID2D1SolidColorBrush* brush, /*out*/ f32* posY) {
 	
-	const f32 scrollbarPosY = self->area.top + (line * style.fontEditor.lineHeight) * self->scrollarea.GetRatio();
+	const f32 scrollbarPosY = self->area.top + (line * theme.fontEditor.lineHeight) * self->scrollarea.GetRatio();
 	deviceContext->DrawLine(
 		D2D1_POINT_2F {
 			.x = self->area.right - SCROLLBAR_WIDTH_WIDE,
@@ -433,21 +429,21 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	GlyphRun runCode {};
 	GlyphRunMultiline runMessage {};
 	
-	runCode.Shape(record->code, style.fontEditor);
-	runMessage.Shape(record->message, style.fontUi);
+	runCode.Shape(record->code, theme.fontEditor);
+	runMessage.Shape(record->message, theme.fontUi);
 	
 	//
 	// measure the width and height
 	//
 	const f32 width = PADDING_X2 + std::max(
-		runCode.width + style.fontEditor.lineHeight + PADDING,
+		runCode.width + theme.fontEditor.lineHeight + PADDING,
 		runMessage.GetWidth());
 		
-	f32 height = PADDING_X2 + style.fontEditor.lineHeight
-			   + PADDING_X2 + (style.fontUi.lineHeight * runMessage.LineCount());
+	f32 height = PADDING_X2 + theme.fontEditor.lineHeight
+			   + PADDING_X2 + (theme.fontUi.lineHeight * runMessage.LineCount());
 			   
 	if (isScrollbarTooltip)
-		height += PADDING_X2 + (style.fontEditor.lineHeight * 4);		
+		height += PADDING_X2 + (theme.fontEditor.lineHeight * 4);		
 	
 	D2D1_POINT_2F position;
 	
@@ -455,12 +451,12 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		const D2D1_POINT_2F curPos = self->GetCaretLocation();
 		position = D2D_POINT_2F {
 			.x = curPos.x,
-			.y = curPos.y + style.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+			.y = curPos.y + theme.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 	
 	} else {		
 		position = D2D_POINT_2F {
 			.x = self->area.right - SCROLLBAR_WIDTH_WIDE - width - 15.0f,
-			.y = self->area.top + (record->from.line * style.fontEditor.lineHeight * self->scrollarea.GetRatio()) - (height / 2.0f)};
+			.y = self->area.top + (record->from.line * theme.fontEditor.lineHeight * self->scrollarea.GetRatio()) - (height / 2.0f)};
 	}
 	
 	const D2D_RECT_F area = MakeRect(position.x, position.y, width, height);	
@@ -489,23 +485,24 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		deviceContext->FillRectangle(
 			MakeRect(
 				position.x,
-				position	.y,
+				position.y,
 		    	width,
-		    	style.fontEditor.lineHeight + PADDING_X2),
-			style.GetBrushUiBackground());
+		    	theme.fontEditor.lineHeight + PADDING_X2),
+			theme.GetBrushUiBackground());
 	
-		deviceContext->DrawBitmap(style.icons[Diagnostics::SEVERITY_ICON_INDICIES[record->severity]],
-				MakeRect(
-					position.x + PADDING,
-					position.y + PADDING,
-			    	style.fontEditor.lineHeight,
-			    	style.fontEditor.lineHeight));
+		deviceContext->DrawBitmap(
+			theme.iconArray[Diagnostics::SEVERITY_ICON_INDICIES[record->severity]],
+			MakeRect(
+				position.x + PADDING,
+				position.y + PADDING,
+			    theme.fontEditor.lineHeight,
+			    theme.fontEditor.lineHeight));
 				
 		runCode.Draw(deviceContext,
-			position.x + PADDING_X2 + style.fontEditor.lineHeight,
+			position.x + PADDING_X2 + theme.fontEditor.lineHeight,
 			position.y + PADDING,
-			style.fontEditor,
-			style.GetBrushUiText());
+			theme.fontEditor,
+			theme.GetBrushUiText());
 	}
 	
 	//
@@ -515,10 +512,10 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = position.x,
-				.y = position.y + PADDING_X2 + style.fontEditor.lineHeight},
+				.y = position.y + PADDING_X2 + theme.fontEditor.lineHeight},
 			D2D1_POINT_2F {
 				.x = position.x + width,
-				.y = position.y + PADDING_X2 + style.fontEditor.lineHeight},
+				.y = position.y + PADDING_X2 + theme.fontEditor.lineHeight},
 			severityBrush);
 	}
 	
@@ -528,9 +525,9 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	{
 		runMessage.Draw(deviceContext,
 			position.x + PADDING,
-			position.y + PADDING_X3 + style.fontEditor.lineHeight,
-			style.fontUi,
-			style.GetBrushUiText());
+			position.y + PADDING_X3 + theme.fontEditor.lineHeight,
+			theme.fontUi,
+			theme.GetBrushUiText());
 	}
 	
 	//
@@ -539,8 +536,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	if (isScrollbarTooltip) {
 	
 		const f32 contextStartY = position.y + PADDING_X4
-			+ style.fontEditor.lineHeight
-	 		+ (style.fontUi.lineHeight * runMessage.LineCount());
+			+ theme.fontEditor.lineHeight
+	 		+ (theme.fontUi.lineHeight * runMessage.LineCount());
 		
 		// draw 2nd seperator
 		deviceContext->DrawLine(
@@ -550,7 +547,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			D2D1_POINT_2F {
 				.x = position.x + width,
 				.y = contextStartY},
-			style.GetBrushUiBackground());
+			theme.GetBrushUiBackground());
 	
 		const s64 sFrom = static_cast<s64>(record->from.line - 1);
 		const s64 sTo   = static_cast<s64>(record->from.line + 2);
@@ -560,9 +557,9 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			self->glyphRuns[i].Draw(
 				deviceContext,
 				position.x + PADDING,
-				contextStartY + (style.fontEditor.lineHeight * (i - sFrom)),
-				style.fontEditor,
-				style.GetBrushEditorText());
+				contextStartY + (theme.fontEditor.lineHeight * (i - sFrom)),
+				theme.fontEditor,
+				theme.GetBrushEditorText());
 		}
 		
 		// draw underline in context
@@ -580,7 +577,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetTo,
 					.y = contextStartY},
-				style.GetBrushUiBackground());
+				theme.GetBrushUiBackground());
 		}
 	}	
 }
@@ -592,7 +589,7 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 	ASSERT(absoluteY >= .0f);
 	
 	const u64 line = std::clamp(
-		static_cast<u64>(absoluteY / style.fontEditor.lineHeight),
+		static_cast<u64>(absoluteY / theme.fontEditor.lineHeight),
 		0ull,
 		self->textController.buffer.GetMaxLine());
 
@@ -613,7 +610,7 @@ void Editor::OnUpdate() {
 	{
 		//GlyphRun::ShapeBatch(GetBuffer(), style.fontEditor, &glyphRuns);
 
-		scrollarea.totalSize.height = glyphRuns.size() * style.fontEditor.lineHeight;
+		scrollarea.totalSize.height = glyphRuns.size() * theme.fontEditor.lineHeight;
 		
 		const bool isHot = mouse.Hittest(area, this);
 		if (isHot) {
@@ -641,7 +638,7 @@ void Editor::OnUpdate() {
 	//
 	// fill background
 	//
-	deviceContext->FillRectangle(area, style.GetBrushEditorBackground());
+	deviceContext->FillRectangle(area, theme.GetBrushEditorBackground());
 
 	//
 	// draw scrollbar
@@ -681,7 +678,7 @@ void Editor::OnUpdate() {
 		{
 			const auto digitChars = reinterpret_cast<const u32*>(U"0123456789");
 			
-			const HRESULT hr = style.fontEditor.fontFace->GetGlyphIndices(digitChars, 10, digitGlyphIndicies);
+			const HRESULT hr = theme.fontEditor.fontFace->GetGlyphIndices(digitChars, 10, digitGlyphIndicies);
 			if (hr != S_OK) {
 				LogError("failed render line numbers. GetGlyphIndices() failed. HRESULT: %", FHr(hr));
 				return;
@@ -695,7 +692,7 @@ void Editor::OnUpdate() {
 		for (u64 i = firstVisible; i <= lastVisible; i++) {
 	
 			u16 glyphsToRender[LINENUMBERS_MAX_DIGITS];
-			std::fill_n(glyphsToRender, LINENUMBERS_MAX_DIGITS, style.fontEditor.glyphIndexSpace);
+			std::fill_n(glyphsToRender, LINENUMBERS_MAX_DIGITS, theme.fontEditor.glyphIndexSpace);
 
 			// get glyphs to render
 			{
@@ -720,25 +717,25 @@ void Editor::OnUpdate() {
 			// draw the glyphs
 			{
 				DWRITE_GLYPH_RUN glyphRun {};
-				glyphRun.fontFace = style.fontEditor.fontFace;
-				glyphRun.fontEmSize = style.fontEditor.size;
+				glyphRun.fontFace = theme.fontEditor.fontFace;
+				glyphRun.fontEmSize = theme.fontEditor.size;
 				glyphRun.glyphCount = LINENUMBERS_MAX_DIGITS;
 				glyphRun.glyphIndices = glyphsToRender;
 				
 				ID2D1SolidColorBrush* brush;
 				for (const TextController::Caret& caret : textController.carets) {
 					if (caret.position.line == i) {
-						brush = style.GetBrushEditorText();
+						brush = theme.GetBrushEditorText();
 						goto draw;
 					}
 				}
-				brush = style.GetBrushUiText(false);
+				brush = theme.GetBrushUiText(false);
 			
 			draw:
 				deviceContext->DrawGlyphRun(
 					D2D_POINT_2F {
 						.x = area.left,
-						.y = area.top + (style.fontEditor.lineHeight * i) - scrollarea.vpY + style.fontEditor.baselineOffset },
+						.y = area.top + (theme.fontEditor.lineHeight * i) - scrollarea.vpY + theme.fontEditor.baselineOffset },
 					&glyphRun,
 					brush);
 			}
@@ -770,9 +767,9 @@ void Editor::OnUpdate() {
 			for (u64 i = firstVisible; i <= lastVisible; i++) {
 				const GlyphRun& glyphRun = glyphRuns[i];
 				
-				const f32 offsetY = (i * style.fontEditor.lineHeight);
+				const f32 offsetY = (i * theme.fontEditor.lineHeight);
 
-				glyphRun.Draw(renderTargetText, 0.0f, offsetY, style.fontEditor, alphaMaskBrush);
+				glyphRun.Draw(renderTargetText, 0.0f, offsetY, theme.fontEditor, alphaMaskBrush);
 			}
 			
 			if (HRESULT hr = renderTargetText->EndDraw(); hr != S_OK) {
@@ -796,7 +793,7 @@ void Editor::OnUpdate() {
 			DEFER(renderTargetColor->Release());
 
 			renderTargetColor->BeginDraw();
-			renderTargetColor->Clear(style.colors[Style::Color_EditorText]);
+			renderTargetColor->Clear(theme.colors.editorText);
 			renderTargetColor->SetTransform(scrollTransform);
 
 			if (language)
@@ -828,15 +825,15 @@ void Editor::OnUpdate() {
 		}
 		
 		const D2D_SIZE_F caretSize {
-			.width  = style.fontEditor.GetSpaceAdvance(),
-			.height = style.fontEditor.lineHeight};
+			.width  = theme.fontEditor.GetSpaceAdvance(),
+			.height = theme.fontEditor.lineHeight};
 		
-		ID2D1SolidColorBrush* brushCaret = style.GetBrushEditorText();
+		ID2D1SolidColorBrush* brushCaret = theme.GetBrushEditorText();
 		for (const TextController::Caret& caret : textController.carets) {
 			
 			// draw selection
 			if (TextPosition selFrom, selTo; caret.GetSelection(&selFrom, &selTo)) {
-				ID2D1SolidColorBrush* brush = style.GetBrushSelection();
+				ID2D1SolidColorBrush* brush = theme.GetBrushSelection();
 				
 				IterateGlyphRange(this, selFrom, selTo, brush, HighlightTextRange);
 			}
@@ -846,7 +843,7 @@ void Editor::OnUpdate() {
 				TranslateTextPosition(this, caret.position),
 				caretSize);
 				
-			ID2D1SolidColorBrush* brushCaret = style.GetBrushEditorText();			
+			ID2D1SolidColorBrush* brushCaret = theme.GetBrushEditorText();			
 			deviceContext->DrawRectangle(caretRect, brushCaret);
 			
 			// draw blink animation
@@ -860,20 +857,20 @@ void Editor::OnUpdate() {
 		
 		if (textController.isEditCaretsMode) {
 			
-			ID2D1SolidColorBrush* brushEditCaret = style.GetBrushEditorMultiCaretEdit();
+			ID2D1SolidColorBrush* brushEditCaret = theme.GetBrushEditorMultiCaretEdit();
 			const D2D_RECT_F caretRect = MakeRect(
 				TranslateTextPosition(this, textController.editCaretsPosition),
 				caretSize);
 			
 			if (!std::isnan(fillingOpacity)) {
 				brushEditCaret->SetOpacity(fillingOpacity);
-				deviceContext->FillRectangle(caretRect, style.GetBrushEditorMultiCaretEdit());
+				deviceContext->FillRectangle(caretRect, theme.GetBrushEditorMultiCaretEdit());
 				brushEditCaret->SetOpacity(1.0f);
 			}
 			
 			for (const TextController::Caret& caret : textController.carets) {
 				if (caret.position == textController.editCaretsPosition) {
-					brushEditCaret = style.GetBrushEditorText();
+					brushEditCaret = theme.GetBrushEditorText();
 					break;
 				}
 			}
@@ -900,10 +897,10 @@ void Editor::OnUpdate() {
 				deviceContext->DrawRectangle(
 					D2D1_RECT_F {
 						.left   = offsetX + run.MeasureOffset(result.from.column),
-						.top    = offsetY + result.from.line * style.fontEditor.lineHeight,
+						.top    = offsetY + result.from.line * theme.fontEditor.lineHeight,
 						.right  = offsetX + run.MeasureOffset(result.to.column),
-						.bottom = offsetY + (result.from.line + 1) * style.fontEditor.lineHeight },
-					style.GetBrushEditorText());
+						.bottom = offsetY + (result.from.line + 1) * theme.fontEditor.lineHeight },
+					theme.GetBrushEditorText());
 			}
 		}
 	}
@@ -912,7 +909,7 @@ void Editor::OnUpdate() {
 	// insert-animation
 	//
 	if (insertAnimationRunning) {
-		ID2D1SolidColorBrush* insertAnimBrush = style.GetBrushSelection();
+		ID2D1SolidColorBrush* insertAnimBrush = theme.GetBrushSelection();
 		insertAnimBrush->SetOpacity(insertAnimationOpacity);
 		DEFER(insertAnimBrush->SetOpacity(1.0f));
 		
@@ -934,7 +931,7 @@ void Editor::OnUpdate() {
 	//
 	{
 		ID2D1SolidColorBrush* severityBrush = nullptr;
-		if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {}, &severityBrush); hr != S_OK) {
+		if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D1_COLOR_F {}, &severityBrush); hr != S_OK) {
 			LogError("CreateSolidColorBrush() failed. HRESULT: %", FHr(hr));
 			return;
 		}
@@ -964,10 +961,10 @@ void Editor::OnUpdate() {
 				deviceContext->DrawLine(
 					D2D_POINT_2F {
 						.x = offsetFrom,
-						.y = offsetY + style.fontEditor.underlineOffset},
+						.y = offsetY + theme.fontEditor.underlineOffset},
 					D2D_POINT_2F { 
 						.x = offsetTo,
-						.y = offsetY + style.fontEditor.underlineOffset},
+						.y = offsetY + theme.fontEditor.underlineOffset},
 					brush,
 					2.0f,
 					nullptr);
@@ -1053,7 +1050,7 @@ void Editor::OnChar(const char* data, u64 len) {
 
 void Editor::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
-	scrollarea.ScrollVertical(distance * style.fontEditor.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * theme.fontEditor.lineHeight * 5);
 }
 
 void Editor::OnKeyDown(KeyEvent event) {
@@ -1169,13 +1166,13 @@ void Editor::OnKeyDown(KeyEvent event) {
 		return;
 	
 	} else if (event == keybinds.actions.scrollUp) {
-		scrollarea.vpY -= (style.fontEditor.lineHeight * 2);
+		scrollarea.vpY -= (theme.fontEditor.lineHeight * 2);
 		if (scrollarea.vpY < 0.0f)
 			scrollarea.vpY = 0.0f;
 		return;
 	
 	} else if (event == keybinds.actions.scrollDown) {
-		scrollarea.vpY += (style.fontEditor.lineHeight * 2);
+		scrollarea.vpY += (theme.fontEditor.lineHeight * 2);
 		if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
 			scrollarea.vpY  = scrollarea.GetMaxPositionY();
 		return;
