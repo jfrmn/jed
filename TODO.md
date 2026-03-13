@@ -19,8 +19,8 @@
 # MINOR TASKS
 
 [ ] print stacktrace in ASSERTS()
-[ ] add key-binding  to select inside brackets
-[ ] add LogDevVariable() to quickly log out the name + value of a local variable
+[x] add key-binding to select inside brackets
+[x] add LogDevVariable() to quickly log out the name + value of a local variable
 [ ] refactor animation so that all animations use the same logic
 [ ] rename TextPostion.column to character
 [ ] refactor statu-bar to utilize the new glyph run better (e.g. use draw partial at text pos)
