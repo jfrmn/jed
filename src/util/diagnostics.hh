@@ -1,6 +1,7 @@
 #pragma once
 
-struct _D3DCOLORVALUE;
+union Color;
+struct ID2D1Bitmap;
 
 namespace Diagnostics {
 	
@@ -14,8 +15,8 @@ namespace Diagnostics {
 	};
 	
 	// color for each severity
-	extern const _D3DCOLORVALUE SEVERITY_COLORS[Severity_MAX];
+	extern const Color SEVERITY_COLORS[Severity_MAX];
 	
 	// index to the icon in the style.icons-array
-	extern const unsigned long SEVERITY_ICON_INDICIES[];
+	extern ID2D1Bitmap** SEVERITY_ICONS[];
 };

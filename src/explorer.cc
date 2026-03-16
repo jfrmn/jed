@@ -1,8 +1,7 @@
 #include "explorer.hh"
 #include "main-window.hh"
 #include "globals.hh"
-#include "key-bindings.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
@@ -137,10 +136,10 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 		
 		ASSERT(itMaxItem != panel->items.end());
 		
-		const float textWidth = theme.fontUi.MeasureText(itMaxItem->filename);
+		const float textWidth = settings.fontUi.MeasureText(itMaxItem->filename);
 		
-  		const float width  = MARGIN_X2 + theme.fontUi.lineHeight + textWidth + MARGIN;
-		const float height = panel->items.size() * theme.fontUi.lineHeight;
+  		const float width  = MARGIN_X2 + settings.fontUi.lineHeight + textWidth + MARGIN;
+		const float height = panel->items.size() * settings.fontUi.lineHeight;
 		
 		panel->area.right = panel->area.left + width;
 		panel->area.bottom = panel->area.top + height;	
@@ -152,19 +151,19 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 static Explorer::NewItemDialog* CreateTextboxPanel(D2D_POINT_2F spawnPoint, std::string_view placeholderText, std::string initialText) {
 	auto tbPanel = std::make_unique<Explorer::NewItemDialog>();
 		
-	if (!tbPanel->textbox.Init(&theme.fontUi, placeholderText, std::move(initialText)))
+	if (!tbPanel->textbox.Init(&settings.fontUi, placeholderText, std::move(initialText)))
 		return nullptr;
 	
 	tbPanel->textbox.position = D2D_POINT_2F {
 		.x = spawnPoint.x + MARGIN,
-		.y = spawnPoint.y + MARGIN + theme.fontUi.lineHeight + MARGIN};
+		.y = spawnPoint.y + MARGIN + settings.fontUi.lineHeight + MARGIN};
 	tbPanel->textbox.width = TEXTBOX_PANEL_WIDTH - MARGIN_X2;
 	
 	tbPanel->area = D2D_RECT_F {
 		.left   = spawnPoint.x,
 		.top    = spawnPoint.y,
 		.right  = spawnPoint.x + TEXTBOX_PANEL_WIDTH,
-		.bottom = spawnPoint.y + MARGIN + theme.fontUi.lineHeight + MARGIN + tbPanel->textbox.Height() + MARGIN};
+		.bottom = spawnPoint.y + MARGIN + settings.fontUi.lineHeight + MARGIN + tbPanel->textbox.Height() + MARGIN};
 	
 	return tbPanel.release();
 }
@@ -176,7 +175,7 @@ Explorer* Explorer::Make() {
 
 	auto panel = std::make_unique<Explorer::Panel>();	
 	panel->area.left = 0u;
-	panel->area.top = theme.fontUi.lineHeight + PADDING_X2;
+	panel->area.top = settings.fontUi.lineHeight + PADDING_X2;
 	panel->parent = nullptr;
 	panel->directoryName = ".";
 	panel->fullPathLength = 1u;
@@ -622,7 +621,7 @@ static void ActionNewItem(Explorer* self, Explorer::Item::Type type) {
 	self->newItemDialog = CreateTextboxPanel(
 		D2D_POINT_2F {
 			.x = self->activePanel->area.right,
-			.y = self->activePanel->area.top + (activeItemIndex * theme.fontUi.lineHeight)},
+			.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)},
 		type == Explorer::Item::Type_File ? "File name" : "Folder name",
 		std::string {});
 	self->newItemDialog->itemType = type;
@@ -636,7 +635,7 @@ static void ActionRenameItem(Explorer* self) {
 	self->newItemDialog = CreateTextboxPanel(
 		D2D_POINT_2F {
 			.x = self->activePanel->area.right,
-			.y = self->activePanel->area.top + (activeItemIndex * theme.fontUi.lineHeight)},
+			.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)},
 		self->activePanel->activeItem->type  == Explorer::Item::Type_File ? "Rename file" : "Rename folder",
 		self->activePanel->activeItem->filename);
 	self->newItemDialog->itemType = self->activePanel->activeItem->type;
@@ -687,7 +686,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				
 				self->newItemDialog->errorText = comError.ErrorMessage();
-				self->newItemDialog->area.bottom += MARGIN + theme.fontUi.lineHeight;
+				self->newItemDialog->area.bottom += MARGIN + settings.fontUi.lineHeight;
 				self->newItemDialog->textbox.invalid = true;
 				return;
 			}
@@ -705,7 +704,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				
 				self->newItemDialog->errorText = comError.ErrorMessage();
-				self->newItemDialog->area.bottom += MARGIN + theme.fontUi.lineHeight;
+				self->newItemDialog->area.bottom += MARGIN + settings.fontUi.lineHeight;
 				self->newItemDialog->textbox.invalid = true;
 				return;
 			}
@@ -730,7 +729,7 @@ static void ActionOpenDirectory(Explorer* self) {
 	const u64 activeItemIndex = (self->activePanel->activeItem - self->activePanel->items.data());
 	const D2D_POINT_2F spawnPos {
 		.x = self->activePanel->area.right,
-		.y = self->activePanel->area.top + (activeItemIndex * theme.fontUi.lineHeight)};
+		.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)};
 			
 	auto newPanel = std::make_unique<Explorer::Panel>();	
 	newPanel->area.left = spawnPos.x;
@@ -814,23 +813,23 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		
 		const D2D_RECT_F itemArea {
 			.left   = panel->area.left,
-			.top    = panel->area.top  + (iItem * (theme.fontUi.lineHeight)),
+			.top    = panel->area.top  + (iItem * (settings.fontUi.lineHeight)),
 			.right  = panel->area.right,
-			.bottom = panel->area.top  + (iItem * (theme.fontUi.lineHeight)) + theme.fontUi.lineHeight};
+			.bottom = panel->area.top  + (iItem * (settings.fontUi.lineHeight)) + settings.fontUi.lineHeight};
 				
 		if (&item == panel->activeItem) {
 			const bool isActiveItemOrRenamed = (isActivePanel && (!self->newItemDialog || self->newItemDialog->isRename));
 			
 			ID2D1Brush* brush = nullptr;
 			if (isActiveItemOrRenamed) {
-				brush = theme.GetBrushGlow();
+				brush = settings.GetBrushDropShadow();
 				brush->SetOpacity(std::sin(self->activeItemAnimationValue) * 0.4f + 0.5f);
 				DEFER(brush->SetOpacity(1.0));
 				
 				deviceContext->FillRectangle(itemArea, brush);
 			
 			} else {
-				deviceContext->FillRectangle(itemArea, theme.GetBrushUiBackground());
+				deviceContext->FillRectangle(itemArea, settings.GetBrushUiBackground());
 			}
 		}
 		
@@ -839,10 +838,10 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		//
 		{
 			if (item.isSelected)
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(itemArea, RADIUS), theme.GetBrushSelection());
+				deviceContext->FillRoundedRectangle(MakeRoundedRect(itemArea, RADIUS), settings.GetBrushSelection());
 				
 			if (item.flags & Explorer::Item::Flag_Inserted) {
-				ID2D1SolidColorBrush* insertAnimBrush = theme.GetBrushSelection();
+				ID2D1SolidColorBrush* insertAnimBrush = settings.GetBrushSelection();
 				insertAnimBrush->SetOpacity(1.0f - self->insertAnimationValue);
 				DEFER(insertAnimBrush->SetOpacity(1.0f));
 				
@@ -853,7 +852,7 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 			}
 			
 			if (item.flags & Explorer::Item::Flag_Copied) {
-				ID2D1SolidColorBrush* copyAnimBrush = theme.GetBrushSelection();
+				ID2D1SolidColorBrush* copyAnimBrush = settings.GetBrushSelection();
 				copyAnimBrush->SetOpacity(std::sin(self->copyAnimationValue));
 				DEFER(copyAnimBrush->SetOpacity(1.0f));
 				
@@ -868,33 +867,33 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		// icon + text
 		//
 		{
-			ID2D1Bitmap* icon = theme.icons.unknown;
+			ID2D1Bitmap* icon = settings.icons.unknown;
 			if (item.type == Explorer::Item::Type_Directory) {
 				icon = (&item == panel->activeItem && !isActivePanel)
-			 		? theme.icons.explorerFolderOpen
-					: theme.icons.explorerFolderClosed;
+			 		? settings.icons.explorerFolderOpen
+					: settings.icons.explorerFolderClosed;
 						
 			} else if (item.type == Explorer::Item::Type_File) {
-				icon = theme.icons.explorerFile;
+				icon = settings.icons.explorerFile;
 			
 			} else {
-				icon = theme.icons.noItems;
+				icon = settings.icons.noItems;
 			}
 			
 			deviceContext->DrawBitmap(icon,
 				D2D_RECT_F {
 					.left   = panel->area.left + MARGIN,
 					.top    = itemArea.top,
-					.right  = panel->area.left + MARGIN + theme.fontUi.lineHeight,
+					.right  = panel->area.left + MARGIN + settings.fontUi.lineHeight,
 					.bottom = itemArea.bottom});
 			
 			const bool isCut = (item.flags & Explorer::Item::Flag_Cut);
-			staticGlyphRun.Shape(item.filename, theme.fontUi);
+			staticGlyphRun.Shape(item.filename, settings.fontUi);
 			staticGlyphRun.Draw(deviceContext,
-				panel->area.left + MARGIN + theme.fontUi.lineHeight + MARGIN,
+				panel->area.left + MARGIN + settings.fontUi.lineHeight + MARGIN,
 				itemArea.top,
-				theme.fontUi,
-				theme.GetBrushUiText(!isCut));
+				settings.fontUi,
+				settings.GetBrushUiText(!isCut));
 		}
 		
 		//
@@ -976,8 +975,8 @@ void Explorer::OnUpdate() {
 			labelText,
 			newItemDialog->area.left + MARGIN,
 			newItemDialog->area.top + MARGIN,
-			theme.fontUi,
-			theme.GetBrushUiText());
+			settings.fontUi,
+			settings.GetBrushUiText());
 		
 		newItemDialog->textbox.OnUpdate();
 		
@@ -986,8 +985,8 @@ void Explorer::OnUpdate() {
 				newItemDialog->errorText,
 				newItemDialog->area.left + MARGIN,
 				newItemDialog->textbox.position.y + newItemDialog->textbox.Height() + MARGIN,
-				theme.fontUi,
-				theme.GetBrushUiText());
+				settings.fontUi,
+				settings.GetBrushUiText());
 		}
 	}
 }
@@ -1051,31 +1050,31 @@ void Explorer::OnKeyDown(KeyEvent event) {
 			
 			activeItemAnimationValue = 0.0f;
 			
-		} else if (event == keybinds.actions.copy) {
+		} else if (event == settings.keybinds.copy) {
 			ActionCopyOrCut(this, false);
 	
-		} else if (event == keybinds.actions.cut) {
+		} else if (event == settings.keybinds.cut) {
 			ActionCopyOrCut(this, true);
 			
-		} else if (event == keybinds.actions.paste) {
+		} else if (event == settings.keybinds.paste) {
 			ActionPaste(this);
 			
-		} else if (event == keybinds.actions.deleteNextChar) {
+		} else if (event == settings.keybinds.deleteNextChar) {
 			ActionDelete(this);
 			
-		} else if (event == keybinds.actions.explorerShellExecute) {
+		} else if (event == settings.keybinds.explorerShellExecute) {
 			ActionShellExecute(this);
 			
-		} else if (event == keybinds.actions.explorerOpenInWindowsExplorer) {
+		} else if (event == settings.keybinds.explorerOpenInWindowsExplorer) {
 			ActionRevealInExplorer(this);
 		
-		} else if (event == keybinds.actions.explorerNewFile) {
+		} else if (event == settings.keybinds.explorerNewFile) {
 			ActionNewItem(this, Item::Type_File);
 		
-		} else if (event == keybinds.actions.explorerNewFolder) {
+		} else if (event == settings.keybinds.explorerNewFolder) {
 			ActionNewItem(this, Item::Type_Directory);
 		
-		} else if (event == keybinds.actions.explorerRename) {
+		} else if (event == settings.keybinds.explorerRename) {
 			ActionRenameItem(this);
 		
 		} else if (event.vkeycode == VK_RETURN) {

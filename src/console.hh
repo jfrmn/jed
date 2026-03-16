@@ -3,11 +3,13 @@
 #include "text/text-position.hh"
 #include "graphics/glyph-run.hh"
 #include "commands/parameter.hh"
+
 #include "ui/scrollarea.hh"
 #include "ui/file-preview.hh"
 
 #include "util/process.hh"
 #include "util/regex.hh"
+#include "util/color.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -40,7 +42,7 @@ struct Console : public Process::Observer {
 	struct StyleChange {
 		StyleChangeType type = StyleChangeType_Reset;
 		TextPosition position = {};
-		D2D_COLOR_F color = {};
+		Color color = {};
 		bool value = false;
 	};
 		
@@ -53,7 +55,7 @@ struct Console : public Process::Observer {
 	struct EditorDiagnosticsRecord {
 		std::string file = {};
 		u64 line = 0u;
-		D2D_COLOR_F color = {};
+		Color color = {};
 		
 		u64 originLine = 0u;
 		u64 originFromColumn = 0u;

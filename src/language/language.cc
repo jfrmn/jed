@@ -1,6 +1,6 @@
 #include "language.hh"
 #include "main-window.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
@@ -159,9 +159,9 @@ void Language::HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, 
 				renderTarget->FillRectangle(
 					D2D_RECT_F {
 						.left   = fromOffset,
-						.top    = (theme.fontEditor.lineHeight * ln),
+						.top    = (settings.fontEditor.lineHeight * ln),
 						.right  = toOffset,
-						.bottom = (theme.fontEditor.lineHeight * (ln+1)) },
+						.bottom = (settings.fontEditor.lineHeight * (ln+1)) },
 					brush);
 			}
 		}

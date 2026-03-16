@@ -1,9 +1,11 @@
 #include "effects.hh"
-#include "theme.hh"
-#include "util/logging.hh"
-#include "util/rect-util.hh"
+#include "settings.hh"
 #include "ui/constants.h"
 #include "graphics/factories.hh"
+
+#include "util/logging.hh"
+#include "util/rect-util.hh"
+#include "util/color.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -153,7 +155,7 @@ void BlurArea(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& area, ID2D1Bi
 
 void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area) {
 	shadowEffect->SetInput(0, background);
-	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {theme.colors.dropShadow.r, theme.colors.dropShadow.g, theme.colors.dropShadow.b, theme.colors.dropShadow.a});
+	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {settings.colors.dropShadow.r, settings.colors.dropShadow.g, settings.colors.dropShadow.b, settings.colors.dropShadow.a});
 	deviceContext->DrawImage(shadowEffect, D2D1_POINT_2F {area.left, area.top});
 }
 
@@ -204,7 +206,7 @@ void PopLayer(ID2D1DeviceContext* deviceContext) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ID2D1SolidColorBrush* GetBrush(const _D3DCOLORVALUE& clr) {
-	brush->SetColor(clr);
+ID2D1SolidColorBrush* GetBrush(const Color& clr) {
+	brush->SetColor(clr.ToD2D());
 	return brush;
 }

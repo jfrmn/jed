@@ -1,6 +1,6 @@
 #include "file-preview.hh"
 #include "globals.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "ui/constants.h"
 #include "graphics/effects.hh"
@@ -12,7 +12,8 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <windows.h>
+#include <d2d1_1.h>
+#include <Windows.h>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static constexpr u32 READ_CHUNK_SIZE = 1024;
@@ -163,7 +164,7 @@ bool FilePreview::Load(const LoadArgs& args) {
 			GlyphRun& run = lines.emplace_back();
 			const TextBuffer::Line& line = textBuffer.GetLineAt(i);
 			
-			run.Shape(line.GetText(), theme.fontEditor);
+			run.Shape(line.GetText(), settings.fontEditor);
 			
 			const f32 runWidth = run.width + PADDING_X2;
 			if (width < runWidth)
@@ -220,7 +221,7 @@ void FilePreview::OnUpdate() {
 	
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
-		run.Draw(deviceContext, x + PADDING, y + (i * theme.fontEditor.lineHeight) + PADDING, theme.fontEditor, theme.GetBrushEditorText());
+		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.GetBrushEditorText());
 	}
 	
 	deviceContext->PopAxisAlignedClip();
@@ -228,6 +229,6 @@ void FilePreview::OnUpdate() {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 D2D_RECT_F FilePreview::GetArea() const {
-	const f32 height = lines.size() * theme.fontEditor.lineHeight + PADDING_X2;
+	const f32 height = lines.size() * settings.fontEditor.lineHeight + PADDING_X2;
 	return MakeRect(x, y, width, height);
 }

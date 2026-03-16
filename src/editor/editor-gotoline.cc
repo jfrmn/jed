@@ -2,7 +2,7 @@
 #include "editor.hh"
 #include "globals.hh"
 #include "events.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "ui/constants.h"
 #include "util/logging.hh"
@@ -22,12 +22,12 @@ EditorGotoLine* EditorGotoLine::Make(Editor* editor) {
 	self->owner = editor;
 
 	// init textbox
-	if (!self->textbox.Init(&theme.fontEditor, "Line")) {
+	if (!self->textbox.Init(&settings.fontEditor, "Line")) {
 		LogError("failed to initalize textbox");
 		return nullptr;
 	}
 
-	if (!self->glyphRunHeadline.Shape("Goto Line", theme.fontUi)) {
+	if (!self->glyphRunHeadline.Shape("Goto Line", settings.fontUi)) {
 		LogError("shaping headline failed");
 		return nullptr;
 	}
@@ -41,9 +41,9 @@ void EditorGotoLine::OnUpdate() {
 	//
 	// calc size
 	//
-	const f32 heightHeadline = theme.fontUi.lineHeight;
+	const f32 heightHeadline = settings.fontUi.lineHeight;
 	const f32 totalHeight = MARGIN + heightHeadline + MARGIN + textbox.Height() + MARGIN;
-	const f32 textBoxWidth = (theme.fontEditor.GetSpaceAdvance() * MAX_DIGITS) + PADDING_X2;
+	const f32 textBoxWidth = (settings.fontEditor.GetSpaceAdvance() * MAX_DIGITS) + PADDING_X2;
 	
 	area = D2D_RECT_F {
 		.left   = owner->area.right - MARGIN - SCROLLBAR_WIDTH_WIDE - textBoxWidth - MARGIN_X2,
@@ -78,17 +78,17 @@ void EditorGotoLine::OnUpdate() {
 	glyphRunHeadline.Draw(deviceContext,
 	    area.left + MARGIN, 
 	    area.top  + MARGIN,
-	    theme.fontUi,
-	    theme.GetBrushUiText());
+	    settings.fontUi,
+	    settings.GetBrushUiText());
 	
 	deviceContext->DrawLine(
 		D2D1_POINT_2F {
 			.x = area.left + MARGIN,
-			.y = area.top  + MARGIN + theme.fontUi.lineHeight },
+			.y = area.top  + MARGIN + settings.fontUi.lineHeight },
 		D2D1_POINT_2F {
 			.x = area.left + MARGIN + glyphRunHeadline.width,
-			.y = area.top  + MARGIN + theme.fontUi.lineHeight },
-		theme.GetBrushUiText());
+			.y = area.top  + MARGIN + settings.fontUi.lineHeight },
+		settings.GetBrushUiText());
 
 	//
 	// draw textbox

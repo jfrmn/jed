@@ -1,7 +1,6 @@
 #include "main-window.hh"
 #include "globals.hh"
-#include "key-bindings.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "graphics/factories.hh"
 #include "graphics/effects.hh"
@@ -14,20 +13,6 @@
 
 // @DUMMY
 #include "editor/editor.hh"
-#include "util/file-util.hh"
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static cJSON* LoadSettings() {
-	
-#ifdef _DEBUG
-	const std::string settingsFilepath = ".\\settings.json";
-#else
-	const std::string settingsFilepath = GetProcessDirectory() + "\\settings.json";
-#endif
-
-	LogInfo("loading settings from '%'", settingsFilepath);
-	return JsonParseFile(settingsFilepath, true);
-}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static bool GetPerformanceFrequency(u64* ticksPerMs) {
@@ -72,33 +57,25 @@ int main(int argc, char** argv) {
 	if (!GetPerformanceFrequency(&ticksPerMs))
 		LogError("init perforamnce counters failed");
 	
-	cJSON* settingsJson = LoadSettings();
-	if (!settingsJson)
-		LogWarning("failed to load settings");
-	
-	if (!keybinds.Init(settingsJson)) {
-		LogFatal("init key bindings failed");
-		return -1;
-	}
 	
 	if (!mainWindow.Create()) {
 		LogFatal("creating window failed");
 		return -1;
 	}
 	
+	if (!settings.Init(mainWindow.deviceContext)) {
+		LogWarning("failed to load settings");
+	}
+	
 	if (!InitEffects(mainWindow.deviceContext)) {
 		LogFatal("init effects failed");
 		return -1;
 	}
-
-	if (!theme.Init(settingsJson, mainWindow.deviceContext)) {
-		LogFatal("failed to load theme");
-		return -1;
-	}
-	
-	if (!Tool::LoadTools(settingsJson)) {
-		LogError("failed to load tools");
-	}
+		
+	// @TODO
+	//if (!Tool::LoadTools(settingsJson)) {
+	//	LogError("failed to load tools");
+	//}
 
 	if (!Language::LoadLanguages(".\\config\\languages"))
 		LogError("failed to load languages");
@@ -108,8 +85,6 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	
-	JsonFree(settingsJson);
-
 	// @DUMMY
 	mainWindow.OpenEditor(".\\src\\main.cc", MainWindow::OpenBehavior_NewPanelLeft);
 	

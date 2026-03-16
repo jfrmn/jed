@@ -1,10 +1,14 @@
 #include "scrollarea.hh"
 #include "globals.hh"
 #include "events.hh"
-#include "theme.hh"
+#include "settings.hh"
 #include "util/rect-util.hh"
 
 #include <algorithm>
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <d2d1_1.h>
 
 void Scrollarea::Init(f32 posX, f32 posY, f32 width, f32 height, f32 barWidth) {
 	vpX = vpY = 0.0f;
@@ -61,7 +65,7 @@ void Scrollarea::OnUpdate() {
 		.right  = position.x + vpSize.width,
 		.bottom = position.y + ((vpY + vpSize.height) * ratio) };
 	
-	deviceContext->FillRectangle(vertBar, theme.GetBrushUiBackground());
+	deviceContext->FillRectangle(vertBar, settings.GetBrushUiBackground());
 
 	const bool isHot = mouse.Hittest(vertBar, this);
 	if (isHot) {
@@ -69,7 +73,7 @@ void Scrollarea::OnUpdate() {
 			mouse.StartDragging();
 		
 		const bool isDragging = mouse.IsDragging();
-		deviceContext->FillRectangle(vertBar, theme.GetBrushHover(isDragging));
+		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(isDragging));
 	
 		if (isDragging) {
 			vpY = std::clamp(

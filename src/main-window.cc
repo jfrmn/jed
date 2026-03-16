@@ -1,8 +1,7 @@
 #include "main-window.hh"
 #include "basic.hh"
-#include "key-bindings.hh"
 #include "globals.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "file-search-bar.hh"
 #include "explorer.hh"
@@ -163,11 +162,11 @@ static void RelinkPanelsAndTabs(MainWindow* self) {
 }
 
 static float GetTabHeight() {
-	return theme.fontUi.lineHeight + PADDING_X2;
+	return settings.fontUi.lineHeight + PADDING_X2;
 }
 
 static float GetStatusBarHeight() {
-	return theme.fontUi.lineHeight + PADDING_X2;
+	return settings.fontUi.lineHeight + PADDING_X2;
 }
 
 static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
@@ -266,7 +265,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			}
 			
 			currentTab.title = title;
-			currentTab.tabWidth = theme.fontUi.MeasureText(title) + theme.fontUi.lineHeight + PADDING_X3;
+			currentTab.tabWidth = settings.fontUi.MeasureText(title) + settings.fontUi.lineHeight + PADDING_X3;
 			return currentTab.editor;
 		
 		} else {
@@ -280,7 +279,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			
 			MainWindow::Tab& newTab = tabs.emplace_back();
 			newTab.title = title,
-			newTab.tabWidth = theme.fontUi.MeasureText(title) + theme.fontUi.lineHeight + PADDING_X3,
+			newTab.tabWidth = settings.fontUi.MeasureText(title) + settings.fontUi.lineHeight + PADDING_X3,
 			newTab.editor = editor.release();
 			
 			if (openBehavior == MainWindow::OpenBehavior_Default) {
@@ -348,10 +347,10 @@ void MainWindow::OnUpdate() {
 				borderRect.right -= 1.0f;
 						
 				if (drawFocusedPanelBorder)
-					deviceContext->DrawRectangle(borderRect, theme.GetBrushSelection(), 2.0f);
+					deviceContext->DrawRectangle(borderRect, settings.GetBrushSelection(), 2.0f);
 							
 				if (drawHoverPanelBorder)
-					deviceContext->DrawRectangle(borderRect, theme.GetBrushHover(), 2.0f);
+					deviceContext->DrawRectangle(borderRect, settings.GetBrushHover(), 2.0f);
 			}
 		}
 	}
@@ -374,18 +373,18 @@ void MainWindow::OnUpdate() {
 				.bottom = tabHeight };
 						
 			if (tab.panelIndex == focusedPanelIndex) {
-				deviceContext->FillRectangle(tabRect, theme.GetBrushGlow());
+				deviceContext->FillRectangle(tabRect, settings.GetBrushDropShadow());
 			
 			} else if (tab.panelIndex != U64_MAX) {
-				deviceContext->FillRectangle(tabRect, theme.GetBrushUiBackground(false));
+				deviceContext->FillRectangle(tabRect, settings.GetBrushUiBackground(false));
 			}
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
 			 	tab.title,
 				PADDING + offsetX,
 				PADDING,
-				theme.fontUi,
-				theme.GetBrushUiText());
+				settings.fontUi,
+				settings.GetBrushUiText());
 						
 			const bool isHovered = mouse.Hittest(tabRect, this, OnClickTab, i);
 			
@@ -394,34 +393,34 @@ void MainWindow::OnUpdate() {
 			// draw tab icon
 			{
 				ID2D1Bitmap* icon = nullptr;
-				if      (tab.editor->modified && isHovered) icon = theme.icons.tabsModifiedHovered;
-				else if (tab.editor->modified)              icon = theme.icons.tabsModified;
-				else if (isHovered)                         icon = theme.icons.tabsHovered;
+				if      (tab.editor->modified && isHovered) icon = settings.icons.tabsModifiedHovered;
+				else if (tab.editor->modified)              icon = settings.icons.tabsModified;
+				else if (isHovered)                         icon = settings.icons.tabsHovered;
 					
 				if (icon) {
 					const f32 totalGlyphAdvances = staticGlyphRun.width;
 					const D2D1_RECT_F iconHitbox {
 						.left   = PADDING + offsetX + totalGlyphAdvances,
 						.top    = 0.0f,
-						.right  = PADDING + offsetX + totalGlyphAdvances + theme.fontUi.lineHeight + PADDING_X2,
-						.bottom = PADDING_X2 + theme.fontUi.lineHeight};
+						.right  = PADDING + offsetX + totalGlyphAdvances + settings.fontUi.lineHeight + PADDING_X2,
+						.bottom = PADDING_X2 + settings.fontUi.lineHeight};
 					
 					const D2D1_RECT_F iconTargetRect {
 						.left   = iconHitbox.left   + PADDING,
 						.top    = iconHitbox.top    + PADDING,
 						.right  = iconHitbox.right  - PADDING,
 						.bottom = iconHitbox.bottom - PADDING};
-					deviceContext->FillOpacityMask(icon, theme.GetBrushUiText(), &iconTargetRect, nullptr);
+					deviceContext->FillOpacityMask(icon, settings.GetBrushUiText(), &iconTargetRect, nullptr);
 					
 					if (RectContains(iconHitbox, mouse.x, mouse.y)) {
-						deviceContext->FillRectangle(iconHitbox, theme.GetBrushHover(mouse.isDown));
+						deviceContext->FillRectangle(iconHitbox, settings.GetBrushHover(mouse.isDown));
 						isCloseIconHovered = true;
 					}
 				}
 			}
 			
 			if (isHovered && !isCloseIconHovered)
-				deviceContext->FillRectangle(tabRect, theme.GetBrushHover(mouse.isDown));
+				deviceContext->FillRectangle(tabRect, settings.GetBrushHover(mouse.isDown));
 			
 			offsetX += tab.tabWidth;
 		}
@@ -509,7 +508,7 @@ static void Hittest(const MainWindow* self, float mx, float my, u64* hitPanel, u
 			
 			offsetX += tab.tabWidth;
 			if (mx < offsetX) {
-				*hitCloseButton = (mx >= (offsetX - theme.fontUi.lineHeight - PADDING_X2));
+				*hitCloseButton = (mx >= (offsetX - settings.fontUi.lineHeight - PADDING_X2));
 				*hitTab = i;
 				*hitPanel = U64_MAX;
 				return;
@@ -818,12 +817,12 @@ static void ActionCloseTabAndPanel(MainWindow* self) {
 
 void MainWindow::OnKeyDown(KeyEvent event) {
 		
-	if (event == keybinds.actions.showFileSearch) {
+	if (event == settings.keybinds.showFileSearch) {
 		if (searchBar) return;
 		
 		searchBar = FileSearchBar::Make();
 			
-	} else if (event == keybinds.actions.showExplorer) {
+	} else if (event == settings.keybinds.showExplorer) {
 		if (explorer) {
 			delete explorer;
 			explorer = nullptr;
@@ -831,41 +830,41 @@ void MainWindow::OnKeyDown(KeyEvent event) {
 			explorer = Explorer::Make();
 		}
 
-	} else if (event == keybinds.actions.showToolSearch) {
+	} else if (event == settings.keybinds.showToolSearch) {
 		if (searchBar) return;
 		searchBar = ToolSearchBar::Make();
 		
-	} else if (event == keybinds.actions.showConsole) {
+	} else if (event == settings.keybinds.showConsole) {
 		console.isOpen = !console.isOpen;
 	
-	} else if (event == keybinds.actions.focusNextTab) {
+	} else if (event == settings.keybinds.focusNextTab) {
 		ActionChangeFocusedTab(this, true);
 
-	} else if (event == keybinds.actions.focusPrevTab) {
+	} else if (event == settings.keybinds.focusPrevTab) {
 		ActionChangeFocusedTab(this, false);
 	
-	} else if (event == keybinds.actions.focusNextPanel) {
+	} else if (event == settings.keybinds.focusNextPanel) {
 		focusedPanelIndex = IncrementWrapAround(focusedPanelIndex, panels.size());
 	
-	} else if (event == keybinds.actions.focusPrevPanel) {
+	} else if (event == settings.keybinds.focusPrevPanel) {
 		focusedPanelIndex = DecrementWrapAround(focusedPanelIndex, panels.size());
 		
-	} else if (event == keybinds.actions.addPanelAfter) {
+	} else if (event == settings.keybinds.addPanelAfter) {
 		ActionAddPanel(this, false);
 	
-	} else if (event == keybinds.actions.addPanelBefore) {
+	} else if (event == settings.keybinds.addPanelBefore) {
 		ActionAddPanel(this, true);
 		
-	} else if (event == keybinds.actions.swapPanels) {
+	} else if (event == settings.keybinds.swapPanels) {
 		ActionSwapPanels(this);
 	
-	} else if (event == keybinds.actions.closePanel) {
+	} else if (event == settings.keybinds.closePanel) {
 		ActionClosePanel(this);
 		
-	} else if (event == keybinds.actions.closeTab) {
+	} else if (event == settings.keybinds.closeTab) {
 		ActionCloseTab(this);
 	
-	} else if (event == keybinds.actions.closePanelAndTab) {
+	} else if (event == settings.keybinds.closePanelAndTab) {
 		ActionCloseTabAndPanel(this);
 
 	} else if (console.isOpen) {

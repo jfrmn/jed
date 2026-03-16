@@ -32,6 +32,9 @@ bool ToUtf8(std::wstring_view utf16, /*out*/ std::span<char>  utf8Buf,  /*out*/ 
 // Char categorization
 //---------------------------------------------------------
 
+// all whitespace characters
+extern const char WHITESPACE[];
+
 // returns ture for spaces, linebrakes and tabs otherwise false
 bool IsWhitespace(char ch);
 // returns true if char is in A-Z or a-z or underscore

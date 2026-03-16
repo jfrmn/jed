@@ -1,25 +1,25 @@
 #include "diagnostics.hh"
 #include "basic.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1_1.h>
 
-const _D3DCOLORVALUE Diagnostics::SEVERITY_COLORS[] {
-	D2D1::ColorF(D2D1::ColorF::White),
-	D2D1::ColorF(D2D1::ColorF::Red),
-	D2D1::ColorF(D2D1::ColorF::Yellow),
-	D2D1::ColorF(D2D1::ColorF::Green),
-	D2D1::ColorF(D2D1::ColorF::LightBlue)};
+const Color Diagnostics::SEVERITY_COLORS[] {
+	Color::FromKnown(D2D1::ColorF::White),
+	Color::FromKnown(D2D1::ColorF::Red),
+	Color::FromKnown(D2D1::ColorF::Yellow),
+	Color::FromKnown(D2D1::ColorF::Green),
+	Color::FromKnown(D2D1::ColorF::LightBlue)};
 	
 static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_COLORS) == Diagnostics::Severity_MAX);
 
-const unsigned long Diagnostics::SEVERITY_ICON_INDICIES[] {
-	0l,
-	static_cast<u32>(theme.icons.editorDiagnosticsError   - theme.iconArray[0]),
-	static_cast<u32>(theme.icons.editorDiagnosticsWarning - theme.iconArray[0]),
-	static_cast<u32>(theme.icons.editorDiagnosticsInfo    - theme.iconArray[0]),
-	static_cast<u32>(theme.icons.editorDiagnosticsHint    - theme.iconArray[0])};
+ID2D1Bitmap** Diagnostics::SEVERITY_ICONS[]{
+	&settings.icons.unknown,
+	&settings.icons.editorDiagnosticsError,
+	&settings.icons.editorDiagnosticsWarning,
+	&settings.icons.editorDiagnosticsInfo,
+	&settings.icons.editorDiagnosticsHint};
 
-static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_ICON_INDICIES) == Diagnostics::Severity_MAX);
+static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_ICONS) == Diagnostics::Severity_MAX);

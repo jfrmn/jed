@@ -1,6 +1,6 @@
 [submodule "deps/cJSON"]
 	path = deps/cJSON
 	url = https://github.com/DaveGamble/cJSON.git
-[submodule "deps/inih"]
-	path = deps/inih
-	url = https://github.com/benhoyt/inih.git
+[submodule "deps/tomlplusplus"]
+	path = deps/tomlplusplus
+	url = https://github.com/marzer/tomlplusplus.git

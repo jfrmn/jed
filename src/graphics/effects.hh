@@ -10,7 +10,8 @@ struct D2D_RECT_F;
 struct D2D_POINT_2F;
 struct D2D_SIZE_F;
 struct D2D1_ROUNDED_RECT;
-struct _D3DCOLORVALUE;
+
+union Color;
 
 //-----------------------------------------------------------------------------
 // Init & Shutdown
@@ -44,6 +45,6 @@ void PopLayer(ID2D1DeviceContext* deviceContext);
 //-----------------------------------------------------------------------------
 // global Brush
 //-----------------------------------------------------------------------------
-ID2D1SolidColorBrush* GetBrush(const _D3DCOLORVALUE& clr);
+ID2D1SolidColorBrush* GetBrush(const Color& clr);
 
 extern ID2D1SolidColorBrush* brush;

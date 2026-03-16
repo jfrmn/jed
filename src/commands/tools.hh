@@ -1,12 +1,9 @@
 #pragma once
 #include "commands/parameter.hh"
+#include "util/color.hh"
 
 #include <string>
 #include <vector>
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <d2dbasetypes.h>
 
 struct cJSON;
 
@@ -52,7 +49,7 @@ struct Tool {
 		
 		struct ColorMapping {
 			std::string key = {};
-			D2D_COLOR_F color = {};
+			Color color = {};
 		};
 		
 		std::string regex = {};

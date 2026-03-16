@@ -29,6 +29,24 @@ add_executable(slick-edit)
 #		"${DependenciesDir}/cJSON/cJSON_Utils.c")
 #endif()
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+add_library(inih STATIC)
+target_include_directories (inih PRIVATE "deps/inih")
+target_sources (inih PRIVATE "deps/inih/ini.c")
+target_compile_definitions(inih PRIVATE
+ 	INI_ALLOW_MULTILINE=1
+ 	INI_ALLOW_BOM=1
+ 	INI_ALLOW_INLINE_COMMENTS=1
+ 	INI_ALLOW_NO_VALUE=1
+ 	INI_STOP_ON_FIRST_ERROR=1
+ 	INI_HANDLER_LINENO=1
+ 	INI_CALL_HANDLER_ON_NEW_SECTION=1)
+target_link_libraries(slick-edit inih)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+target_include_directories (slick-edit PRIVATE "deps/tomlplusplus/include")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 set (CJSON_BUILD_SHARED_LIBS OFF)
 
 add_subdirectory("deps/cJSON")

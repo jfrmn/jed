@@ -3,7 +3,7 @@
 #include "globals.hh"
 #include "events.hh"
 #include "main-window.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "util/rect-util.hh"
 #include "util/logging.hh"
@@ -38,7 +38,7 @@ EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 	self->owner = editor;
 
 	// shape headline
-	if (!self->glyphRunHeadline.Shape("Find & Replace", theme.fontUi)) {
+	if (!self->glyphRunHeadline.Shape("Find & Replace", settings.fontUi)) {
 		LogError("failed to shape headline");
 		return nullptr;
 	}
@@ -62,12 +62,12 @@ EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 			StartNewSearch(self.get(), initText);
 		}
 
-		if (!self->textboxSearch.Init(&theme.fontEditor, "Search", std::move(initText))) {
+		if (!self->textboxSearch.Init(&settings.fontEditor, "Search", std::move(initText))) {
 			LogError("init search textbox failed");
 			return nullptr;
 		}
 
-		if (!self->textboxReplace.Init(&theme.fontEditor, "Replace")) {
+		if (!self->textboxReplace.Init(&settings.fontEditor, "Replace")) {
 			LogError("init replace textbox failed");
 			return nullptr;
 		}
@@ -160,17 +160,17 @@ bool EditorSearch::IsSearch() const {
 static D2D_RECT_F GetResultListButtonArea(const EditorSearch* self) {
 	return D2D_RECT_F {
 		.left   = self->area.left,
-		.top    = self->area.bottom - theme.fontUi.lineHeight - PADDING_X2,
+		.top    = self->area.bottom - settings.fontUi.lineHeight - PADDING_X2,
 		.right  = self->area.right,
 		.bottom = self->area.bottom };
 }
 
 static D2D_RECT_F GetSearchModifierButtonArea(const EditorSearch* self, int buttonIndex) {
 	return D2D_RECT_F {
-		.left   = self->area.right  - (MARGIN * (buttonIndex+1)) - (theme.fontUi.lineHeight * (buttonIndex+1)),
+		.left   = self->area.right  - (MARGIN * (buttonIndex+1)) - (settings.fontUi.lineHeight * (buttonIndex+1)),
 		.top    = self->area.top    +  MARGIN,
-		.right  = self->area.right  - (MARGIN * (buttonIndex+1)) - (theme.fontUi.lineHeight * (buttonIndex)),
-		.bottom = self->area.top    +  MARGIN + theme.fontUi.lineHeight};
+		.right  = self->area.right  - (MARGIN * (buttonIndex+1)) - (settings.fontUi.lineHeight * (buttonIndex)),
+		.bottom = self->area.top    +  MARGIN + settings.fontUi.lineHeight};
 }
 
 static void OnClickToggleResultList(void* ud, u64) {
@@ -196,7 +196,7 @@ void EditorSearch::OnUpdate() {
 	// calc size
 	//
 	{
-		const float headlineHeight = theme.fontUi.lineHeight;
+		const float headlineHeight = settings.fontUi.lineHeight;
 		
 		const float totalWidth = (RectWidth(owner->area) * 0.3f);
 		float totalHeight = MARGIN + headlineHeight + MARGIN + textboxSearch.Height() + MARGIN;
@@ -205,7 +205,7 @@ void EditorSearch::OnUpdate() {
 			totalHeight += textboxReplace.Height() + PADDING;
 			
 		if (threadData)
-			totalHeight += theme.fontUi.lineHeight + PADDING_X2;
+			totalHeight += settings.fontUi.lineHeight + PADDING_X2;
 		
 		area = MakeRect(
 			owner->area.right - SCROLLBAR_WIDTH_WIDE - totalWidth - MARGIN,
@@ -246,17 +246,17 @@ void EditorSearch::OnUpdate() {
 		glyphRunHeadline.Draw(deviceContext,
 			area.left + MARGIN,
 			area.top  + MARGIN,
-			theme.fontUi,
-			theme.GetBrushUiText());
+			settings.fontUi,
+			settings.GetBrushUiText());
 			
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN,
-				.y = area.top  + MARGIN + theme.fontUi.lineHeight },
+				.y = area.top  + MARGIN + settings.fontUi.lineHeight },
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN + glyphRunHeadline.width,
-				.y = area.top  + MARGIN + theme.fontUi.lineHeight },
-			theme.GetBrushUiText());
+				.y = area.top  + MARGIN + settings.fontUi.lineHeight },
+			settings.GetBrushUiText());
 	}
 
 	textboxSearch.OnUpdate();
@@ -272,12 +272,12 @@ void EditorSearch::OnUpdate() {
 		{
 			deviceContext->DrawBitmap(
 				isResultListVisible
-					? theme.icons.editorSearchResultsOpened
-					: theme.icons.editorSearchResultsClosed,
+					? settings.icons.editorSearchResultsOpened
+					: settings.icons.editorSearchResultsClosed,
 				D2D_RECT_F {
 					.left   = area.left   + PADDING_X2,
-					.top    = area.bottom - PADDING    - theme.fontUi.lineHeight,
-					.right  = area.left   + PADDING_X2 + theme.fontUi.lineHeight,
+					.top    = area.bottom - PADDING    - settings.fontUi.lineHeight,
+					.right  = area.left   + PADDING_X2 + settings.fontUi.lineHeight,
 					.bottom = area.bottom - PADDING });
 
 			const std::string text = (!threadData->isComplete)
@@ -286,19 +286,19 @@ void EditorSearch::OnUpdate() {
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
 				text,
-				area.left   + theme.fontUi.lineHeight + PADDING_X2 + theme.fontUi.GetSpaceAdvance(),
-				area.bottom - theme.fontUi.lineHeight - PADDING,
-				theme.fontUi,
-				theme.GetBrushUiText());
+				area.left   + settings.fontUi.lineHeight + PADDING_X2 + settings.fontUi.GetSpaceAdvance(),
+				area.bottom - settings.fontUi.lineHeight - PADDING,
+				settings.fontUi,
+				settings.GetBrushUiText());
 			
 			const D2D_RECT_F resultListButtonArea {
 				.left   = area.left,
-				.top    = area.bottom - theme.fontUi.lineHeight - PADDING_X2,
+				.top    = area.bottom - settings.fontUi.lineHeight - PADDING_X2,
 				.right  = area.right,
 				.bottom = area.bottom};
 			
 			if (mouse.Hittest(resultListButtonArea, this, OnClickToggleResultList))
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(resultListButtonArea, RADIUS), theme.GetBrushHover(mouse.isDown));
+				deviceContext->FillRoundedRectangle(MakeRoundedRect(resultListButtonArea, RADIUS), settings.GetBrushHover(mouse.isDown));
 		}
 
 		//
@@ -319,12 +319,12 @@ void EditorSearch::OnUpdate() {
 				if (maxLocationLength < locationBufferLen)
 					maxLocationLength = locationBufferLen;
 				
-				staticGlyphRun.Shape(locationBuffer, theme.fontEditor);
+				staticGlyphRun.Shape(locationBuffer, settings.fontEditor);
 				staticGlyphRun.Draw(deviceContext,
 					area.left,
-					area.bottom + (i * theme.fontEditor.lineHeight),
-					theme.fontEditor,
-					theme.GetBrushUiBackground());
+					area.bottom + (i * settings.fontEditor.lineHeight),
+					settings.fontEditor,
+					settings.GetBrushUiBackground());
 			}
 			
 			// draw actual line
@@ -346,45 +346,45 @@ void EditorSearch::OnUpdate() {
 						deviceContext->DrawRectangle(
 							D2D1_RECT_F {
 								.left   = area.left,
-								.top    = area.bottom + (theme.fontEditor.lineHeight * i),
+								.top    = area.bottom + (settings.fontEditor.lineHeight * i),
 								.right  = area.right,
-								.bottom = area.bottom + (theme.fontEditor.lineHeight * (i+1))},
-							theme.GetBrushUiText(false));
+								.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))},
+							settings.GetBrushUiText(false));
 						break;
 					}
 				}
 				
-				staticGlyphRun.Shape(lineText, theme.fontEditor);
+				staticGlyphRun.Shape(lineText, settings.fontEditor);
 
-				const float locationOffset = theme.fontEditor.GetSpaceAdvance() * maxLocationLength;
+				const float locationOffset = settings.fontEditor.GetSpaceAdvance() * maxLocationLength;
 				deviceContext->FillRectangle(
 					D2D1_RECT_F {
 						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.column - numSkippedCharacters),
-						.top    = area.bottom + (theme.fontEditor.lineHeight * i),
+						.top    = area.bottom + (settings.fontEditor.lineHeight * i),
 						.right  = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.to.column - numSkippedCharacters),
-						.bottom = area.bottom + (theme.fontEditor.lineHeight * (i+1)) },
-					theme.GetBrushUiSearchResult());
+						.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1)) },
+					settings.GetBrushUiSearchResult());
 
 				staticGlyphRun.Draw(deviceContext,
 					area.left + locationOffset,
-					area.bottom + (i * theme.fontEditor.lineHeight),
-					theme.fontEditor,
-					theme.GetBrushUiText());
+					area.bottom + (i * settings.fontEditor.lineHeight),
+					settings.fontEditor,
+					settings.GetBrushUiText());
 				
 				const D2D1_RECT_F itemRect {
 					.left   = area.left,
-					.top    = area.bottom + (theme.fontEditor.lineHeight * i),
+					.top    = area.bottom + (settings.fontEditor.lineHeight * i),
 					.right  = area.right,
-					.bottom = area.bottom + (theme.fontEditor.lineHeight * (i+1))};
+					.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))};
 				
 				if (mouse.Hittest(itemRect, this, OnClickResultItem, i)) {
 					deviceContext->FillRectangle(
 						D2D1_RECT_F {
 							.left   = area.left,
-							.top    = area.bottom + (theme.fontEditor.lineHeight * i),
+							.top    = area.bottom + (settings.fontEditor.lineHeight * i),
 							.right  = area.right,
-							.bottom = area.bottom + (theme.fontEditor.lineHeight * (i+1))},
-						theme.GetBrushHover());
+							.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))},
+						settings.GetBrushHover());
 				}
 			}
 		}

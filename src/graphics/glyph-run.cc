@@ -300,14 +300,14 @@ static u32 ConvertToUtf16(std::string_view utf8, ShapingBuffer* shapingBuffer) {
 	
 	u32 size = 0;
 	
-	for (u64 i = 0; i < utf8.size(); i++) {
+	for (u64 i = 0; i < utf8.size(); /**/) {
     	u32 cp = 0;
     	u8 seqLen = 0u;
     				
 		// Decode UTF-8
     	
     	// 1 byte (0-127)
-    	if (utf8[i] <= 0x7F) {
+    	if (utf8[i] >= 0 && utf8[i] <= 0x7F) {
         	cp = utf8[i];
         	seqLen = 1u;
     	
@@ -318,7 +318,7 @@ static u32 ConvertToUtf16(std::string_view utf8, ShapingBuffer* shapingBuffer) {
         	seqLen = 2u;
     	
     	// 3 bytes
-    	} else if ((utf8[i+1] & 0xF0) == 0xE0 && i < utf8.size()-2) {
+    	} else if ((utf8[i] & 0xF0) == 0xE0 && i < utf8.size()-2) {
         	cp =  (utf8[i  ] & 0x0F) << 12;
         	cp |= (utf8[i+1] & 0x3F) << 6;
         	cp |= (utf8[i+2] & 0x3F);
@@ -376,8 +376,11 @@ static u32 ConvertToUtf16(std::string_view utf8, ShapingBuffer* shapingBuffer) {
         	// Code point is out of UTF-16 range (from 5-6 byte UTF-8)
         	shapingBuffer->stringData[size] = UTF16_REPLACEMENT_CHAR;
         	shapingBuffer->stringUtfMapping[size] = seqLen;
+
         	size += 1;
     	}
+
+		i += seqLen;
 	}
 	
 	return size;

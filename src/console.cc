@@ -1,8 +1,7 @@
 #include "console.hh"
 #include "globals.hh"
 #include "main-window.hh"
-#include "key-bindings.hh"
-#include "theme.hh"
+#include "settings.hh"
 
 #include "util/rect-util.hh"
 #include "util/logging.hh"
@@ -15,6 +14,10 @@
 
 #include <charconv>
 #include <algorithm>
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <d2d1_1.h>
 
 //#################################################################################################
 //
@@ -259,7 +262,7 @@ bool Console::StartProcess() {
 //#################################################################################################
 
 static f32 GetToolbarHeight() {
-	return MARGIN_X2 + theme.fontUi.lineHeight;
+	return MARGIN_X2 + settings.fontUi.lineHeight;
 }
 
 static void UpdateFilePreview(Console* self, const Console::EditorDiagnosticsRecord& record) {
@@ -311,7 +314,7 @@ static void RenderOutput(Console* self) {
 	ID2D1RenderTarget* background = deviceContext;
 	
 	foreground->BeginDraw();
-	foreground->Clear(theme.colors.editorText);
+	foreground->Clear(settings.colors.editorText.ToD2D());
 
 	text->BeginDraw();
 	text->Clear();
@@ -327,7 +330,7 @@ static void RenderOutput(Console* self) {
 		foreground->SetTransform(D2D1::Matrix3x2F::Translation(self->scrollarea.vpX, -self->scrollarea.vpY));
 		
 		ID2D1SolidColorBrush* brushForeground = nullptr;
-		foreground->CreateSolidColorBrush(theme.colors.editorText, &brushForeground);
+		foreground->CreateSolidColorBrush(settings.colors.editorText.ToD2D(), &brushForeground);
 		if (!brushForeground) return;
 		DEFER(brushForeground->Release());
 		
@@ -352,9 +355,9 @@ static void RenderOutput(Console* self) {
 			
 			const D2D_RECT_F rect {
 				.left   = PADDING + from,
-				.top    = ln * theme.fontEditor.lineHeight,
+				.top    = ln * settings.fontEditor.lineHeight,
 				.right  = PADDING + to,
-				.bottom = (ln+1) * theme.fontEditor.lineHeight};
+				.bottom = (ln+1) * settings.fontEditor.lineHeight};
 		
 			if (state.hasBackgroundColor)
 				background->FillRectangle(rect, (state.hasNegative ? brushForeground : brushBackground));
@@ -364,8 +367,8 @@ static void RenderOutput(Console* self) {
 				
 			if (state.hasUnderline)
 				text->DrawLine(
-					D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + theme.fontEditor.baselineOffset},
-					D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + theme.fontEditor.baselineOffset},
+					D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
+					D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
 					alphaMaskBrush);
 		};
 		
@@ -383,14 +386,14 @@ static void RenderOutput(Console* self) {
 					state.hasNegative = styleChange->value;
 				} break;
 				case Console::StyleChangeType_Foreground: {
-					brushForeground->SetColor(styleChange->color);
+					brushForeground->SetColor(styleChange->color.ToD2D());
 					state.hasForegroundColor = true;
 				} break;
 				case Console::StyleChangeType_ForegroundDefault: {
 					state.hasForegroundColor = false;
 				} break;
 				case Console::StyleChangeType_Background: {
-					brushBackground->SetColor(styleChange->color);
+					brushBackground->SetColor(styleChange->color.ToD2D());
 					state.hasBackgroundColor = true;
 				} break;
 				case Console::StyleChangeType_BackgroundDefault: {
@@ -416,7 +419,7 @@ static void RenderOutput(Console* self) {
 		
 		for (u64 i = 0; i < self->glyphRunCache.size(); i++) {
 			const GlyphRun& run = self->glyphRunCache[i];
-			run.Draw(text, PADDING , (i * theme.fontEditor.lineHeight), theme.fontEditor, alphaMaskBrush);
+			run.Draw(text, PADDING , (i * settings.fontEditor.lineHeight), settings.fontEditor, alphaMaskBrush);
 		}
 	}
 	
@@ -465,9 +468,9 @@ static void RenderOutput(Console* self) {
 			deviceContext->DrawRectangle(
 				D2D_RECT_F {
 					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + ( record.originLine    * theme.fontEditor.lineHeight) - self->scrollarea.vpY,
+					.top    = self->area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - self->scrollarea.vpY,
 					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * theme.fontEditor.lineHeight) - self->scrollarea.vpY},
+					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - self->scrollarea.vpY},
 				GetBrush(record.color));
 		}
 	}
@@ -490,10 +493,10 @@ static void RenderOutput(Console* self) {
 			deviceContext->FillRectangle(
 				D2D_RECT_F {
 					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + (theme.fontEditor.lineHeight * ln)     - self->scrollarea.vpY,
+					.top    = self->area.top  + toolbarHeight + (settings.fontEditor.lineHeight * ln)     - self->scrollarea.vpY,
 					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + (theme.fontEditor.lineHeight * (ln+1)) - self->scrollarea.vpY},
-				theme.GetBrushSelection());
+					.bottom = self->area.top  + toolbarHeight + (settings.fontEditor.lineHeight * (ln+1)) - self->scrollarea.vpY},
+				settings.GetBrushSelection());
 		});
 	}
 	
@@ -511,7 +514,7 @@ static void RenderOutput(Console* self) {
 			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
 			
 			const u64 hitLine = std::clamp<u64>(
-				static_cast<u64>((relativePoistion.y + self->scrollarea.vpY) / theme.fontEditor.lineHeight),
+				static_cast<u64>((relativePoistion.y + self->scrollarea.vpY) / settings.fontEditor.lineHeight),
 				0u,
 				self->glyphRunCache.size() - 1u);
 			const GlyphRun& hitRun = self->glyphRunCache[hitLine];
@@ -553,7 +556,7 @@ static void RenderOutput(Console* self) {
 		const Console::EditorDiagnosticsRecord& record = self->diagnosticsRecords[self->selectedDiagnosticsRecord];
 	
 		self->filePreview.x = self->area.left - self->filePreview.width;
-		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * theme.fontEditor.lineHeight) - self->scrollarea.vpY;
+		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - self->scrollarea.vpY;
 		self->filePreview.OnUpdate();
 			
 		deviceContext->DrawRectangle(self->filePreview.GetArea(), GetBrush(record.color));
@@ -580,7 +583,7 @@ static void RenderToolDiagnostics(Console* self) {
 	for (u64 i = 0; i < self->toolDiagnostics.size(); i++) {
 		const Console::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
 		
-		run.Shape(record.message, theme.fontEditor);
+		run.Shape(record.message, settings.fontEditor);
 		
 		const D2D_POINT_2F position {
 			.x = self->area.left + PADDING,
@@ -588,12 +591,12 @@ static void RenderToolDiagnostics(Console* self) {
 
 		brush->SetColor(Diagnostics::SEVERITY_COLORS[self->process
 			? Diagnostics::Severity_Error
-			: Diagnostics::Severity_Warning]);
+			: Diagnostics::Severity_Warning].ToD2D());
 
-		run.Draw(deviceContext, position.x, position.y, theme.fontEditor, brush);
+		run.Draw(deviceContext, position.x, position.y, settings.fontEditor, brush);
 		
 		if (!record.source.empty()) {
-			run.Shape(record.source, theme.fontEditor);
+			run.Shape(record.source, settings.fontEditor);
 			
 			if (record.position < U64_MAX) {
 				f32 from = .0f, to = .0f;
@@ -604,15 +607,15 @@ static void RenderToolDiagnostics(Console* self) {
 						.left   = position.x + from,
 						.top    = position.y,
 						.right  = position.x + to,
-						.bottom = position.y + theme.fontEditor.lineHeight},
+						.bottom = position.y + settings.fontEditor.lineHeight},
 					brush);
 			}
 			
-			run.Draw(deviceContext, position.x, position.y + theme.fontEditor.lineHeight, theme.fontEditor, theme.GetBrushEditorText());
-			offsetTop += theme.fontEditor.lineHeight;
+			run.Draw(deviceContext, position.x, position.y + settings.fontEditor.lineHeight, settings.fontEditor, settings.GetBrushEditorText());
+			offsetTop += settings.fontEditor.lineHeight;
 		}
 		
-		offsetTop += theme.fontEditor.lineHeight + PADDING;
+		offsetTop += settings.fontEditor.lineHeight + PADDING;
 	}
 }
 
@@ -649,25 +652,25 @@ void Console::OnUpdate() {
 			.right = area.right,
 			.bottom = area.top + GetToolbarHeight()};
 		
-		deviceContext->FillRectangle(toolbarArea, theme.GetBrushUiBackground());
+		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
 	
 		if (tool) {
 			f32 offsetX = 0.0f;
 						
 			// draw tool name
 			{
-				run.Shape(tool->name, theme.fontUi);
-				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText());
+				run.Shape(tool->name, settings.fontUi);
+				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
 				
 				// underline
 				deviceContext->DrawLine(
 					D2D_POINT_2F {
 						.x = toolbarArea.left + MARGIN,
-						.y = toolbarArea.top  + MARGIN + theme.fontUi.underlineOffset},
+						.y = toolbarArea.top  + MARGIN + settings.fontUi.underlineOffset},
 					D2D_POINT_2F {
 						.x = toolbarArea.left + MARGIN + run.width,
-						.y = toolbarArea.top  + MARGIN + theme.fontUi.underlineOffset},
-					theme.GetBrushUiText());
+						.y = toolbarArea.top  + MARGIN + settings.fontUi.underlineOffset},
+					settings.GetBrushUiText());
 				
 				offsetX = run.width + MARGIN_X2;
 				
@@ -690,15 +693,15 @@ void Console::OnUpdate() {
 				
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea), RADIUS),
-					GetBrush(D2D1::ColorF(D2D1::ColorF::Green)));
+					GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
 				
 				deviceContext->DrawRoundedRectangle(
 					MakeRoundedRect(progressArea, RADIUS),	
-					theme.GetBrushUiText());
+					settings.GetBrushUiText());
 			} else {
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea, RADIUS),
-					theme.GetBrushUiBackground(false));
+					settings.GetBrushUiBackground(false));
 			}
 				
 			// draw prgress text
@@ -706,8 +709,7 @@ void Console::OnUpdate() {
 				std::string_view label = progressText;
 				std::string_view hoverLabel;
 				Mouse::OnClickFunction onClickFunc;
-				D2D_COLOR_F labelColor;
-				D2D_COLOR_F hoverLabelColor;
+				Color labelColor, hoverLabelColor;
 				
 				char exitCodeBuffer[32] {'\0'};
 				const u64 exitCode = process ? process->GetExitCode() : 0;
@@ -716,37 +718,37 @@ void Console::OnUpdate() {
 					onClickFunc = OnRerunProcess;
  					label = "Error";
  					hoverLabel = "Retry";
- 					labelColor = D2D1::ColorF(D2D1::ColorF::Red);
- 					hoverLabelColor = theme.colors.uiText;
+ 					labelColor = Color::FromKnown(D2D1::ColorF::Red);
+ 					hoverLabelColor = settings.colors.uiText;
 				
 				} else if (exitCode == STILL_ACTIVE) {
 					onClickFunc = OnClickedKillProcess;
- 					labelColor = theme.colors.uiText;
+ 					labelColor = settings.colors.uiText;
  					hoverLabel = "Terminate";
- 					hoverLabelColor = D2D1::ColorF(D2D1::ColorF::Crimson);
+ 					hoverLabelColor = Color::FromKnown(D2D1::ColorF::Crimson);
 				
 				} else {
 					onClickFunc = OnRerunProcess;
  					labelColor = (exitCode == 0)
-	 					? theme.colors.uiText
-	 					: D2D1::ColorF(D2D1::ColorF::Crimson);
+	 					? settings.colors.uiText
+	 					: Color::FromKnown(D2D1::ColorF::Crimson);
  					hoverLabel = "Restart";
- 					hoverLabelColor = theme.colors.uiText;
+ 					hoverLabelColor = settings.colors.uiText;
 				}
 				
 				if (mouse.Hittest(progressArea, this, onClickFunc)) {
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), theme.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), settings.GetBrushHover(mouse.isDown));
 					
-					brush->SetColor(hoverLabelColor);
-					run.Shape(hoverLabel, theme.fontUi);
+					brush->SetColor(hoverLabelColor.ToD2D());
+					run.Shape(hoverLabel, settings.fontUi);
 				
 				} else {
-					brush->SetColor(labelColor);
-					run.Shape(label, theme.fontUi);
+					brush->SetColor(labelColor.ToD2D());
+					run.Shape(label, settings.fontUi);
 				}
 				
 				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (run.width / 2.0f);
-				run.Draw(deviceContext, x, area.top + MARGIN, theme.fontUi, brush);
+				run.Draw(deviceContext, x, area.top + MARGIN, settings.fontUi, brush);
 				
 				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
 			}
@@ -756,26 +758,26 @@ void Console::OnUpdate() {
 				D2D_RECT_F areaBothIcons {
 					.left  = toolbarArea.left + offsetX,
 					.top   = toolbarArea.top + MARGIN - PADDING,
-					.right = toolbarArea.left + offsetX + theme.fontUi.lineHeight + PADDING_X2,
+					.right = toolbarArea.left + offsetX + settings.fontUi.lineHeight + PADDING_X2,
 					.bottom = toolbarArea.bottom - MARGIN + PADDING};
 				
 				if (showToolDiagnostics)
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), theme.GetBrushUiBackground(false));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), settings.GetBrushUiBackground(false));
 					
 				if (mouse.Hittest(areaBothIcons, this, OnClickToggleShowToolDiagnostics))
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), theme.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), settings.GetBrushHover(mouse.isDown));
 				
 				deviceContext->DrawBitmap(
-					theme.icons.editorDiagnosticsWarning,
-					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, theme.fontUi.lineHeight, theme.fontUi.lineHeight));
+					settings.icons.editorDiagnosticsWarning,
+					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
 				
-				offsetX += theme.fontUi.lineHeight + PADDING_X2;
+				offsetX += settings.fontUi.lineHeight + PADDING_X2;
 			}
 			
 		// no tool
 		} else {
-			run.Shape("No tool run yet.", theme.fontUi);
-			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, theme.fontUi, theme.GetBrushUiText());
+			run.Shape("No tool run yet.", settings.fontUi);
+			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
 		}
 		
 		offsetTop += GetToolbarHeight();
@@ -788,7 +790,7 @@ void Console::OnUpdate() {
 		glyphRunCache.clear();
 		for (const std::string& line : lines) {
 			GlyphRun& run = glyphRunCache.emplace_back();
-			run.Shape(line, theme.fontEditor);
+			run.Shape(line, settings.fontEditor);
 		}
 		
 		glyphRunCacheIsValid = true;
@@ -800,11 +802,11 @@ void Console::OnUpdate() {
 	{
 		f32 height = 0.0f;
 		if (showToolDiagnostics) {
-			height = toolDiagnostics.size() * theme.fontEditor.lineHeight;
+			height = toolDiagnostics.size() * settings.fontEditor.lineHeight;
 			for (const ToolDiagnosticsRecord& rec : toolDiagnostics)
-				if (rec.source.empty()) height += theme.fontEditor.lineHeight;
+				if (rec.source.empty()) height += settings.fontEditor.lineHeight;
 		} else {
-			height = glyphRunCache.size() * theme.fontEditor.lineHeight;
+			height = glyphRunCache.size() * settings.fontEditor.lineHeight;
 		}
 		
 		scrollarea.totalSize = D2D_SIZE_F {
@@ -833,9 +835,9 @@ void Console::OnUpdate() {
 void Console::OnResize(f32 newWidth, f32 newHeight) {
 	area = D2D_RECT_F {
 		.left = std::floor(mainWindow.width * 0.6f),
-		.top = PADDING_X2 + theme.fontUi.lineHeight,
+		.top = PADDING_X2 + settings.fontUi.lineHeight,
 		.right = mainWindow.width,
-		.bottom = mainWindow.height - PADDING_X2 - theme.fontUi.lineHeight};
+		.bottom = mainWindow.height - PADDING_X2 - settings.fontUi.lineHeight};
 	
 	scrollarea.position = D2D_POINT_2F {
 		.x = area.left,
@@ -847,7 +849,7 @@ void Console::OnResize(f32 newWidth, f32 newHeight) {
 
 void Console::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
-	scrollarea.ScrollVertical(distance * theme.fontEditor.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5);
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
@@ -856,21 +858,21 @@ static void ActionGotoDiagnostic(Console* self, u64 newSelectedRecord) {
 }
 
 bool Console::OnKeyDown(KeyEvent event) {
-	if (event == keybinds.actions.gotoNextDiagnostic) {
+	if (event == settings.keybinds.gotoNextDiagnostic) {
 		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
 		return true;
 		
-	} else if (event == keybinds.actions.gotoPrevDiagnostic) {
+	} else if (event == settings.keybinds.gotoPrevDiagnostic) {
 		selectedDiagnosticsRecord = DecrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
 		return true;
 	
-	} else if (event == keybinds.actions.consoleTerminateProcess) {
+	} else if (event == settings.keybinds.consoleTerminateProcess) {
 		if (process) process->Terminate();
 		return true;
 	
-	} else if (event == keybinds.actions.consoleCopy) {
+	} else if (event == settings.keybinds.consoleCopy) {
 		if (selectionStart == selectionEnd) return true;
 		
 		const std::string& startLine = lines[selectionStart.line];
@@ -1020,7 +1022,7 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 
 	Console::EditorDiagnosticsRecord record {};
 	
-	record.color = theme.colors.editorText;
+	record.color = settings.colors.editorText;
 	record.originLine = self->lines.size() - 1u;
 	record.originFromColumn = matchResult.groups.front().begin - line->data();
 	record.originToColumn = matchResult.groups.front().end - line->data();
@@ -1135,7 +1137,7 @@ static void ParseChunk(Console* self, std::string_view data) {
 					if (res.ec != std::errc()) continue;
 					j = (res.ptr - sequence.data());
 					
-					styleChange.color = D2D_COLOR_F {r/255.0f, g/255.0f, b/255.0f, 1.0f};
+					styleChange.color = Color {r/255.0f, g/255.0f, b/255.0f, 1.0f};
 				}
 				
 				styleChange.position = TextPosition {
@@ -1236,31 +1238,31 @@ Console::StyleChange GetStyleChange(int value) {
 		// foreground	
 		case 30: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Black)};
+			.color = Color::FromKnown(D2D1::ColorF::Black)};
 			
 		case 31: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Red)};
+			.color = Color::FromKnown(D2D1::ColorF::Red)};
 		
 		case 32: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Green)};
+			.color = Color::FromKnown(D2D1::ColorF::Green)};
 			
 		case 33: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Yellow)};
+			.color = Color::FromKnown(D2D1::ColorF::Yellow)};
 			
 		case 34: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Blue)};
+			.color = Color::FromKnown(D2D1::ColorF::Blue)};
 			
 		case 35: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Magenta)};
+			.color = Color::FromKnown(D2D1::ColorF::Magenta)};
 
 		case 36: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::Cyan)};
+			.color = Color::FromKnown(D2D1::ColorF::Cyan)};
 
 		case 37: return Console::StyleChange {
 			.type = Console::StyleChangeType_ForegroundDefault};
@@ -1270,36 +1272,36 @@ Console::StyleChange GetStyleChange(int value) {
 			
 		case 39: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = theme.colors.editorText}; // default
+			.color = settings.colors.editorText}; // default
 			
 		// background
 		case 40: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Black)};
+			.color = Color::FromKnown(D2D1::ColorF::Black)};
 			
 		case 41: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Red)};
+			.color = Color::FromKnown(D2D1::ColorF::Red)};
 		
 		case 42: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Green)};
+			.color = Color::FromKnown(D2D1::ColorF::Green)};
 			
 		case 43: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Yellow)};
+			.color = Color::FromKnown(D2D1::ColorF::Yellow)};
 			
 		case 44: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Blue)};
+			.color = Color::FromKnown(D2D1::ColorF::Blue)};
 			
 		case 45: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Magenta)};
+			.color = Color::FromKnown(D2D1::ColorF::Magenta)};
 
 		case 46: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::Cyan)};
+			.color = Color::FromKnown(D2D1::ColorF::Cyan)};
 
 		case 47: return Console::StyleChange {
 			.type = Console::StyleChangeType_BackgroundDefault};
@@ -1310,68 +1312,68 @@ Console::StyleChange GetStyleChange(int value) {
 		// bright foreground
 		case 90: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::DarkGray)};
+			.color = Color::FromKnown(D2D1::ColorF::DarkGray)};
 			
 		case 91: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::DarkSalmon)};
+			.color = Color::FromKnown(D2D1::ColorF::DarkSalmon)};
 		
 		case 92: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::LightGreen)};
+			.color = Color::FromKnown(D2D1::ColorF::LightGreen)};
 			
 		case 93: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::LightYellow)};
+			.color = Color::FromKnown(D2D1::ColorF::LightYellow)};
 			
 		case 94: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::LightBlue)};
+			.color = Color::FromKnown(D2D1::ColorF::LightBlue)};
 			
 		case 95: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::HotPink)};
+			.color = Color::FromKnown(D2D1::ColorF::HotPink)};
 
 		case 96: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::LightCyan)};
+			.color = Color::FromKnown(D2D1::ColorF::LightCyan)};
 
 		case 97: return Console::StyleChange {
 			.type = Console::StyleChangeType_Foreground,
-			.color = D2D1::ColorF(D2D1::ColorF::LightGray)};	
+			.color = Color::FromKnown(D2D1::ColorF::LightGray)};	
 		
 		// bright background
 		case 100: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::DarkGray)};
+			.color = Color::FromKnown(D2D1::ColorF::DarkGray)};
 			
 		case 101: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::DarkSalmon)};
+			.color = Color::FromKnown(D2D1::ColorF::DarkSalmon)};
 		
 		case 102: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::LightGreen)};
+			.color = Color::FromKnown(D2D1::ColorF::LightGreen)};
 			
 		case 103: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::LightYellow)};
+			.color = Color::FromKnown(D2D1::ColorF::LightYellow)};
 			
 		case 104: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::LightBlue)};
+			.color = Color::FromKnown(D2D1::ColorF::LightBlue)};
 			
 		case 105: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::HotPink)};
+			.color = Color::FromKnown(D2D1::ColorF::HotPink)};
 
 		case 106: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::LightCyan)};
+			.color = Color::FromKnown(D2D1::ColorF::LightCyan)};
 
 		case 107: return Console::StyleChange {
 			.type = Console::StyleChangeType_Background,
-			.color = D2D1::ColorF(D2D1::ColorF::LightGray)};
+			.color = Color::FromKnown(D2D1::ColorF::LightGray)};
 		
 		default: return Console::StyleChange {
 			.type = Console::StyleChangeType_Unknown};

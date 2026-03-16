@@ -10,6 +10,8 @@
 #define MULTIBYTE_INDICATOR_4_BYTES 0b1111'0000
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const char WHITESPACE[] = " \t\n\r\v";
+
 bool IsMultibyteCodepointMember(char ch) {
 	return (ch & 0b1100'0000) == 0b1000'0000;
 }
