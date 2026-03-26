@@ -791,12 +791,21 @@ void Editor::OnUpdate() {
 			DEFER(renderTargetColor->Release());
 
 			renderTargetColor->BeginDraw();
-			renderTargetColor->Clear(settings.colors.editorText.ToD2D());
 			renderTargetColor->SetTransform(scrollTransform);
+			renderTargetColor->Clear(settings.colors.editorText.ToD2D());
 
-			if (language)
-				language->HighlightSyntax(this, renderTargetColor, firstVisible, lastVisible);
-
+			if (language) {
+				if (language->syntaxHighlighting.type != Language::SyntaxHighlighting::Type_None) {
+					//MeasureTime("basic-parser", language->HighlightSyntax(this, renderTargetColor, firstVisible, lastVisible));
+				}
+				
+				renderTargetColor->Clear(settings.colors.editorText.ToD2D());
+				
+				if (language->syntaxHighlighter) {
+					MeasureTime("highlighting", language->syntaxHighlighter->Highlight(this, renderTargetColor, firstVisible, lastVisible));
+				}
+			}
+			
 			if (HRESULT hr = renderTargetColor->EndDraw(); hr != S_OK) {
 				LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
 				return;

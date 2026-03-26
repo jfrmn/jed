@@ -1,5 +1,6 @@
 #pragma once
 #include "language/language-server.hh"
+#include "language/syntaxhighlighter-regex.hh"
 #include "text/text-change.hh"
 #include "basic-parser.hh"
 
@@ -20,6 +21,7 @@ struct Language : public LanguageServer::NotificationHandler {
 	static std::vector<Language*> languages;
 
 	static bool LoadLanguages(std::string_view directory);
+	static bool LoadLanguages2(std::string_view directory);
 	static void UnloadLanguages();
 	static Language* GetLanguage(std::string_view fileEnding);
 
@@ -35,7 +37,6 @@ struct Language : public LanguageServer::NotificationHandler {
 			 Startup_OnAppStart
 		};
 
-		std::string_view application = {};
 		std::string commandLine = {};
 		Startup startup = Startup_Never;
 	};
@@ -61,7 +62,10 @@ struct Language : public LanguageServer::NotificationHandler {
 
 	LanguageServerStartInfo serverStartInfo = {};
 	LanguageServer          server = {};
-
+	
+	SyntaxHighlighter*     syntaxHighlighter = nullptr;
+	SyntaxHighlighterRegex syntaxHighlighterRegex = {};
+	
 	SyntaxHighlighting syntaxHighlighting = {};
 	
 	std::string lineComment = {};

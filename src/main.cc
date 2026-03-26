@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
 	//	LogError("failed to load tools");
 	//}
 
-	if (!Language::LoadLanguages(".\\config\\languages"))
+	if (!Language::LoadLanguages2(".\\config\\languages"))
 		LogError("failed to load languages");
 		
 	if (!mainWindow.Init()) {

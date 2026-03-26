@@ -350,7 +350,12 @@ static u32 ConvertToUtf16(std::string_view utf8, ShapingBuffer* shapingBuffer) {
         	cp |= (utf8[i+4] & 0x3F) << 6;
         	cp |= (utf8[i+5] & 0x3F);
         	seqLen = 6u;
-    	}
+		
+		// can only happen with invalid utf8 sequences. we can do whatever
+		} else {
+			cp = utf8[i];
+			seqLen = 1;
+		}
 	
 		// Encode to UTF-16
     	if (cp < UTF16_SURROGATE_OFFSET) {

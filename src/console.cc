@@ -19,11 +19,11 @@
 #define NOMINMAX
 #include <d2d1_1.h>
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Init + reset
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Console::Init() {
 	scrollarea.barWidth = SCROLLBAR_WIDTH_WIDE;
@@ -58,11 +58,11 @@ static void Reset(Console* self) {
 	self->selectionStart = self->selectionEnd = TextPosition {};
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Command compiling
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void AppendParameterValue(std::string* builder, const ParameterValue& value, const Parameter& definition) {
 	switch (definition.type) {
@@ -205,18 +205,18 @@ bool Console::StartProcess() {
 	//
 	{
 		if (tool->HasProgress()) {
-			if (!progressRegex.Compile(tool->progress.regex)) {
+			if (RegexError regexError; !progressRegex.Compile(tool->progress.regex, &regexError)) {
 				toolDiagnostics.push_back(ToolDiagnosticsRecord {
-					.message  = FormatString("'progress': %", progressRegex.GetErrorString()),
+					.message  = FormatString("'progress': %", F(regexError)),
 					.source   = tool->progress.regex,
 					.position = U64_MAX});
 			}
 		}
 		
 		if (tool->HasDiagnosticsMatcher()) {
-			if (!diagnosticsRegex.Compile(tool->diagnosticsMatcher.regex)) {
+			if (RegexError regexError; !diagnosticsRegex.Compile(tool->diagnosticsMatcher.regex, &regexError)) {
 				toolDiagnostics.push_back(ToolDiagnosticsRecord {
-					.message  = FormatString("'diagnostics': %", progressRegex.GetErrorString()),
+					.message  = FormatString("'diagnostics': %", F(regexError)),
 					.source   = tool->diagnosticsMatcher.regex,
 					.position = U64_MAX});
 			}
@@ -255,11 +255,11 @@ bool Console::StartProcess() {
 	return true;
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Update
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static f32 GetToolbarHeight() {
 	return MARGIN_X2 + settings.fontUi.lineHeight;
@@ -689,7 +689,7 @@ void Console::OnUpdate() {
 				.bottom = toolbarArea.bottom - MARGIN + PADDING};
 								
 			// draw progress bar
-			if (progressRegex.IsOk()) {
+			if (progressRegex.isOk) {
 				
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea), RADIUS),
@@ -911,38 +911,38 @@ bool Console::OnKeyDown(KeyEvent event) {
 	return false;
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Output processing
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void WarnCaptureGroupOutOfRange(Console* self, const Regex::MatchResult& matchResult, u64 index, std::string_view groupName, std::string_view source) {
+static void WarnCaptureGroupOutOfRange(Console* self, const RegexMatch& match, u64 index, std::string_view groupName, std::string_view source) {
 	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-		.message  = FormatString("'%' % is out of range. Regex provides only % groups", groupName, index, matchResult.Size()),
+		.message  = FormatString("'%' % is out of range. Regex provides only % groups", groupName, index, match.groupCount),
 		.source   = source,
 		.position = U64_MAX});
 }
 
-static void WarnMatchedTextParseErr(Console* self, std::string_view groupName, std::string_view source, std::from_chars_result fcr) {
+static void WarnMatchedTextParseErr(Console* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
 	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-		.message  = FormatString("failed to parse matched text for '%': '%'", groupName, FFromCharsResult(fcr)),
-		.source   = source,
+		.message  = FormatString("failed to parse matched text for '%': '%'", groupName, F(fcr)),
+		.source   = text,
 		.position = U64_MAX});
 }
 
 static void MatchProgress(Console* self, const std::string* line) {
-	if (!self->progressRegex.IsOk()) return;
+	if (!self->progressRegex.isOk) return;
 	
-	Regex::MatchResult matchResult {};
-	if (!self->progressRegex.Match(*line, &matchResult)) return;
-	if (self->tool->progress.captureGroupValue >= matchResult.Size()) {
-		WarnCaptureGroupOutOfRange(self, matchResult, self->tool->progress.captureGroupValue, "capture-group-value", self->tool->progress.regex);
+	RegexMatch match {};
+	if (!self->progressRegex.Match(*line, &match)) return;
+	if (self->tool->progress.captureGroupValue >= match.groupCount) {
+		WarnCaptureGroupOutOfRange(self, match, self->tool->progress.captureGroupValue, "capture-group-value", self->tool->progress.regex);
 		self->progressRegex.Reset();
 		return;
 	}
 	
-	const Regex::MatchResult::Group& groupValue = matchResult.GetGroup(self->tool->progress.captureGroupValue);
+	const RegexMatch::Group groupValue = match.GetGroup(self->tool->progress.captureGroupValue);
 	
 	s64 newValue = 0;
 	const std::from_chars_result fcrValue = std::from_chars(groupValue.begin, groupValue.end, newValue);
@@ -952,8 +952,10 @@ static void MatchProgress(Console* self, const std::string* line) {
 	}
 	
 	s64 newMax = self->tool->progress.maxValue;
-	if (self->tool->progress.captureGroupMax < matchResult.Size()) {
-		const Regex::MatchResult::Group& groupMax = matchResult.GetGroup(self->tool->progress.captureGroupMax);
+	if (self->tool->progress.captureGroupMax < match.groupCount) {
+		
+		const RegexMatch::Group groupMax = match.GetGroup(self->tool->progress.captureGroupMax);
+		
 		const std::from_chars_result fcrMax = std::from_chars(groupMax.begin, groupMax.end, newMax);
 		if (fcrMax.ec != std::errc()) {
 			WarnMatchedTextParseErr(self, "capture-group-max", groupMax.GetText(), fcrMax);
@@ -983,7 +985,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 			self->progressText.assign("TOO LARGE");
 			
 		} else {
-			LogWarning("converting to precentage text failed. Error: %", FToCharsResult(tcr));
+			LogWarning("converting to precentage text failed. Error: %", F(tcr));
 			self->progressText.assign("ERROR");
 		}
 	
@@ -991,8 +993,8 @@ static void MatchProgress(Console* self, const std::string* line) {
 		self->progressText.assign(groupValue.GetText());
 		self->progressText.append(" / ");
 		
-		if (self->tool->progress.captureGroupMax < matchResult.Size()) {
-			self->progressText.append(matchResult.GetGroup(self->tool->progress.captureGroupMax).GetText());
+		if (self->tool->progress.captureGroupMax < match.groupCount) {
+			self->progressText.append(match.GetGroupText(self->tool->progress.captureGroupMax));
 		
 		} else {
 			constexpr u64 bufferSize = 16;
@@ -1003,7 +1005,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 				self->progressText.append(buffer, resultToCh.ptr);
 			
 			} else {
-				LogWarning("converting to max text failed. Error: %", FToCharsResult(resultToCh));
+				LogWarning("converting to max text failed. Error: %", F(resultToCh));
 				self->progressText.append("ERROR");
 			}
 		}
@@ -1015,21 +1017,22 @@ static void MatchProgress(Console* self, const std::string* line) {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static void MatchDiagnostics(Console* self, const std::string* line) {
- 	if (!self->progressRegex.IsOk()) return;
+ 	if (!self->progressRegex.isOk) return;
 	 
-	Regex::MatchResult matchResult {};
-	if (!self->diagnosticsRegex.Match(*line, &matchResult)) return;
+	RegexMatch match {};
+	if (!self->diagnosticsRegex.Match(*line, &match)) return;
 
 	Console::EditorDiagnosticsRecord record {};
-	
 	record.color = settings.colors.editorText;
 	record.originLine = self->lines.size() - 1u;
-	record.originFromColumn = matchResult.groups.front().begin - line->data();
-	record.originToColumn = matchResult.groups.front().end - line->data();
+	
+	const RegexMatch::Group fullMatch = match.GetFullMatch();
+	record.originFromColumn = fullMatch.begin - line->data();
+	record.originToColumn = fullMatch.end - line->data();
 	
 	// color
-	if (self->tool->diagnosticsMatcher.captureGroupColor < matchResult.Size()) {
-		const Regex::MatchResult::Group& group = matchResult.GetGroup(self->tool->diagnosticsMatcher.captureGroupColor);
+	if (self->tool->diagnosticsMatcher.captureGroupColor < match.groupCount) {
+		const RegexMatch::Group& group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupColor);
 		
 		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnosticsMatcher.colorMapping) {
 			if (StringEqualsCasesInsen(entry.key, group.GetText())) {
@@ -1040,14 +1043,14 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 	}
 	
 	// file
-	if (self->tool->diagnosticsMatcher.captureGroupFile < matchResult.Size()) {
-		const Regex::MatchResult::Group& group = matchResult.GetGroup(self->tool->diagnosticsMatcher.captureGroupFile);
+	if (self->tool->diagnosticsMatcher.captureGroupFile < match.groupCount) {
+		const RegexMatch::Group group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupFile);
 		record.file = group.GetText();
 	}
 	
 	// line
-	if (self->tool->diagnosticsMatcher.captureGroupLine < matchResult.Size()) {
-		const Regex::MatchResult::Group& group = matchResult.GetGroup(self->tool->diagnosticsMatcher.captureGroupLine);
+	if (self->tool->diagnosticsMatcher.captureGroupLine < match.groupCount) {
+		RegexMatch::Group group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupLine);
 		const std::from_chars_result fcr = std::from_chars(group.begin, group.end, record.line);
 		
 		if (fcr.ec != std::errc()) {

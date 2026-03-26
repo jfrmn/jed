@@ -106,7 +106,7 @@ static u64 GetCurrentLineNumber(EditorGotoLine* self) {
 	std::from_chars_result res = std::from_chars(text.data(), text.data() + text.size(), lineNumber);
 
 	if (res.ec != std::errc()) {
-		LogError("failed to parse line numnber '%'. Error: %", text, FFromCharsResult(res));
+		LogError("failed to parse line numnber '%'. Error: %", text, F(res));
 		return 0;
 	}
 

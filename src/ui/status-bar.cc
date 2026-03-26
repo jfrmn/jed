@@ -29,11 +29,11 @@ constexpr D2D_COLOR_F languageServerStatusColors[] {
 
 static const f32 LANGUAGE_STATUS_INDICATOR_WIDTH = 5.0f;
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 // H E L P E R
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static bool IsL2R(const StatusBar* statusBar, u64 i) {
 	return i < statusBar->l2rElementCount;
@@ -61,11 +61,11 @@ static Editor* GetFocusedEditor() {
 	return mainWindow.panels[mainWindow.focusedPanelIndex].editor;
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 // S T A T U S   B A R   E L E M E N T S
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // None
@@ -132,14 +132,14 @@ static f32 UpdateConsoleButton(StatusBar* self, f32 posX, u64 i) {
 static bool IsVisibleConsoleProgress() {
 	if (!mainWindow.console.tool) return false;
 	if (mainWindow.console.tool->progress.hideFromStatusBar) return false;
-	if (!mainWindow.console.progressRegex.IsOk()) return false;
+	if (!mainWindow.console.progressRegex.isOk) return false;
 	return true;
 }
 
 static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 	if (!mainWindow.console.tool) return posX;
 	if (mainWindow.console.tool->progress.hideFromStatusBar) return posX;
-	if (!mainWindow.console.progressRegex.IsOk()) return posX;
+	if (!mainWindow.console.progressRegex.isOk) return posX;
 	
 	constexpr f32 PROGRESS_BAR_WIDTH = 100.0f;
 
@@ -395,7 +395,7 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			
 			const std::to_chars_result result = std::to_chars(buffer, buffer + bufferSize, recordCount);
 			if (result.ec != std::errc()) {
-				LogWarning("failed to convert diagnostics count: %. Error: %", recordCount, FToCharsResult(result));
+				LogWarning("failed to convert diagnostics count: %. Error: %", recordCount, F(result));
 				continue;
 			}
 			
@@ -483,7 +483,7 @@ static void AppendNumber(char* numberBuffer, CaretInfoText* info, u64 numberToFo
 	
 	const std::to_chars_result result = std::to_chars(numberBuffer, numberBuffer + NUMBER_BUFFER_SIZE, numberToFormat);
 	if (result.ec != std::errc {}) {
-		LogError("std::to_chars() failed. Error: %", FToCharsResult(result));
+		LogError("std::to_chars() failed. Error: %", F(result));
 		return;
 	}
 	

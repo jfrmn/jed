@@ -5,6 +5,7 @@
 #include "util/file-util.hh"
 #include "util/string-util.hh"
 #include "util/logging.hh"
+#include "util/toml-util.hh"
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1
@@ -19,11 +20,11 @@
 #include <dwrite_1.h> // @FIXME only needed to release font face - handle that in Font 
 #include <Windows.h>
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// BOILER PLATE
+// Boiler Plate
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static constexpr std::string_view colorNames[] {
 	"unknown",
@@ -380,11 +381,11 @@ static constexpr std::string_view actionNames[] = {
 
 static_assert(STATIC_ARRAY_SIZE(actionNames) == Settings::NUM_KEYBINDS);
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// DEFAULTS
+// Defaults
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 Settings settings {
 	.icons = {},
@@ -499,11 +500,11 @@ Settings settings {
 	}
 };
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// BRUSH FUNCTIONS
+// Brush Function
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ID2D1SolidColorBrush* Settings::GetBrushDropShadow() {
 	brush->SetColor(colors.dropShadow.ToD2D());
@@ -569,25 +570,11 @@ ID2D1SolidColorBrush* Settings::GetBrushToggled() {
 	return brush;
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// DEFAULT VALUES
+// Loading
 //
-//#################################################################################################
-
-static FormatArgument FTomlSrc(const toml::source_region& srcRegion) {
-	return FormatArgument {
-		.userdata = &srcRegion,
-		.Write = [](const void* ud, std::ostream* sink) {
-			auto srcRegion = static_cast<const toml::source_region*>(ud);
-			*sink
-				<< (srcRegion->path ? *srcRegion->path : "<null>")
-				<< ":L" << srcRegion->begin.line << "C" << srcRegion->begin.column
-				<< '-'
-				<< ":L" << srcRegion->end.line << "C" << srcRegion->end.column;
-		}
-	};
-}
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
 	
@@ -622,8 +609,8 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 		const auto arr = node->as<toml::array>();
 		ASSERT(arr);
 		
-		if (arr->size() < 3) LogWarning("%: insufficient number of values (expected 3 or 4)", FTomlSrc(node->source()));
-		if (arr->size() > 4) LogWarning("%: too many number of values (expected 3 or 4)", FTomlSrc(node->source()));
+		if (arr->size() < 3) LogWarning("%: insufficient number of values (expected 3 or 4)", node->source());
+		if (arr->size() > 4) LogWarning("%: too many number of values (expected 3 or 4)", node->source());
 		if (arr->empty()) return false;
 				
 		for (u64 i = 0u; i < std::min(4llu, arr->size()); i++) {
@@ -636,7 +623,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				color->array[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", FTomlSrc(nodeValue->source()));
+				LogWarning("%: invalid value type (should be int of float)", nodeValue->source());
 				color->array[i] = 0.0f;
 			}
 		}
@@ -654,7 +641,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			
 			if (!nodeValue) {
 				if (channelNames[i] != 'a')
-					LogWarning("%: missing entry '%'", FTomlSrc(tbl->source()), channelName);
+					LogWarning("%: missing entry '%'", tbl->source(), channelName);
 				*channels[i] = 0.0f;
 			} else if (nodeValue->is_integer()) {
 				const s64 asInt = nodeValue->as_integer()->get();
@@ -662,7 +649,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				*channels[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", FTomlSrc(tbl->source()));
+				LogWarning("%: invalid value type (should be int of float)", tbl->source());
 				*channels[i] = 0.0f;
 			}
 		}
@@ -680,12 +667,12 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 		else if (clrName == "white") *color = Color {1.0f, 1.0f, 1.0f, 1.0f};
 		else if (clrName == "transparent") *color = Color {0.0f, 0.0f, 0.0f, 0.0f};
 		else {
-			LogError("%: unknown named color", FTomlSrc(node->source()));
+			LogError("%: unknown named color", node->source());
 			return false;
 		}
 	
 	} else {
-		LogError("%: expected a table, array or string", FTomlSrc(node->source()));
+		LogError("%: expected a table, array or string", node->source());
 		return false;
 	}
 	
@@ -760,39 +747,28 @@ static bool LoadIcon(const toml::node* node, ID2D1DeviceContext* deviceContext, 
 	
 	const toml::value<std::string>* value = node->as_string();
 	if (!value) {
-		LogError("%: expected a string", FTomlSrc(node->source()));
+		LogError("%: expected a string", node->source());
 		return false;
 	}
 	
 	return LoadIcon(value->get(), deviceContext, icon);
 }
 
-static bool LoadFont(const toml::node* node, /*out*/ Font* font) {
+static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	Font::Description fontDescription {};
 	
-	const toml::table* table = node->as_table();
+	toml::table* table = node->as_table();
 	if (!table) {
-		LogError("%: expected a table", FTomlSrc(node->source()));
+		LogError("%: expected a table", node->source());
 		return false;
 	}
 	
 	//
 	// name
 	//
-	{
-		const toml::node* nodeName = table->get("name");
-		if (!nodeName) {
-			LogError("%: entry 'name' not found", FTomlSrc(nodeName->source()));
-			return false;
-		}
-		
-		const auto* nodeNameAsStr = nodeName->as_string();
-		if (!nodeNameAsStr) {
-			LogError("%: expected a string", FTomlSrc(nodeName->source()));
-			return false;
-		}
-	
-		fontDescription.name = nodeNameAsStr->get();
+	if (!ExpectString(table, "name", &fontDescription.name)) {
+		LogError("%: required entry 'name' not found", table->source());
+		return false;
 	}
 	
 	//
@@ -801,7 +777,7 @@ static bool LoadFont(const toml::node* node, /*out*/ Font* font) {
 	{
 		const toml::node* node = table->get("size");
 		if (!node) {
-			LogError("%: entry 'size' not found", FTomlSrc(node->source()));
+			LogError("%: required entry 'size' not found", node->source());
 			return false;
 		}
 		
@@ -810,45 +786,23 @@ static bool LoadFont(const toml::node* node, /*out*/ Font* font) {
 		} else if (const auto* value = node->as_integer()) {
 			fontDescription.size = static_cast<f32>(value->get());
 		} else {
-			LogError("%: expected a float or int", FTomlSrc(node->source()));
+			LogError("%: expected a float or int", node->source());
 			return false;
 		}
 	}
 	
 	//
-	// weight
+	// weight, style and stretch
 	//
-	if (const toml::node* node = table->get("weight")) {
-		const auto* value = node->as_integer();
-		if (!value) {
-			LogError("%: expected an integer", FTomlSrc(value->source()));
-			return false;
-		}
-		fontDescription.weight  = static_cast<s32>(value->get());
-	}
-	
-	//
-	// style
-	//
-	if (const toml::node* node = table->get("style")) {
-		const auto* value = node->as_integer();
-		if (!value) {
-			LogError("%: expected an integer", FTomlSrc(value->source()));
-			return false;
-		}
-		fontDescription.style  = static_cast<s32>(value->get());
-	}	
-	
-	//
-	// stretch
-	//
-	if (const toml::node* node = table->get("stretch")) {
-		const auto* value = node->as_integer();
-		if (!value) {
-			LogError("%: expected an integer", FTomlSrc(value->source()));
-			return false;
-		}
-		fontDescription.stretch  = static_cast<s32>(value->get());
+	{
+		if (const toml::node* node = table->get("weight"))
+			ExpectInteger(node, &fontDescription.weight);
+		
+		if (const toml::node* node = table->get("style"))
+			ExpectInteger(node, &fontDescription.style);
+		
+		if (const toml::node* node = table->get("stretch"))
+			ExpectInteger(node, &fontDescription.stretch);
 	}
 	
 	Font newFont {};
@@ -904,7 +858,7 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 		
 		if (result.failed()) {
 			const toml::parse_error& error = result.error();
-			LogError("file parse settings file '%'\nerror: % at %", settingsFilepath, error.description(), FTomlSrc(error.source()));
+			LogError("file parse settings file '%'\nerror: % at %", settingsFilepath, error.description(), error.source());
 			return false;
 		}
 	
@@ -936,10 +890,10 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	//
 	// load fonts
 	//
-	if (const toml::table* tblFonts = table.get_as<toml::table>("Font")) {
-		if (const toml::node* nodeFontEditor = tblFonts->get("editor"))
+	if (toml::table* tblFonts = table.get_as<toml::table>("Font")) {
+		if (toml::node* nodeFontEditor = tblFonts->get("editor"))
 			LoadFont(nodeFontEditor, &fontEditor);
-		if (const toml::node* nodeFontUi = tblFonts->get("ui"))
+		if (toml::node* nodeFontUi = tblFonts->get("ui"))
 			LoadFont(nodeFontUi, &fontUi);
 	}
 	

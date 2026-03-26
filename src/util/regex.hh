@@ -1,54 +1,69 @@
 #pragma once
 #include "basic.hh"
 
-#include <string_view>
-#include <vector>
+#include <string>
 
-union RegexInternal;
+struct Regex;
+struct FormatArgument;
+struct pcre2_real_code_8;
+struct pcre2_real_match_data_8;
 
-// wrapper around stl regex, that hides exceptions and makes working with capture groups a bit easier
-struct Regex {
+struct RegexError {
+	int code = 0u;
+	std::string message = {};
+	u64 position = 0;
+};
 
-	//---------------------------------------------------------
-	// types
-
-	struct MatchResult {
-
-		struct Group {
-			const char* begin = nullptr;
-			const char* end = nullptr;
-			
-			std::string_view GetText() const;
-			u64 Length() const;
-		};
-
-		std::vector<Group> groups = {};
-			
-		      Group& GetGroup(u64 index)       { return groups[index]; }
-		const Group& GetGroup(u64 index) const { return groups[index]; }
-
-		u64 Size() const { return groups.size(); }
+struct RegexMatch {
+	struct Group {
+		const char* begin = nullptr;
+		const char* end = nullptr;
+		
+		std::string_view GetText() const;
+		u64 Length() const;
 	};
+
+	std::string_view subject = {};
+	pcre2_real_match_data_8* data = nullptr;
+	u64 offset = 0u; // for multiple matches
+	u32 capacity = 0u;
+	u32 groupCount = 0u;
+	
+	void Prepare(u32 capacity);
+	void ClearSubject();
+	
+	Group GetFullMatch() const;	
+	Group GetGroup(u32 index) const;
+	std::string_view GetGroupText(u32 index) const;
+};
+
+struct Regex {
+	
+	//---------------------------------------------------------
+	// data
+	
+	pcre2_real_code_8* code = nullptr;
+	u32 captureGroupCount = 0u; // these are ADDITIONAL groups (group at 0 is always the full match)
+	bool isOk = false;
+	bool isJitCompiled = false;
 
 	//---------------------------------------------------------
 	// functions
 	
-	bool Compile(std::string_view expression);
+	bool Compile(std::string_view expression, /*out*/ RegexError* error);
 	void Reset();
 
-	bool Match(std::string_view string, /*out*/ MatchResult* results) const;
-	bool IsOk() const;
-	std::string_view GetErrorString() const;
+	bool Match(std::string_view subject, RegexMatch* match) const;
+	u64 GetCaptureGroupByName(const char* name) const; // needs to be zero terminated
 
 	//---------------------------------------------------------
-	// construction & assignment
-
-	Regex() noexcept;
+	// construction	
+	
+	Regex() noexcept = default;
 	Regex(const Regex& other) noexcept;
 	Regex(Regex&& other) noexcept;
 	~Regex() noexcept;
-
-private:
-	RegexInternal* internal = nullptr;
-	bool isOk = false;
 };
+
+FormatArgument F(const RegexError& error);
+

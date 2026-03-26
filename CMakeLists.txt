@@ -10,7 +10,7 @@ set (CMAKE_CXX_FLAGS_RELEASE "/MD  /Ob2 /O2 /DRELEASE")
 
 set (BUILD_SHARED_LIBS OFF)
 
-add_executable(slick-edit)
+add_executable (slick-edit)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #if (BuildTs)
@@ -20,37 +20,41 @@ add_executable(slick-edit)
 #endif()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#if (BuildcJSON)
+##if (BuildcJSON)
 #	add_library(cJSON STATIC)
 #	target_include_directories (cJSON PRIVATE "${DependenciesDir}/cJSON")
 #    target_compile_options(cJSON PRIVATE "/GS" "/Za" "/sdl" "/W4" "/wd4001" "/D_CRT_SECURE_NO_WARNINGS" "/TC")
 #	target_sources (cJSON PRIVATE
 #		"${DependenciesDir}/cJSON/cJSON.c"
 #		"${DependenciesDir}/cJSON/cJSON_Utils.c")
-#endif()
+##endif()
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-add_library(inih STATIC)
-target_include_directories (inih PRIVATE "deps/inih")
-target_sources (inih PRIVATE "deps/inih/ini.c")
-target_compile_definitions(inih PRIVATE
- 	INI_ALLOW_MULTILINE=1
- 	INI_ALLOW_BOM=1
- 	INI_ALLOW_INLINE_COMMENTS=1
- 	INI_ALLOW_NO_VALUE=1
- 	INI_STOP_ON_FIRST_ERROR=1
- 	INI_HANDLER_LINENO=1
- 	INI_CALL_HANDLER_ON_NEW_SECTION=1)
-target_link_libraries(slick-edit inih)
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# toml++
+#
 target_include_directories (slick-edit PRIVATE "deps/tomlplusplus/include")
+
+#
+# pearl regex lib
+#
+set (PCRE2_BUILD_PCRE2_8 ON)
+set (BUILD_STATIC_LIBS ON)
+set (PCRE2_NEWLINE ANYCRLF)
+set (PCRE2_SUPPORT_JIT ON)
+set (PCRE2_NEVER_BACKSLASH_C OFF)
+set (PCRE2_BUILD_PCRE2GREP OFF)
+set (PCRE2_BUILD_TESTS OFF)
+
+add_subdirectory("deps/pcre2")
+target_link_libraries (slick-edit pcre2-8-static)
+target_include_directories (slick-edit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2/interface")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 set (CJSON_BUILD_SHARED_LIBS OFF)
 
-add_subdirectory("deps/cJSON")
+add_subdirectory ("deps/cJSON")
 target_link_libraries(slick-edit cjson)
+target_include_directories (slick-edit PRIVATE "deps")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 target_link_libraries(slick-edit
@@ -58,7 +62,7 @@ target_link_libraries(slick-edit
 
 set_target_properties(slick-edit PROPERTIES CXX_STANDARD 23)
 
-target_include_directories (slick-edit PRIVATE "src" "deps")
+target_include_directories (slick-edit PRIVATE "src")
 
 file (GLOB_RECURSE Sources "src/*")
 target_sources (slick-edit PRIVATE ${Sources})

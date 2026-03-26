@@ -96,7 +96,7 @@ std::string MakeUriFromPath(std::string_view path) {
 			} else {
 				uri.push_back(charaterToEncode);
 				LogError("error converting path to uri: %\nfailed to encode characetrer '%' (%), Error: %",
-					orgPath, charaterToEncode, static_cast<int>(charaterToEncode), FToCharsResult(toCharsResult));
+					orgPath, charaterToEncode, static_cast<int>(charaterToEncode), F(toCharsResult));
 			}
 		}
 		
@@ -143,7 +143,7 @@ std::string MakePathFromUri(std::string_view uri) {
 				LogError("error converting uri to path: %\nfailed to decode special char '%'. Error: %", 
 					orgUri,
 					uri.substr(pos, 3u),
-					FFromCharsResult(fromCharsRes));
+					F(fromCharsRes));
 				path.append(uri.substr(pos, 3u));
 			}
 			

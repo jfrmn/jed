@@ -1,6 +1,6 @@
 #pragma once
 #include "basic.hh"
-#include <string_view>
+#include <string>
 #include <memory>
 
 struct IDWriteFontFace1;
@@ -42,12 +42,12 @@ struct Font {
 
 	struct Description {
 
-		std::string_view name = {};
+		std::string name = {};
 		f32 size = .0f;
 
-		s32 weight  = Weight_Normal;
-		s32 style   = Style_Normal;
-		s32 stretch = Stretch_Normal;
+		s64 weight  = Weight_Normal;
+		s64 style   = Style_Normal;
+		s64 stretch = Stretch_Normal;
 	};
 
 	//-----------------------------------------------------

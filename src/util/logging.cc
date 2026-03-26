@@ -6,6 +6,12 @@
 #include <comdef.h>
 #include <dbghelp.h>
 
+#define TOML_ABI_NAMESPACES 0
+#define TOML_ENABLE_UNRELEASED_FEATURES 1
+#define TOML_EXCEPTIONS 0
+#define TOML_IMPLEMENTATION 1
+#include <toml++/toml.hpp>
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static std::mutex mtxCout {};
 static Logger globalLogger {
@@ -117,7 +123,7 @@ FormatArgument FWaitRes(unsigned long waitRes) {
 	};
 }
 
-FormatArgument FFromCharsResult(const std::from_chars_result& fcr) {
+FormatArgument F(const std::from_chars_result& fcr) {
 	return FormatArgument {
 		.userdata = &fcr,
 		.Write = [] (const void* userdata, std::ostream* sink) {
@@ -128,7 +134,7 @@ FormatArgument FFromCharsResult(const std::from_chars_result& fcr) {
 	};
 }
 
-FormatArgument FToCharsResult(const std::to_chars_result& tcr) {
+FormatArgument F(const std::to_chars_result& tcr) {
 	return FormatArgument {
 		.userdata = &tcr,
 		.Write = [] (const void* userdata, std::ostream* sink) {
@@ -139,17 +145,14 @@ FormatArgument FToCharsResult(const std::to_chars_result& tcr) {
 	};
 }
 
-
-FormatArgument FGuid(const _GUID& guid) {
+FormatArgument F(const toml::source_region& srcRegion) {
 	return FormatArgument {
-		.userdata = &guid,
-		.Write = [](const void* userdata, std::ostream* sink) {
-			const auto guid = static_cast<const _GUID*>(userdata);
-
-			OLECHAR buffer[64] {};
-			const int bufferLen = StringFromGUID2(*guid, buffer, 64);
-
-			FormatValue(buffer, sink);
+		.userdata = &srcRegion,
+		.Write = [] (const void* userdata, std::ostream* sink) {
+			const auto srcReg = static_cast<const toml::source_region*>(userdata);
+			(*sink) << *srcReg->path
+			        << ":l" << srcReg->begin.line << 'c' << srcReg->begin.column
+			        << "-l" << srcReg->end.line << 'c' << srcReg->end.column;
 		}
 	};
 }

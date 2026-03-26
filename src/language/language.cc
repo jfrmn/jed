@@ -13,6 +13,7 @@
 
 #include "util/file-util.hh"
 #include "util/logging.hh"
+#include "util/toml-util.hh"
 
 #include "json/json-basic.hh"
 #include "json/json-mapping.hh"
@@ -24,6 +25,13 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1.h>
+
+#define TOML_ABI_NAMESPACES 0
+#define TOML_ENABLE_UNRELEASED_FEATURES 1
+#define TOML_EXCEPTIONS 0
+#define TOML_IMPLEMENTATION 0
+#include <toml++/toml.hpp>
+
 
 bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json, /*out*/ Language* result);
 
@@ -75,6 +83,95 @@ bool Language::LoadLanguages(std::string_view directory) {
 		return false;
 	}
 
+	return true;
+}
+
+bool Language::LoadLanguages2(std::string_view directory) {
+	std::string fileBuffer = {};
+	
+	DirectoryIterator iter {std::string(directory)};	
+	while (iter.Next()) {
+
+		if (!iter.IsDirectory())
+			continue;
+		
+		char pathBuffer[MAX_PATH] {};
+		const u64 pathLen = FormatToBuffer(pathBuffer, "%\\%\\language.toml", iter.GetSearchPath(), iter.filename);
+		
+		const std::string_view path {pathBuffer, pathLen};
+		LogDetail("reading language: '%'", path);
+		
+		fileBuffer.clear();
+		if (!ReadEntireFile(path, &fileBuffer))
+			continue;
+			
+		toml::parse_result parseResult = toml::parse(fileBuffer, path);
+		if (parseResult.failed()) {
+			LogError("failed to parse toml '%' %. Ignoring language...", path, parseResult.error().description());
+			continue;
+		}
+		
+		toml::table& tblLanguage = parseResult.table();
+		
+		auto language = new Language();
+		ExpectString(&tblLanguage, "name", &language->name, iter.filename);
+		
+		// @DUMMY
+		if (language->name == "C++") {
+			
+			ReadEntireFile(".\\config\\languages\\cpp\\basic-parser.json", &fileBuffer);
+			const cJSON* json = JsonParseString(fileBuffer, true);
+			ASSERT(json)
+			
+			language->syntaxHighlighting.type = Language::SyntaxHighlighting::Type_Builtin;
+			JsonToValue({}, json, &language->syntaxHighlighting.builtinParserRules);
+		}
+		
+		if (auto arrFileEndings = tblLanguage.get_as<toml::array>("file-endings")) {
+			for (toml::node& nodeEnding : *arrFileEndings) {
+				if (std::string ending; ExpectString(&nodeEnding, &ending))
+					language->fileEndings.push_back(std::move(ending));
+			}
+		}
+		
+		if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("language-server")) {
+			ExpectString(nodeLanguageServer, "command", &language->serverStartInfo.commandLine);
+			
+			if (std::string startupValue; ExpectString(nodeLanguageServer, "startup", &startupValue)) {
+				if      (startupValue == "never") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
+				else if (startupValue == "manual") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Manual;
+				else if (startupValue == "on-file-open") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnFileOpen;
+				else if (startupValue == "on-app-start") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnAppStart;
+				else LogWarning("%: unknwon startup value '%'", nodeLanguageServer->source(), startupValue);
+			}
+		}
+		
+		if (auto valLineComment = tblLanguage.get("line-comment"))
+			ExpectString(valLineComment, &language->lineComment);
+		
+		if (auto arrBlockComment = tblLanguage.get_as<toml::array>("block-comment")) {
+			for (u64 i = 0u; i < std::min(2ull, arrBlockComment->size()); i++) {
+				if (toml::value<std::string>* valEnding = arrBlockComment->get_as<std::string>(i))
+					language->fileEndings.push_back(std::move(valEnding->get()));
+				else
+					LogWarning("%: expected a string", valEnding->source());		
+			}
+		}
+		
+		if (auto nodeSyntaxHlRegex = tblLanguage.get("syntax-highlight-regex")) {
+			language->syntaxHighlighterRegex.FromToml(nodeSyntaxHlRegex);
+			language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+		}
+			
+		if (auto nodeDefaultSyntaxHighlighter = tblLanguage.get_as<std::string>("default-syntax-highlight")) {
+			if      (nodeDefaultSyntaxHighlighter->get() == "none")  language->syntaxHighlighter = nullptr;
+			else if (nodeDefaultSyntaxHighlighter->get() == "regex") language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+			else LogWarning("%: unknwon default-syntax-highlight value '%'", nodeDefaultSyntaxHighlighter->source(), nodeDefaultSyntaxHighlighter->get());
+		}
+		
+		languages.push_back(std::move(language));
+	}
+	
 	return true;
 }
 
@@ -505,7 +602,6 @@ void Language::OnOpenFile(Editor* editor, std::string_view buffer) {
 		server.notficationHandler = this;
 		if (!server.Initialize(
 				Process::StartInfo {
-					.application = serverStartInfo.application,
 					.commandLine = serverStartInfo.commandLine},
 				name)) {
 
@@ -658,7 +754,6 @@ static JSON_TO_ENUM_BEGIN(Language::LanguageServerStartInfo::Startup)
 JSON_TO_ENUM_END
 
 static JSON_TO_VALUE_BEGIN(Language::LanguageServerStartInfo)
-	JSON_TO_VALUE_PROPERTY(application)
 	JSON_TO_VALUE_PROPERTY(commandLine)
 	JSON_TO_VALUE_PROPERTY(startup)
 	JSON_TO_VALUE_CHECK_UNRECOGNIZED

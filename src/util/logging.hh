@@ -1,7 +1,7 @@
 #pragma once
-#include "util/format.hh"
-#include <mutex>
 #include <charconv>
+#include <mutex>
+#include "util/format.hh"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 enum LogLevel {
@@ -61,11 +61,12 @@ Logger* SetActiveLogger(Logger* logger);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-struct _GUID;
+namespace toml { struct source_region; }
+struct RegexError;
 
 FormatArgument FHr(long hResult);
 FormatArgument FLastErr(unsigned long err);
 FormatArgument FWaitRes(unsigned long waitRes);
-FormatArgument FFromCharsResult(const std::from_chars_result& fcr);
-FormatArgument FToCharsResult(const std::to_chars_result& tcr);
-FormatArgument FGuid(const _GUID& guid);
+FormatArgument F(const std::from_chars_result& fcr);
+FormatArgument F(const std::to_chars_result& tcr);
+FormatArgument F(const toml::source_region& srcRegion);

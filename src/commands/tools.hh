@@ -30,8 +30,8 @@ struct Tool {
 		
 		Format format = Format_Percent;
 		std::string regex = {};
-		u64 captureGroupValue = 0;
-		u64 captureGroupMax = U64_MAX;
+		u32 captureGroupValue = 0;
+		u32 captureGroupMax = U32_MAX;
 		s64 maxValue = 100;
 		bool hideFromStatusBar = false;
 	};
@@ -53,9 +53,9 @@ struct Tool {
 		};
 		
 		std::string regex = {};
-		u64 captureGroupFile = U64_MAX;
-		u64 captureGroupLine = U64_MAX;
-		u64 captureGroupColor = U64_MAX;
+		u32 captureGroupFile = U32_MAX;
+		u32 captureGroupLine = U32_MAX;
+		u32 captureGroupColor = U32_MAX;
 		
 		bool linesStartAtOne = false;
 		
