@@ -1,6 +1,5 @@
 #include "language.hh"
 #include "main-window.hh"
-#include "settings.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
@@ -8,16 +7,8 @@
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-textlocationlist.hh"
 
-#include "graphics/glyph-run.hh"
-#include "text/text-buffer.hh"
-
 #include "util/file-util.hh"
 #include "util/logging.hh"
-#include "util/toml-util.hh"
-
-#include "json/json-basic.hh"
-#include "json/json-mapping.hh"
-#include "json/json-mapping-stl.h"
 
 #include <mutex>
 #include <string>
@@ -32,61 +23,10 @@
 #define TOML_IMPLEMENTATION 0
 #include <toml++/toml.hpp>
 
-
-bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json, /*out*/ Language* result);
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 std::vector<Language*> Language::languages = {};
 
 bool Language::LoadLanguages(std::string_view directory) {
-	
-	JsonAllocator jsonAlloc {};
-	jsonAlloc.Init();
-	
-	JsonAllocator* prevAlloc = SetActiveJsonAllocator(&jsonAlloc);
-	DEFER(activeJsonAllocator = prevAlloc);
-	
-	std::string fileBuffer {};
-	
-	DirectoryIterator iter {std::string(directory)};
-	while (iter.Next()) {
-
-		if (!iter.IsDirectory())
-			continue;
-		
-		char pathBuffer[MAX_PATH] {};
-		const u64 pathBufferLen = FormatToBuffer(pathBuffer, "%\\%\\language.json", iter.GetSearchPath(), iter.filename);
-		
-		const std::string_view pathToLanguageJson {pathBuffer, pathBufferLen};
-		LogDetail("reading language json: '%'", pathToLanguageJson);
-		
-		fileBuffer.clear();
-		if (!ReadEntireFile(pathToLanguageJson, &fileBuffer))
-			continue;
-		
-		const cJSON* json = JsonParseString(fileBuffer, true);
-		if (!json)
-			continue;
-		
-		auto language = new Language();
-		if (!JsonToValue(nullptr, json, language)) {
-			LogError("failed to deserialized language '%'", iter.filename);
-			delete language;
-			continue;
-		}
-
-		languages.emplace_back(language);
-	}
-
-	if (iter.Failed()) {
-		LogError("failed to search directory: '%'. Last Error: %", iter.searchPattern, FLastErr(iter.lastError));
-		return false;
-	}
-
-	return true;
-}
-
-bool Language::LoadLanguages2(std::string_view directory) {
 	std::string fileBuffer = {};
 	
 	DirectoryIterator iter {std::string(directory)};	
@@ -114,40 +54,40 @@ bool Language::LoadLanguages2(std::string_view directory) {
 		toml::table& tblLanguage = parseResult.table();
 		
 		auto language = new Language();
-		ExpectString(&tblLanguage, "name", &language->name, iter.filename);
-		
-		// @DUMMY
-		if (language->name == "C++") {
-			
-			ReadEntireFile(".\\config\\languages\\cpp\\basic-parser.json", &fileBuffer);
-			const cJSON* json = JsonParseString(fileBuffer, true);
-			ASSERT(json)
-			
-			language->syntaxHighlighting.type = Language::SyntaxHighlighting::Type_Builtin;
-			JsonToValue({}, json, &language->syntaxHighlighting.builtinParserRules);
-		}
+		if (auto valName = tblLanguage.get_as<std::string>("name"))
+			language->name = std::move(valName->get());
+		else
+			language->name = iter.filename;
 		
 		if (auto arrFileEndings = tblLanguage.get_as<toml::array>("file-endings")) {
 			for (toml::node& nodeEnding : *arrFileEndings) {
-				if (std::string ending; ExpectString(&nodeEnding, &ending))
-					language->fileEndings.push_back(std::move(ending));
+				if (auto valEnding = nodeEnding.as<std::string>())
+					language->fileEndings.push_back(std::move(valEnding->get()));
 			}
 		}
 		
 		if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("language-server")) {
-			ExpectString(nodeLanguageServer, "command", &language->serverStartInfo.commandLine);
-			
-			if (std::string startupValue; ExpectString(nodeLanguageServer, "startup", &startupValue)) {
-				if      (startupValue == "never") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
-				else if (startupValue == "manual") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Manual;
-				else if (startupValue == "on-file-open") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnFileOpen;
-				else if (startupValue == "on-app-start") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnAppStart;
-				else LogWarning("%: unknwon startup value '%'", nodeLanguageServer->source(), startupValue);
+			if (auto valCommand = nodeLanguageServer->get_as<std::string>("command")) {
+				language->serverStartInfo.commandLine = valCommand->get();
+			} else {
+				LogError("%: expected entry 'command' as string", F(nodeLanguageServer->source()));
+				language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
+				goto skip_startup;
 			}
+			
+			if (auto valStartup = nodeLanguageServer->get_as<std::string>("startup")) {
+				if      (valStartup->get() == "never") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
+				else if (valStartup->get() == "manual") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Manual;
+				else if (valStartup->get() == "on-file-open") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnFileOpen;
+				else if (valStartup->get() == "on-app-start") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnAppStart;
+				else LogWarning("%: unknwon startup value '%'", nodeLanguageServer->source(), valStartup->get());
+			}
+		
+		skip_startup: __noop;
 		}
 		
-		if (auto valLineComment = tblLanguage.get("line-comment"))
-			ExpectString(valLineComment, &language->lineComment);
+		if (auto valLineComment = tblLanguage.get_as<std::string>("line-comment"))
+			language->lineComment = std::move(valLineComment->get());
 		
 		if (auto arrBlockComment = tblLanguage.get_as<toml::array>("block-comment")) {
 			for (u64 i = 0u; i < std::min(2ull, arrBlockComment->size()); i++) {
@@ -218,60 +158,6 @@ static D2D1_COLOR_F GetColorForLabel(std::string_view label) {
 		return D2D1::ColorF(D2D1::ColorF::LimeGreen);
 	else
 		return D2D1::ColorF(D2D1::ColorF::White);
-}
-
-void Language::HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, u64 fromLine, u64 toLine) {
-
-	if (syntaxHighlighting.type == SyntaxHighlighting::Type_None) {
-		return;
-
-	} else if (syntaxHighlighting.type == SyntaxHighlighting::Type_Builtin) {
-		
-		ID2D1SolidColorBrush* brush = nullptr;
-		if (HRESULT hr = renderTarget->CreateSolidColorBrush(D2D_COLOR_F {}, &brush); hr != S_OK) {
-			LogError("CreateSolidColorBrush() failed. HRESULT: %", hr);
-			return;
-		}
-		
-		DEFER(brush->Release());
-
-		std::vector<BasicParser::Token> tokens {};
-		std::vector<BasicParser::Match> matches {};
-
-		for (u64 ln = fromLine; ln <= toLine; ln++) {
-			
-			const TextBuffer::Line& line = editor->textController.buffer.GetLineAt(ln);
-			const GlyphRun& run = editor->glyphRuns[ln];
-
-			BasicParser::Tokenize(line.GetText(), &tokens);
-			BasicParser::MatchRules(tokens, syntaxHighlighting.builtinParserRules, &matches);
-
-			for (const BasicParser::Match& match : matches) {
-
-				float fromOffset = .0f, toOffset = .0f;
-				run.MeasureOffsetRange(match.startColumn, match.endColumn, &fromOffset, &toOffset);
-
-				brush->SetColor(GetColorForLabel(match.label));
-
-				renderTarget->FillRectangle(
-					D2D_RECT_F {
-						.left   = fromOffset,
-						.top    = (settings.fontEditor.lineHeight * ln),
-						.right  = toOffset,
-						.bottom = (settings.fontEditor.lineHeight * (ln+1)) },
-					brush);
-			}
-		}
-
-	} else if (syntaxHighlighting.type == SyntaxHighlighting::Type_TreeSitter) {
-		ASSERT_NOT_IMPLEMENTED;
-
-	} else if (syntaxHighlighting.type == SyntaxHighlighting::Type_LanguageServer) {
-		ASSERT_NOT_IMPLEMENTED;
-
-	} else {
-		ASSERT_UNREACHABLE;
-	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -743,103 +629,3 @@ found_editor:
 	}
 	editor->editorDiagnostics.diagnosticsVersion++;	
 }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-static JSON_TO_ENUM_BEGIN(Language::LanguageServerStartInfo::Startup)
-	JSON_TO_ENUM_MEMBER("never", Startup_Never)
-	JSON_TO_ENUM_MEMBER("manual", Startup_Manual)
-	JSON_TO_ENUM_MEMBER("on-file-open", Startup_OnFileOpen)
-	JSON_TO_ENUM_MEMBER("on-app-start", Startup_OnAppStart)
-JSON_TO_ENUM_END
-
-static JSON_TO_VALUE_BEGIN(Language::LanguageServerStartInfo)
-	JSON_TO_VALUE_PROPERTY(commandLine)
-	JSON_TO_VALUE_PROPERTY(startup)
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED
-JSON_TO_VALUE_END
-
-static JSON_TO_ENUM_BEGIN(Language::SyntaxHighlighting::Type)
-	JSON_TO_ENUM_MEMBER("none", Type_None)
-	JSON_TO_ENUM_MEMBER("basic", Type_Builtin) // @TODO remove -- depricated
-	JSON_TO_ENUM_MEMBER("builtin", Type_Builtin)
-	JSON_TO_ENUM_MEMBER("trees-sitter", Type_TreeSitter)
-	JSON_TO_ENUM_MEMBER("language-server", Type_LanguageServer)
-JSON_TO_ENUM_END
-
-
-static bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json,  Language::SyntaxHighlighting* result) {
-	
-	if (cJSON_IsObject(json)) {
-		
-		// read type
-		{
-			const JsonTrace trace {parentTrace, "type"};
-			const cJSON* jsonType = cJSON_GetObjectItem(json, "type");
-			if (!jsonType) {
-				JsonLogError(&trace, "required property is missing");
-				return false;
-			}
-			
-			if (!JsonToValue(&trace, jsonType, &result->type))
-				return false;
-		}
-		
-		if (result->type == Language::SyntaxHighlighting::Type_Builtin) {
-			const JsonTrace trace {parentTrace, "rules"};
-			const cJSON* jsonType = cJSON_GetObjectItem(json, "rules");
-			if (!jsonType) {
-				JsonLogError(&trace, "required property is missing");
-				return false;
-			}
-			
-			if (!JsonToValue(&trace, jsonType, &result->builtinParserRules))
-				return false;
-				
-			return true;
-				
-		} else {
-			ASSERT_NOT_IMPLEMENTED
-			return false;
-		}
-
-	} else if (cJSON_IsString(json)) {
-		return JsonToValue(parentTrace, json, &result->type);
-	
-	} else {
-		JsonLogError(parentTrace, "expected either an [object] or a [string]- but was [%]", JsonTypeToString(json->type));
-		return false;
-	}	
-}
-
-// for block comments
-static bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json, std::string (*result)[2]) {
-	
-	if (!JsonCheckType(parentTrace, json, cJSON_Array))
-		return false;
-	
-	const int arraySize = cJSON_GetArraySize(json);
-	if (arraySize < 2) {
-		JsonLogError(parentTrace, "expected exactly 2 values but got %", arraySize);
-		return false;
-	}
-	
-	for (int i = 0; i < 2; i++) {
-		const JsonTrace trace (parentTrace, i);
-		cJSON* jsonItem = cJSON_GetArrayItem(json, i);
-		if (!JsonToValue(&trace, jsonItem, &(*result)[i]))
-			return false;
-	}
-	
-	return true;
-}
-
-static JSON_TO_VALUE_BEGIN(Language)
-	JSON_TO_VALUE_PROPERTY(name)
-	JSON_TO_VALUE_PROPERTY(fileEndings)
-	JSON_TO_VALUE_PROPERTY_NAMED("languageServer", serverStartInfo)
-	JSON_TO_VALUE_PROPERTY(syntaxHighlighting)
-	JSON_TO_VALUE_PROPERTY(lineComment)
-	JSON_TO_VALUE_PROPERTY(blockComment)
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED
-JSON_TO_VALUE_END

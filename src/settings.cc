@@ -5,7 +5,6 @@
 #include "util/file-util.hh"
 #include "util/string-util.hh"
 #include "util/logging.hh"
-#include "util/toml-util.hh"
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1
@@ -766,8 +765,10 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	//
 	// name
 	//
-	if (!ExpectString(table, "name", &fontDescription.name)) {
-		LogError("%: required entry 'name' not found", table->source());
+	if (toml::value<std::string>* valName = table->get_as<std::string>("name")) {
+		fontDescription.name = std::move(valName->get());
+	} else {
+		LogError("%: expected entry 'name' as string", F(table->source()));
 		return false;
 	}
 	
@@ -795,14 +796,14 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	// weight, style and stretch
 	//
 	{
-		if (const toml::node* node = table->get("weight"))
-			ExpectInteger(node, &fontDescription.weight);
+		if (const auto node = table->get_as<s64>("weight"))
+			fontDescription.weight = node->get();
 		
-		if (const toml::node* node = table->get("style"))
-			ExpectInteger(node, &fontDescription.style);
+		if (const auto node = table->get_as<s64>("style"))
+			fontDescription.style = node->get();
 		
-		if (const toml::node* node = table->get("stretch"))
-			ExpectInteger(node, &fontDescription.stretch);
+		if (const auto node = table->get_as<s64>("stretch"))
+			fontDescription.stretch = node->get();
 	}
 	
 	Font newFont {};

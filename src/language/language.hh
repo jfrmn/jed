@@ -2,7 +2,6 @@
 #include "language/language-server.hh"
 #include "language/syntaxhighlighter-regex.hh"
 #include "text/text-change.hh"
-#include "basic-parser.hh"
 
 #include <string_view>
 #include <vector>
@@ -41,19 +40,6 @@ struct Language : public LanguageServer::NotificationHandler {
 		Startup startup = Startup_Never;
 	};
 
-	struct SyntaxHighlighting {
-		
-		enum Type {
-			 Type_None = 0,
-			 Type_Builtin,
-			 Type_TreeSitter, // @TODO not implemented
-			 Type_LanguageServer
-		};
-
-		Type type = Type_None;
-		std::vector<BasicParser::Rule> builtinParserRules = {};
-	};
-	
 	//-----------------------------------------------------
 	// data
 
@@ -65,9 +51,7 @@ struct Language : public LanguageServer::NotificationHandler {
 	
 	SyntaxHighlighter*     syntaxHighlighter = nullptr;
 	SyntaxHighlighterRegex syntaxHighlighterRegex = {};
-	
-	SyntaxHighlighting syntaxHighlighting = {};
-	
+		
 	std::string lineComment = {};
 	std::string blockComment[2] = {};
 
