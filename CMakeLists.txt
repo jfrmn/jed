@@ -13,13 +13,6 @@ set (BUILD_SHARED_LIBS OFF)
 add_executable (slick-edit)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#if (BuildTs)
-#	add_library(tree-sitter OBJECT "${DependenciesDir}/tree-sitter/src/lib.c")
-#	target_compile_options(tree-sitter PRIVATE "/W0") # disable warnings
-#	target_include_directories (tree-sitter PRIVATE "${DependenciesDir}/tree-sitter/include")
-#endif()
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##if (BuildcJSON)
 #	add_library(cJSON STATIC)
 #	target_include_directories (cJSON PRIVATE "${DependenciesDir}/cJSON")
@@ -45,9 +38,16 @@ set (PCRE2_NEVER_BACKSLASH_C OFF)
 set (PCRE2_BUILD_PCRE2GREP OFF)
 set (PCRE2_BUILD_TESTS OFF)
 
-add_subdirectory("deps/pcre2")
+add_subdirectory ("deps/pcre2")
 target_link_libraries (slick-edit pcre2-8-static)
 target_include_directories (slick-edit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2/interface")
+
+#
+# tree-sitter
+#
+add_subdirectory ("deps/tree-sitter")
+target_link_libraries (slick-edit tree-sitter)
+target_include_directories (slick-edit PRIVATE "deps/tree-sitter/lib/include")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 set (CJSON_BUILD_SHARED_LIBS OFF)

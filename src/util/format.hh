@@ -90,8 +90,8 @@ void        FormatToStringWithArgs(std::string* sink, std::string_view fmt, std:
 u64         FormatToBufferWithArgs(std::span<char> buffer, std::string_view fmt, std::span<const FormatArgument> arguments);
 
 
-#define SELECT_NUMBER(                                            _1, _2, _3, _4, _5, _6, _7, _N, ...) _N
-#define COUNT_VA_ARGS(...) SELECT_NUMBER(__VA_ARGS__ __VA_OPT__(,) 7,  6,  5,  4,  3,  2,  1,  0)
+#define SELECT_NUMBER(                                             _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _N, ...) _N
+#define COUNT_VA_ARGS(...) SELECT_NUMBER(__VA_ARGS__ __VA_OPT__(,) 11, 10,  9,  8,  7,  6,  5,  4,  3,   2,   1,  0)
 
 #define Format(sink, fmt, ...)\
 	FormatChecked<\

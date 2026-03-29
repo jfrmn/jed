@@ -21,7 +21,10 @@ struct MouseEvent;
 struct EditorCaretAttached;
 struct EditorToolWindow;
 
-struct  Editor {
+struct TSParser;
+struct TSTree;
+
+struct Editor {
 	
 	//-------------------------------------------
 	// types
@@ -74,6 +77,9 @@ struct  Editor {
 	
 	f32 cursorBlinkValue = 0.0f;
 	u64 cursorBlickStopTick = 0u;
+	
+	TSParser* tsParser = nullptr;
+	TSTree* tsTree = nullptr;
 	
 	//-------------------------------------------
 	// functions

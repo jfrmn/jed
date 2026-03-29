@@ -1,6 +1,7 @@
 #pragma once
 #include "language/language-server.hh"
 #include "language/syntaxhighlighter-regex.hh"
+#include "language/syntaxhighlighter-treesitter.hh"
 #include "text/text-change.hh"
 
 #include <string_view>
@@ -27,17 +28,16 @@ struct Language : public LanguageServer::NotificationHandler {
 	//-----------------------------------------------------
 	// types
 
+	enum Startup {
+		 Startup_Never = 0,
+		 Startup_Manual,
+		 Startup_OnFileOpen,
+		 Startup_OnAppStart
+	};
+	
+	// @TODO use ProcessStartInfo
 	struct LanguageServerStartInfo {
-		
-		enum Startup {
-			 Startup_Never = 0,
-			 Startup_Manual,
-			 Startup_OnFileOpen,
-			 Startup_OnAppStart
-		};
-
 		std::string commandLine = {};
-		Startup startup = Startup_Never;
 	};
 
 	//-----------------------------------------------------
@@ -47,10 +47,12 @@ struct Language : public LanguageServer::NotificationHandler {
 	std::vector<std::string> fileEndings = {};
 
 	LanguageServerStartInfo serverStartInfo = {};
+	Startup                 serverStartup = Startup_Never;
 	LanguageServer          server = {};
 	
-	SyntaxHighlighter*     syntaxHighlighter = nullptr;
-	SyntaxHighlighterRegex syntaxHighlighterRegex = {};
+	SyntaxHighlighter*          syntaxHighlighter = nullptr;
+	SyntaxHighlighterRegex      syntaxHighlighterRegex = {};
+	SyntaxHighlighterTreeSitter syntaxHighlighterTreeSitter = {};
 		
 	std::string lineComment = {};
 	std::string blockComment[2] = {};

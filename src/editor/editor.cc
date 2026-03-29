@@ -22,6 +22,8 @@
 
 #include <algorithm>
 
+#include <tree_sitter/api.h>
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1_1.h>
@@ -1215,4 +1217,7 @@ Editor::~Editor() noexcept {
 	 	editorCaretAttached->RemoveReference();
 
 	delete toolWindow;
+	
+	ts_parser_delete(tsParser);
+	ts_tree_delete(tsTree);
 }

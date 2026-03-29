@@ -65,12 +65,12 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 		rules.push_back(std::move(rule));
 	}
 	
-	u64 maxCaptureGroupCount = 0;
+	u32 maxCaptureGroupCount = 0;
 	for (const Rule& rule : rules) {
 		if (maxCaptureGroupCount < rule.regex.captureGroupCount)
 			maxCaptureGroupCount = rule.regex.captureGroupCount;
 	}
-	match.Prepare(maxCaptureGroupCount + 1);
+	match.Prepare(maxCaptureGroupCount + 1u);
 	
 	return true;
 }
@@ -110,7 +110,7 @@ void SyntaxHighlighterRegex::Highlight(Editor* editor, ID2D1RenderTarget* render
 			while(rule.regex.Match(line.GetText(), &match)) {
 				for (u64 i = 0u; i < std::min<u64>(rule.labels.size(), match.groupCount); i++) {
 					if (rule.labels[i].empty()) continue;
-					const RegexMatch::Group& group = match.GetGroup(i);
+					const RegexMatch::Group& group = match.GetGroup(static_cast<u32>(i));
 					
 					const D2D_COLOR_F color = GetColorForLabel(rule.labels[i]);
 					brush->SetColor(color);
@@ -133,12 +133,3 @@ void SyntaxHighlighterRegex::Highlight(Editor* editor, ID2D1RenderTarget* render
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

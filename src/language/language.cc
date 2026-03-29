@@ -47,7 +47,8 @@ bool Language::LoadLanguages(std::string_view directory) {
 			
 		toml::parse_result parseResult = toml::parse(fileBuffer, path);
 		if (parseResult.failed()) {
-			LogError("failed to parse toml '%' %. Ignoring language...", path, parseResult.error().description());
+			const toml::parse_error& error = parseResult.error();
+			LogError("failed to parse toml %: %. Ignoring language...", F(error.source()), error.description());
 			continue;
 		}
 		
@@ -71,15 +72,15 @@ bool Language::LoadLanguages(std::string_view directory) {
 				language->serverStartInfo.commandLine = valCommand->get();
 			} else {
 				LogError("%: expected entry 'command' as string", F(nodeLanguageServer->source()));
-				language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
+				language->serverStartup = Startup_Never;
 				goto skip_startup;
 			}
 			
 			if (auto valStartup = nodeLanguageServer->get_as<std::string>("startup")) {
-				if      (valStartup->get() == "never") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Never;
-				else if (valStartup->get() == "manual") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_Manual;
-				else if (valStartup->get() == "on-file-open") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnFileOpen;
-				else if (valStartup->get() == "on-app-start") language->serverStartInfo.startup = LanguageServerStartInfo::Startup_OnAppStart;
+				if      (valStartup->get() == "never") language->serverStartup = Startup_Never;
+				else if (valStartup->get() == "manual") language->serverStartup = Startup_Manual;
+				else if (valStartup->get() == "on-file-open") language->serverStartup = Startup_OnFileOpen;
+				else if (valStartup->get() == "on-app-start") language->serverStartup = Startup_OnAppStart;
 				else LogWarning("%: unknwon startup value '%'", nodeLanguageServer->source(), valStartup->get());
 			}
 		
@@ -98,9 +99,17 @@ bool Language::LoadLanguages(std::string_view directory) {
 			}
 		}
 		
-		if (auto nodeSyntaxHlRegex = tblLanguage.get("syntax-highlight-regex")) {
-			language->syntaxHighlighterRegex.FromToml(nodeSyntaxHlRegex);
-			language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+		if (auto tblSyntaxHighlight = tblLanguage.get_as<toml::table>("syntax-highlight")) {
+			
+			if (auto nodeRegex = tblSyntaxHighlight->get("regex")) {
+				const bool ok = language->syntaxHighlighterRegex.FromToml(nodeRegex);
+				if (ok) language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+			}
+			
+			if (auto nodeTreeSitter = tblSyntaxHighlight->get("tree-sitter")) {
+				const bool ok = language->syntaxHighlighterTreeSitter.FromToml(nodeTreeSitter);
+				if (ok)  language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
+			}
 		}
 			
 		if (auto nodeDefaultSyntaxHighlighter = tblLanguage.get_as<std::string>("default-syntax-highlight")) {
@@ -135,7 +144,7 @@ void Language::UnloadLanguages() {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 bool Language::HasLanguageServer() const {
-	return serverStartInfo.startup != LanguageServerStartInfo::Startup_Never;
+	return serverStartup != Startup_Never;
 }
 
 // @DUMMY
@@ -482,9 +491,7 @@ EditorTextLocationList* Language::GotoImplementation(Editor* editor) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void Language::OnOpenFile(Editor* editor, std::string_view buffer) {
 
-	if (server.state == LanguageServer::State_Standby &&
-	    serverStartInfo.startup == Language::LanguageServerStartInfo::Startup_OnFileOpen) {
-		
+	if (server.state == LanguageServer::State_Standby && serverStartup == Startup_OnFileOpen) {
 		server.notficationHandler = this;
 		if (!server.Initialize(
 				Process::StartInfo {
@@ -504,6 +511,9 @@ void Language::OnOpenFile(Editor* editor, std::string_view buffer) {
 				.version = 0,
 				.text = buffer}});
 	}
+	
+	if (syntaxHighlighter)
+		syntaxHighlighter->OnOpenFile(editor, buffer);
 }
 
 void Language::OnCloseFile(Editor* editor) {
@@ -515,86 +525,92 @@ void Language::OnCloseFile(Editor* editor) {
 			.textDocument = Lsp::TextDocumentIdentifier {
 				.uri = editor->textDocumentIdentifier.uri}});
 	}
+	
+	if (syntaxHighlighter)
+		syntaxHighlighter->OnCloseFile(editor);
 }
 
 void Language::OnTextBufferChanged(Editor* editor, const TextChange* change) {
 	
-	if (!server.IsRunning())
-		return;
-
-	const auto syncKind = server.GetTextDocumentSyncKind();
-
-	//
-	// no sync
-	//
-	if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_None) {
-		return;
-
-	//
-	// incremental sync
-	//	
-	} else if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_Incremental) {
-		ASSERT(!editor->textDocumentIdentifier.uri.empty());
-		
-		std::vector<Lsp::DidChangeTextDocumentNotification::ChangeEvent> changeEvents;
-		changeEvents.reserve(change->count);
-
-		for (usize i = 0u; i < change->count; i++) {
-			const TextChangeOperation& operation = change->operations[i];
-			
-			if (!operation.insertedText.empty() && !operation.removedText.empty()) {
-				changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
-					.range = ToLspRange(operation.start, operation.removalEnd),
-					.text = operation.insertedText});
-			
-			} else if (!operation.insertedText.empty()) {
-				changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
-					.range = ToLspRange(operation.start, operation.start),
-					.text = operation.insertedText});
-			
-			} else if (!operation.removedText.empty()) {
-				changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
-					.range = ToLspRange(operation.start, operation.removalEnd),
-					.text = {}});
-			
-			} else {
-				ASSERT_UNREACHABLE;
-			}
-		}
-
-		server.SendDidChangeNotification(Lsp::DidChangeTextDocumentNotification {
-			.textDocument = Lsp::VersionedTextDocumentIdentifier {
-				.uri = editor->textDocumentIdentifier.uri,
-				.version = editor->textDocumentIdentifier.version },
-			.contentChanges = changeEvents });
-			//.clangdWantDiagnostics = true });
+	if (syntaxHighlighter)
+		syntaxHighlighter->OnTextBufferChanged(editor, change);	
 	
-	//
-	// full sync
-	//
-	} else if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_Full) {
+	if (server.IsRunning()) {
+
+		const auto syncKind = server.GetTextDocumentSyncKind();
+	
+		//
+		// no sync
+		//
+		if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_None) {
+			return;
+	
+		//
+		// incremental sync
+		//	
+		} else if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_Incremental) {
+			ASSERT(!editor->textDocumentIdentifier.uri.empty());
+			
+			std::vector<Lsp::DidChangeTextDocumentNotification::ChangeEvent> changeEvents;
+			changeEvents.reserve(change->count);
+	
+			for (usize i = 0u; i < change->count; i++) {
+				const TextChangeOperation& operation = change->operations[i];
+				
+				if (!operation.insertedText.empty() && !operation.removedText.empty()) {
+					changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
+						.range = ToLspRange(operation.start, operation.removalEnd),
+						.text = operation.insertedText});
+				
+				} else if (!operation.insertedText.empty()) {
+					changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
+						.range = ToLspRange(operation.start, operation.start),
+						.text = operation.insertedText});
+				
+				} else if (!operation.removedText.empty()) {
+					changeEvents.push_back(Lsp::DidChangeTextDocumentNotification::ChangeEvent {
+						.range = ToLspRange(operation.start, operation.removalEnd),
+						.text = {}});
+				
+				} else {
+					ASSERT_UNREACHABLE;
+				}
+			}
+	
+			server.SendDidChangeNotification(Lsp::DidChangeTextDocumentNotification {
+				.textDocument = Lsp::VersionedTextDocumentIdentifier {
+					.uri = editor->textDocumentIdentifier.uri,
+					.version = editor->textDocumentIdentifier.version },
+				.contentChanges = changeEvents });
+				//.clangdWantDiagnostics = true });
 		
-		// @TODO 
-		//std::string fullText;
-		//editor->textBuffer.GetText(&fullText);
-
-		// const auto changeEvent = LSP::DidChangeTextDocumentNotification::ChangeEvent {
-		// 	.range = std::nullopt,
-		// 	.text = 
-
-		// }
-		ASSERT_NOT_IMPLEMENTED;
-		ASSERT(!editor->textDocumentIdentifier.uri.empty());
-
-		server.SendDidChangeNotification(Lsp::DidChangeTextDocumentNotification {
-			.textDocument = Lsp::VersionedTextDocumentIdentifier {
-				.uri = editor->textDocumentIdentifier.uri,
-				.version = editor->textDocumentIdentifier.version },
-			.contentChanges = {},
-			.clangdWantDiagnostics = false });
-
-	} else {
-		ASSERT_UNREACHABLE;
+		//
+		// full sync
+		//
+		} else if (syncKind == Lsp::TextDocumentSyncServerCapabilities::SyncKind_Full) {
+			
+			// @TODO 
+			//std::string fullText;
+			//editor->textBuffer.GetText(&fullText);
+	
+			// const auto changeEvent = LSP::DidChangeTextDocumentNotification::ChangeEvent {
+			// 	.range = std::nullopt,
+			// 	.text = 
+	
+			// }
+			ASSERT_NOT_IMPLEMENTED;
+			ASSERT(!editor->textDocumentIdentifier.uri.empty());
+	
+			server.SendDidChangeNotification(Lsp::DidChangeTextDocumentNotification {
+				.textDocument = Lsp::VersionedTextDocumentIdentifier {
+					.uri = editor->textDocumentIdentifier.uri,
+					.version = editor->textDocumentIdentifier.version },
+				.contentChanges = {},
+				.clangdWantDiagnostics = false });
+	
+		} else {
+			ASSERT_UNREACHABLE;
+		}
 	}
 }
 

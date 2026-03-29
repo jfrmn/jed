@@ -151,8 +151,8 @@ FormatArgument F(const toml::source_region& srcRegion) {
 		.Write = [] (const void* userdata, std::ostream* sink) {
 			const auto srcReg = static_cast<const toml::source_region*>(userdata);
 			(*sink) << *srcReg->path
-			        << ":l" << srcReg->begin.line << 'c' << srcReg->begin.column
-			        << "-l" << srcReg->end.line << 'c' << srcReg->end.column;
+			        << ':' << srcReg->begin.line << ':' << srcReg->begin.column
+			        << '-' << srcReg->end.line << ':' << srcReg->end.column;
 		}
 	};
 }
