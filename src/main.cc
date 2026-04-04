@@ -7,7 +7,6 @@
 #include "graphics/glyph-run.hh"
 
 #include "language/language.hh"
-#include "commands/tools.hh"
 #include "json/json-basic.hh"
 #include "util/logging.hh"
 
@@ -71,11 +70,6 @@ int main(int argc, char** argv) {
 		LogFatal("init effects failed");
 		return -1;
 	}
-		
-	// @TODO
-	//if (!Tool::LoadTools(settingsJson)) {
-	//	LogError("failed to load tools");
-	//}
 
 	if (!Language::LoadLanguages(".\\config\\languages"))
 		LogError("failed to load languages");

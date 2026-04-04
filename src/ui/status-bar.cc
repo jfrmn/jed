@@ -132,14 +132,14 @@ static f32 UpdateConsoleButton(StatusBar* self, f32 posX, u64 i) {
 static bool IsVisibleConsoleProgress() {
 	if (!mainWindow.console.tool) return false;
 	if (mainWindow.console.tool->progress.hideFromStatusBar) return false;
-	if (!mainWindow.console.progressRegex.isOk) return false;
+	if (!mainWindow.console.tool->progress.regex.isOk) return false;
 	return true;
 }
 
 static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 	if (!mainWindow.console.tool) return posX;
 	if (mainWindow.console.tool->progress.hideFromStatusBar) return posX;
-	if (!mainWindow.console.progressRegex.isOk) return posX;
+	if (!mainWindow.console.tool->progress.regex.isOk) return posX;
 	
 	constexpr f32 PROGRESS_BAR_WIDTH = 100.0f;
 

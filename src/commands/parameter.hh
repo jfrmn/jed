@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+namespace toml { class node; }
+
 struct ParameterValue {
 	std::string stringValue = {};
 	union {
@@ -33,7 +35,6 @@ struct Parameter {
 		std::string value = {};
 		std::string_view GetValue() const;
 	};
-	
 
 	//-----------------------------------------------------
 	// data
@@ -51,4 +52,12 @@ struct Parameter {
 	s64 minValue = S64_MIN;
 	std::string ifTrue = {};
 	std::string ifFalse = {};
+	bool hasIfTrue = false;
+	bool hasIfFalse = false;	
+	
+	//-----------------------------------------------------
+	// functions
+	//-----------------------------------------------------
+	
+	static bool FromToml(toml::node& node, /*out*/ Parameter* parameter);
 };

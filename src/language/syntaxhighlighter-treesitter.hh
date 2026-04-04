@@ -11,6 +11,7 @@ struct SyntaxHighlighterTreeSitter : public SyntaxHighlighter {
 
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 
 	std::string modulePath = {};
 	std::string procName = {};
@@ -23,6 +24,7 @@ struct SyntaxHighlighterTreeSitter : public SyntaxHighlighter {
 	
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 	
 	static void Cleanup(Editor* editor);
 	

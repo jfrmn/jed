@@ -38,14 +38,11 @@ static void Reset(Console* self) {
 	self->showToolDiagnostics = false;
 	self->selectedDiagnosticsRecord = U64_MAX;
 	
-	self->progressRegex.Reset();
 	self->progressValue = 0.0f;
 	self->progressText.clear();
 	
-	self->diagnosticsRegex.Reset();
 	self->diagnosticsRecords.clear();
 	
-	self->compiledCommandLine.clear();
 	delete self->process;
 	self->process = nullptr;
 	
@@ -82,33 +79,44 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 			builder->append(buffer, result.ptr);
 		} break;
 		case Parameter::Type_Bool: {
-			builder->append(value.boolValue ? "true" : "false");
+			if (value.boolValue) {
+				if (definition.hasIfTrue)
+					builder->append(definition.ifTrue);
+				else 
+					builder->append("true");
+			} else {
+				if (definition.hasIfFalse)
+					builder->append(definition.ifFalse);
+				else 
+					builder->append("false");
+			}
 		} break;
 		default: ASSERT_UNREACHABLE;
 	};
 }
 
-static bool CompileCommand(Console* self) {
+static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 	if (self->toolParameterValues.size() < self->tool->parameters.size()) {
 		self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
 			.message = FormatString("Not enough parameters provided. Expected % but got %", self->toolParameterValues.size(), self->tool->parameters.size())});
 		return false;
 	}
-		
+			
 	for (u64 pos, start = 0u; /**/; start = pos) {
 		pos = self->tool->command.find('%', start);
 		if (pos == std::string::npos) {
-			self->compiledCommandLine.append(self->tool->command, start);
+			// append remaining command
+			commandLine->append(self->tool->command, start);
 			break;
 		}
 		
 		// append everything up to the percent
-		self->compiledCommandLine.append(self->tool->command, start, (pos - start));
+		commandLine->append(self->tool->command, start, (pos - start));
 		start = pos+1;
 		
 		// check if it's an escaped percent - e.g. %%
 		if (pos < self->tool->command.size()-1 && self->tool->command[pos+1] == '%') {
-			self->compiledCommandLine.push_back('%');
+			commandLine->push_back('%');
 			pos += 2;
 			continue;
 		}
@@ -118,10 +126,10 @@ static bool CompileCommand(Console* self) {
 			pos += 1;
 			
 			u64 parameterIndex = U64_MAX;
-			const auto result = std::from_chars(self->tool->command.data()+pos, self->tool->command.data()+self->tool->command.size(), parameterIndex);
+			const auto fcr = std::from_chars(self->tool->command.data()+pos, self->tool->command.data()+self->tool->command.size(), parameterIndex);
 			
 			// we just checked if its a numeric char so this should come back as ok
-			ASSERT(result.ec == std::errc());
+			ASSERT(fcr.ec == std::errc());
 			ASSERT(parameterIndex < U64_MAX);
 			
 			if (parameterIndex >= self->toolParameterValues.size()) {
@@ -134,9 +142,9 @@ static bool CompileCommand(Console* self) {
 					
 			const ParameterValue& paramValue = self->toolParameterValues[parameterIndex];
 			const Parameter& paramDef = self->tool->parameters[parameterIndex];
-			AppendParameterValue(&self->compiledCommandLine, paramValue, paramDef);
+			AppendParameterValue(commandLine, paramValue, paramDef);
 		
-			pos = (result.ptr - self->tool->command.data());
+			pos = (fcr.ptr - self->tool->command.data());
 			continue;
 		}
 		
@@ -172,7 +180,7 @@ static bool CompileCommand(Console* self) {
 			return false;
 			
 		found:
-			AppendParameterValue(&self->compiledCommandLine, *paramValue, *paramDef);
+			AppendParameterValue(commandLine, *paramValue, *paramDef);
 			pos = posEnd+1;
 		}
 	}
@@ -189,50 +197,22 @@ bool Console::StartProcess() {
 	
 	Reset(this);
 	
-	// 
-	// compile command
-	//
-	{
-		if (!CompileCommand(this)) {
-			showToolDiagnostics = true;
-			isOpen = true;
-			return false;
-		}
-	}
-	
-	//
-	// compile regexes
-	//
-	{
-		if (tool->HasProgress()) {
-			if (RegexError regexError; !progressRegex.Compile(tool->progress.regex, &regexError)) {
-				toolDiagnostics.push_back(ToolDiagnosticsRecord {
-					.message  = FormatString("'progress': %", F(regexError)),
-					.source   = tool->progress.regex,
-					.position = U64_MAX});
-			}
-		}
-		
-		if (tool->HasDiagnosticsMatcher()) {
-			if (RegexError regexError; !diagnosticsRegex.Compile(tool->diagnosticsMatcher.regex, &regexError)) {
-				toolDiagnostics.push_back(ToolDiagnosticsRecord {
-					.message  = FormatString("'diagnostics': %", F(regexError)),
-					.source   = tool->diagnosticsMatcher.regex,
-					.position = U64_MAX});
-			}
-		}
-	}
-	
-	
 	//
 	// start process
 	//
 	{
-		LogInfo("Running: %", compiledCommandLine);
+		std::string commandLine {};
+		if (!CompileCommand(this, &commandLine)) {
+			showToolDiagnostics = true;
+			isOpen = true;
+			return false;
+		}
+		
+		LogInfo("Running: %", commandLine);
 		
 		Process::StartInfo startInfo {
 			.application = {},
-			.commandLine = compiledCommandLine,
+			.commandLine = std::move(commandLine),
 			.environment = tool->environment,
 			.flags = tool->flags};
 		
@@ -689,7 +669,7 @@ void Console::OnUpdate() {
 				.bottom = toolbarArea.bottom - MARGIN + PADDING};
 								
 			// draw progress bar
-			if (progressRegex.isOk) {
+			if (tool->progress.regex.isOk) {
 				
 				deviceContext->FillRoundedRectangle(
 					MakeRoundedRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea), RADIUS),
@@ -917,28 +897,20 @@ bool Console::OnKeyDown(KeyEvent event) {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void WarnCaptureGroupOutOfRange(Console* self, const RegexMatch& match, u64 index, std::string_view groupName, std::string_view source) {
-	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-		.message  = FormatString("'%' % is out of range. Regex provides only % groups", groupName, index, match.groupCount),
-		.source   = source,
-		.position = U64_MAX});
-}
-
 static void WarnMatchedTextParseErr(Console* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
 	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-		.message  = FormatString("failed to parse matched text for '%': '%'", groupName, F(fcr)),
+		.message  = FormatString("failed to parse matched text for capture group '%': '%'", groupName, F(fcr)),
 		.source   = text,
 		.position = U64_MAX});
 }
 
 static void MatchProgress(Console* self, const std::string* line) {
-	if (!self->progressRegex.isOk) return;
+	if (!self->tool->progress.regex.isOk) return;
 	
-	RegexMatch match {};
-	if (!self->progressRegex.Match(*line, &match)) return;
+	RegexMatch match;
+	if (!self->tool->progress.regex.Match(*line, &match)) return;
 	if (self->tool->progress.captureGroupValue >= match.groupCount) {
-		WarnCaptureGroupOutOfRange(self, match, self->tool->progress.captureGroupValue, "capture-group-value", self->tool->progress.regex);
-		self->progressRegex.Reset();
+		LogError("capture group 'value' (index %) is out of range. Regex only provided only % capture groups", self->tool->progress.captureGroupValue, self->tool->progress.regex.captureGroupCount);
 		return;
 	}
 	
@@ -958,7 +930,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 		
 		const std::from_chars_result fcrMax = std::from_chars(groupMax.begin, groupMax.end, newMax);
 		if (fcrMax.ec != std::errc()) {
-			WarnMatchedTextParseErr(self, "capture-group-max", groupMax.GetText(), fcrMax);
+			WarnMatchedTextParseErr(self, "max", groupMax.GetText(), fcrMax);
 			// not aborting, using the default max
 		}
 	}
@@ -1017,10 +989,10 @@ static void MatchProgress(Console* self, const std::string* line) {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static void MatchDiagnostics(Console* self, const std::string* line) {
- 	if (!self->progressRegex.isOk) return;
+ 	if (!self->tool->diagnostics.regex.isOk) return;
 	 
 	RegexMatch match {};
-	if (!self->diagnosticsRegex.Match(*line, &match)) return;
+	if (!self->tool->diagnostics.regex.Match(*line, &match)) return;
 
 	Console::EditorDiagnosticsRecord record {};
 	record.color = settings.colors.editorText;
@@ -1031,10 +1003,10 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 	record.originToColumn = fullMatch.end - line->data();
 	
 	// color
-	if (self->tool->diagnosticsMatcher.captureGroupColor < match.groupCount) {
-		const RegexMatch::Group& group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupColor);
+	if (self->tool->diagnostics.captureGroupColor < match.groupCount) {
+		const RegexMatch::Group& group = match.GetGroup(self->tool->diagnostics.captureGroupColor);
 		
-		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnosticsMatcher.colorMapping) {
+		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnostics.colorMapping) {
 			if (StringEqualsCasesInsen(entry.key, group.GetText())) {
 				record.color = entry.color;
 				break;
@@ -1043,14 +1015,14 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 	}
 	
 	// file
-	if (self->tool->diagnosticsMatcher.captureGroupFile < match.groupCount) {
-		const RegexMatch::Group group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupFile);
+	if (self->tool->diagnostics.captureGroupFile < match.groupCount) {
+		const RegexMatch::Group group = match.GetGroup(self->tool->diagnostics.captureGroupFile);
 		record.file = group.GetText();
 	}
 	
 	// line
-	if (self->tool->diagnosticsMatcher.captureGroupLine < match.groupCount) {
-		RegexMatch::Group group = match.GetGroup(self->tool->diagnosticsMatcher.captureGroupLine);
+	if (self->tool->diagnostics.captureGroupLine < match.groupCount) {
+		RegexMatch::Group group = match.GetGroup(self->tool->diagnostics.captureGroupLine);
 		const std::from_chars_result fcr = std::from_chars(group.begin, group.end, record.line);
 		
 		if (fcr.ec != std::errc()) {
@@ -1058,7 +1030,7 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 			record.line = 0u;
 		}
 		
-		if (self->tool->diagnosticsMatcher.linesStartAtOne && record.line > 0u)
+		if (self->tool->diagnostics.linesStartAtOne && record.line > 0u)
 			record.line -= 1;
 	}
 	

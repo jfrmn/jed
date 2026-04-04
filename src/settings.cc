@@ -6,6 +6,8 @@
 #include "util/string-util.hh"
 #include "util/logging.hh"
 
+#include "commands/tools.hh"
+
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
@@ -896,6 +898,13 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 			LoadFont(nodeFontEditor, &fontEditor);
 		if (toml::node* nodeFontUi = tblFonts->get("ui"))
 			LoadFont(nodeFontUi, &fontUi);
+	}
+	
+	//
+	// load tools
+	//
+	if (toml::node* nodeTools = table.get("Tools")) {
+		Tool::LoadTools(nodeTools);
 	}
 	
 	return true;

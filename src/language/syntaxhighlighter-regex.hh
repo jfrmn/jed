@@ -12,7 +12,8 @@ struct SyntaxHighlighterRegex : public SyntaxHighlighter {
 	
 	//-----------------------------------------------------
 	// types
-		
+	//-----------------------------------------------------
+	
 	struct Rule {
 		Regex regex = {};
 		std::vector<std::string> labels = {};
@@ -20,12 +21,14 @@ struct SyntaxHighlighterRegex : public SyntaxHighlighter {
 	
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 	
 	std::vector<Rule> rules = {};
 	RegexMatch match = {};
 	
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 	
 	bool FromToml(toml::node* toml);
 	

@@ -70,7 +70,7 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 		if (maxCaptureGroupCount < rule.regex.captureGroupCount)
 			maxCaptureGroupCount = rule.regex.captureGroupCount;
 	}
-	match.Prepare(maxCaptureGroupCount + 1u);
+	match.Reserve(maxCaptureGroupCount);
 	
 	return true;
 }

@@ -79,25 +79,22 @@ struct Console : public Process::Observer {
 	std::vector<ToolDiagnosticsRecord> toolDiagnostics = {};
 	bool showToolDiagnostics = false;
 	
-	Regex progressRegex = {};
-	f32   progressValue = 0.0f;
+	f32         progressValue = 0.0f;
 	std::string progressText = {};
 	
-	Regex diagnosticsRegex = {};
 	std::vector<EditorDiagnosticsRecord> diagnosticsRecords = {};
-	u64 selectedDiagnosticsRecord = 0;
+	u64         selectedDiagnosticsRecord = 0;
 	FilePreview filePreview = {};
 	
-	std::string compiledCommandLine = {};
-	Process* process = nullptr;
+	Process*    process = nullptr;
 	
 	std::vector<StyleChange> styleChanges = {};
 	std::vector<std::string> lines = {};
 	
-	bool glyphRunCacheIsValid = false;
+	bool                  glyphRunCacheIsValid = false;
 	std::vector<GlyphRun> glyphRunCache = {};
 	
-	bool disableAutoScroll = false;
+	bool       disableAutoScroll = false;
 	Scrollarea scrollarea = {};
 	
 	TextPosition selectionStart = {};

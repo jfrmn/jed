@@ -1,96 +1,206 @@
 #include "tools.hh"
-#include "json/json-basic.hh"
-#include "json/json-mapping.hh"
-#include "json/json-mapping-stl.h"
-
-#include <cJSON/cJSON.h>
+#include "util/logging.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1.h>
 
+#define TOML_ABI_NAMESPACES 0
+#define TOML_ENABLE_UNRELEASED_FEATURES 1
+#define TOML_EXCEPTIONS 0
+#define TOML_IMPLEMENTATION 0
+#include <toml++/toml.hpp>
+
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 std::vector<Tool> Tool::tools {};
 
-static bool CheckParameters(std::string_view toolName, std::span<const Parameter> parameters) {
-	
-	for (u64 i = 0u; i < parameters.size(); i++) {
-		const Parameter& param = parameters[i];
-		
-		if (param.name.empty()) {
-			LogWarning("tool '%' parameter #% has no name. Ignoring tool...", toolName, i); 
-			return false;
-		}
-		
-		if (param.type == Parameter::Type_String && param.defaultValue.stringValue.empty()) {
-			LogWarning("tool '%' parameter '%': Default value is empty but parameter does not allow empty values. Ignoring tool...", toolName, param.name);
-			return false;
-		}
-		
-		if (param.type == Parameter::Type_Enum && param.enumValues.empty()) {
-			LogWarning("tool '%' parameter '%': is an enum but has no enum values. Ignoring tool...", toolName, param.name);
-			return false;
-		}
-		
-		if (param.type == Parameter::Type_Enum && param.defaultValue.enumIndex >= param.enumValues.size()) {
-			LogWarning("tool '%' parameter '%': default value (%) greater than enum size (%). Ignoring tool...",
-				toolName, param.name, param.defaultValue.enumIndex, param.enumValues.size());
-			return false;
-		}
-		
-		if (param.type == Parameter::Type_Number) {
-			if (param.defaultValue.numberValue < param.minValue) {
-				LogWarning("tool '%' parameter '%': default value (%) is below the min value (%). Ignoring...", toolName, param.name, param.defaultValue.numberValue, param.minValue);
-				return false;
-			}
-			
-			if (param.defaultValue.numberValue > param.maxValue) {
-				LogWarning("tool '%' parameter '%': default value (%) is above the max value (%). Ignoring...", toolName, param.name, param.defaultValue.numberValue, param.maxValue);
-				return false;
-			}
-		}
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, std::string_view key, /*out*/ u32* captureGroup) {
+	auto valGroup = table->get_as<s64>(key);
+	if (!valGroup) return;
+	if (valGroup->get() >= regex.captureGroupCount + 1u || valGroup->get() < 0u) {
+		LogWarning("%: value is out of range. regex only provides % groups", F(valGroup->source()), regex.captureGroupCount + 1u);
+		return;
 	}
-	
-	return true;
+			
+	*captureGroup = static_cast<u32>(valGroup->get());
 }
 
-static bool JsonToValue(const JsonTrace* trace, const cJSON* json, Tool* result);
-
-bool Tool::LoadTools(const cJSON* json) {
-		
-	LogInfo("loading tools...");
+bool Tool::LoadTools(toml::node* toml) {
 	
-	if (const cJSON* jsonTools = cJSON_GetObjectItem(json, "tools")) {
-		const JsonTrace trace {nullptr, "tools"};
-		
-		if (!JsonToValue(&trace, jsonTools, &tools))
-			return false;
-			
-		// check for validity
-		for (u64 i = 0u; i < tools.size(); /**/) {
-			const Tool& tool = tools[i];
-			
-			if (tool.name.empty()) {
-				LogWarning("tool with no name found. Ignoring...");
-				tools.erase(tools.begin() + i);
-				continue;
-			}
-			if (tool.command.empty()) {
-				LogWarning("tool '%' has no application. Ignoring...", tool.name); 
-				tools.erase(tools.begin() + i);
-				continue;
-			}
-			
-			if (!CheckParameters(tool.name, tool.parameters)) {
-				tools.erase(tools.begin() + i);
-				continue;
-			}
-			
-			 ++i;
-		}
+	toml::array* array = toml->as_array();
+	if (!array) {
+		LogError("%: expected an array", F(toml->source()));
+		return false;
 	}
 	
-	LogInfo("% valid tools defined", tools.size());
+	Tool tool {};
+	for (toml::node& node : *array) {
+		
+		toml::table* tblTool = node.as_table();
+		if (!tblTool) {
+			LogError("%: expected a table", F(node.source()));
+			continue;
+		}
+		
+		//
+		// name 
+		//
+		auto valName = tblTool->get_as<std::string>("name");
+		if (!valName) {
+			LogError("%: expected entry 'name' as string", F(tblTool->source()));
+			continue;
+		}
+		tool.name = std::move(valName->get());
+		
+		//
+		// command 
+		//
+		auto valCommand = tblTool->get_as<std::string>("command");
+		if (!valCommand) {
+			LogError("%: expected entry 'command' as string", F(tblTool->source()));
+			continue;	
+		}
+		tool.command = std::move(valCommand->get());
+		
+		//
+		// force-configuration 
+		//
+		if (auto valForceConfig = tblTool->get_as<bool>("force-configuration"))
+			tool.forceConfiguration = valForceConfig->get();
+		
+		//
+		// external
+		//
+		if (auto valExternal = tblTool->get_as<bool>("external"))
+			tool.external = valExternal->get();
+			
+		//
+		// enviornment 
+		//
+		if (auto nodeEnv = tblTool->get_as<toml::table>("environment")) {
+			for (toml::impl::table_proxy_pair<false> kvp : *nodeEnv) {
+				auto valValue = kvp.second.as_string();
+				if (!valValue) continue;
+			
+				tool.environment.append(kvp.first);
+				tool.environment.push_back('=');
+				tool.environment.append(std::move(valValue->get()));
+				tool.environment.push_back('\0');
+			}
+			tool.environment.push_back('\0');
+		}
+		
+		//
+		// parameter 
+		//
+		if (auto arrParameters = tblTool->get_as<toml::array>("parameters")) {
+			tool.parameters.reserve(arrParameters->size());
+			
+			for (u64 i = 0u; i < arrParameters->size(); i++) {
+				toml::node* node = arrParameters->get(i);
+				ASSERT(node);
+				
+				Parameter parameter {};
+				if (!Parameter::FromToml(*node, &parameter))
+					continue;
+			
+				tool.parameters.push_back(std::move(parameter));
+			}
+		}
+		
+		//
+		// open-console
+		//
+		if (auto valOpenFlags = tblTool->get_as<std::string>("open-console")) {
+			if      (valOpenFlags->get() == "never")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_Never;
+			else if (valOpenFlags->get() == "on-start")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_OnStart;
+			else if (valOpenFlags->get() == "on-exit-success")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_OnExitSuccess;
+			else if (valOpenFlags->get() == "on-exit-error")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_OnExitSuccess;
+			else if (valOpenFlags->get() == "on-exit")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_OnExit;
+			else if (valOpenFlags->get() == "always")
+				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_Always;
+			else
+				LogWarning("%: unknown open-console value '%'", F(valOpenFlags->source()), valOpenFlags->get());
+		}
+		
+		//
+		// progress
+		//
+		if (auto tblProgress = tblTool->get_as<toml::table>("progress")) {
+			
+			if (auto valRegex = tblProgress->get_as<std::string>("regex")) {
+				RegexError err;
+				const bool ok = tool.progress.regex.Compile(valRegex->get(), &err);
+				if (!ok) LogError("%: regex did not compile: %,", F(valRegex->source()), F(err));
+				
+			} else {
+				LogWarning("%: expected entry 'regex' as string", F(valRegex->source()));
+			}
+			
+			ReadRegexCaptureGroup(tblProgress, tool.progress.regex, "group-value", &tool.progress.captureGroupValue);
+			ReadRegexCaptureGroup(tblProgress, tool.progress.regex, "group-max", &tool.progress.captureGroupMax);
+			
+			if (auto valMax = tblProgress->get_as<s64>("max-value"))
+				tool.progress.maxValue = valMax->get();
+						
+			if (auto valFormat = tblProgress->get_as<std::string>("format")) {
+				if (valFormat->get() == "none")
+					tool.progress.format = Progress::Format_None;
+				else if (valFormat->get() == "percent")
+					tool.progress.format = Progress::Format_Percent;
+				else if (valFormat->get() == "absolute")
+					tool.progress.format = Progress::Format_Absolute;
+				else
+					LogWarning("%: unknown format value: '%'", F(valFormat->source()), valFormat->get());
+			}
+			
+			if (auto valHideFromStatusBar = tblProgress->get_as<s64>("hide-from-status-bar"))
+				tool.progress.hideFromStatusBar = valHideFromStatusBar->get();
+		}
+		
+		//
+		// diagnostics 
+		//
+		if (auto tblDiagnostics = tblTool->get_as<toml::table>("diagnostics")) {
+			
+			if (auto valRegex = tblDiagnostics->get_as<std::string>("regex")) {
+				RegexError err;
+				const bool ok = tool.diagnostics.regex.Compile(valRegex->get(), &err);
+				if (!ok) LogWarning("%: regex did not compile: %", F(valRegex->source()), F(err));
+			}
+			
+			ReadRegexCaptureGroup(tblDiagnostics, tool.diagnostics.regex, "group-file", &tool.diagnostics.captureGroupFile);			
+			ReadRegexCaptureGroup(tblDiagnostics, tool.diagnostics.regex, "group-line", &tool.diagnostics.captureGroupLine);			
+			ReadRegexCaptureGroup(tblDiagnostics, tool.diagnostics.regex, "group-color", &tool.diagnostics.captureGroupColor);			
+			
+			if (auto valLinesStartAtOne = tblDiagnostics->get_as<bool>("lines-start-at-one"))
+				tool.diagnostics.linesStartAtOne = valLinesStartAtOne->get();
+				
+			if (auto tblColorMapping = tblDiagnostics->get_as<toml::table>("color-mapping")) {
+				
+				tool.diagnostics.colorMapping.reserve(tblColorMapping->size());
+				for (toml::impl::table_proxy_pair<false> kvp : *tblColorMapping) {
+					Color color;
+					if (!Color::FromToml(kvp.second, &color))
+						continue;
+				
+					tool.diagnostics.colorMapping.push_back(DiagnosticsMatcher::ColorMapping {
+						.key = std::string {kvp.first.str()},
+						.color = color});
+				}
+			}
+		}
+		
+		tools.push_back(std::move(tool));
+	}
+	
 	return true;
 }
 
@@ -101,189 +211,3 @@ void Tool::GetDefaultValues(/*out*/ std::vector<ParameterValue>* parameterValues
 	for (u64 i = 0u; i < parameters.size(); i++)
 		parameterValues->push_back(parameters[i].defaultValue);
 }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool Tool::HasProgress() const {
-	return !progress.regex.empty();
-}
-
-bool Tool::HasDiagnosticsMatcher() const {
-	return !diagnosticsMatcher.regex.empty();
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static JSON_TO_ENUM_BEGIN(Parameter::Type)
-	JSON_TO_ENUM_MEMBER("none", Parameter::Type_None)
-	JSON_TO_ENUM_MEMBER("string", Parameter::Type_String)
-	JSON_TO_ENUM_MEMBER("enum", Parameter::Type_Enum)
-	JSON_TO_ENUM_MEMBER("number", Parameter::Type_Number)
-	JSON_TO_ENUM_MEMBER("bool", Parameter::Type_Bool)
-JSON_TO_ENUM_END
-
-static bool JsonToValue(const JsonTrace* trace, const cJSON* json, Parameter::EnumValue* result) {
-	if (!JsonCheckType(trace, json, cJSON_String | cJSON_Object)) return false;
-	 
-	 if (cJSON_IsString(json)) {
-		 result->name = cJSON_GetStringValue(json);
-		 result->value = {};
-	 } else {
-	 	{
-		 	const JsonTrace traceName {trace, "name"};
-			const cJSON* jsonName = cJSON_GetObjectItem(json, "name");
-			if (!jsonName) {
-				JsonLogError(&traceName, "required property is missing");
-				return false;
-			}
-			
-			if (!JsonToValue(&traceName, jsonName, &result->name))
-				return false;
-		}
-		{
-			const JsonTrace traceName {trace, "value"};
-			const cJSON* jsonName = cJSON_GetObjectItem(json, "value");
-			if (!jsonName) {
-				JsonLogError(&traceName, "required property is missing");
-				return false;
-			}
-			
-			if (!JsonToValue(&traceName, jsonName, &result->value))
-				return false;
-		}
-	 }
- 
-	 return true;
- }
- 
-
-static JSON_TO_VALUE_BEGIN(Parameter)
-	JSON_TO_VALUE_PROPERTY(type)
-	JSON_TO_VALUE_PROPERTY(name)
-	JSON_TO_VALUE_PROPERTY(enumValues)
-	JSON_TO_VALUE_PROPERTY(allowEmpty)
-	JSON_TO_VALUE_PROPERTY(maxValue)
-	JSON_TO_VALUE_PROPERTY(minValue)
-	JSON_TO_VALUE_PROPERTY(ifTrue)
-	JSON_TO_VALUE_PROPERTY(ifFalse)
-	
-	if (auto nodeDefault = properties.extract("default"); !nodeDefault.empty()) {
-		const JsonTrace trace {parentTrace, "default"};
-		
-		if (result->type == Parameter::Type_None) {
-			// ignore
-			
-		} else if (result->type == Parameter::Type_String) {
-			if (const char* str = cJSON_GetStringValue(nodeDefault.mapped())) {
-				result->defaultValue.stringValue = str;
-			} else {
-				JsonLogWarning(&trace, "expected a [string]");
-			}
-			
-		} else if (result->type == Parameter::Type_Number) {
-			if (f64 number = cJSON_GetNumberValue(nodeDefault.mapped()); !isnan(number)) {
-				result->defaultValue.numberValue = static_cast<s64>(number);
-			} else {
-				JsonLogWarning(&trace, "expected a [number]");
-			}
-		
-		} else if (result->type == Parameter::Type_Enum) {
-			if (const char* str = cJSON_GetStringValue(nodeDefault.mapped())) {
-				
-				u64 i = 0u;
-				for (; i < result->enumValues.size(); i++)
-					if (result->enumValues[i].name == str) goto found;
-				
-				JsonLogWarning(&trace, "'default' value must be in 'enumValues'.");
-				i = U64_MAX;
-				
-			found:
-				result->defaultValue.enumIndex = i;
-			
-			} else if (f64 idx = cJSON_GetNumberValue(nodeDefault.mapped()); !isnan(idx)) {
-				result->defaultValue.enumIndex = static_cast<u64>(idx);
-			
-			} else {
-				JsonLogWarning(&trace, "expected [number] - but was [%]", JsonTypeToString(json->type));
-			}
-		
-		} else if (result->type == Parameter::Type_Bool) {
-			if (cJSON_IsBool(nodeDefault.mapped())) {
-				result->defaultValue.boolValue = cJSON_IsTrue(nodeDefault.mapped());
-			} else {
-				JsonLogWarning(&trace, "expected [bool] - but was [%]", JsonTypeToString(json->type));
-			}
-		
-		} else {
-			ASSERT_UNREACHABLE
-		}
-	}	
-JSON_TO_VALUE_END
-
-static JSON_TO_ENUM_BEGIN(Tool::Progress::Format)
-	JSON_TO_ENUM_MEMBER("none", Tool::Progress::Format_None)
-	JSON_TO_ENUM_MEMBER("percent", Tool::Progress::Format_Percent)
-	JSON_TO_ENUM_MEMBER("absolute", Tool::Progress::Format_Absolute)
-JSON_TO_ENUM_END
-
-static JSON_TO_ENUM_BEGIN(Tool::ConsoleOpenFlags)
-	JSON_TO_ENUM_MEMBER("never", Tool::ConsoleOpenFlags_Never)
-	JSON_TO_ENUM_MEMBER("on-start", Tool::ConsoleOpenFlags_OnStart)
-	JSON_TO_ENUM_MEMBER("on-exit-success", Tool::ConsoleOpenFlags_OnExitSuccess)
-	JSON_TO_ENUM_MEMBER("on-exit-error", Tool::ConsoleOpenFlags_OnExitError)
-	JSON_TO_ENUM_MEMBER("on-exit", Tool::ConsoleOpenFlags_OnExit)
-	JSON_TO_ENUM_MEMBER("always", Tool::ConsoleOpenFlags_Always)
-JSON_TO_ENUM_END
-
-static JSON_TO_VALUE_BEGIN(Tool::Progress)
-	JSON_TO_VALUE_PROPERTY(format)
-	JSON_TO_VALUE_PROPERTY(regex)
-	JSON_TO_VALUE_PROPERTY_NAMED("capture-group-value", captureGroupValue)
-	JSON_TO_VALUE_PROPERTY_NAMED("capture-group-max", captureGroupMax)
-	JSON_TO_VALUE_PROPERTY_NAMED("max", maxValue)
-	JSON_TO_VALUE_PROPERTY_NAMED("hide-from-status-bar", hideFromStatusBar)
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED	
-JSON_TO_VALUE_END
-
-static JSON_TO_VALUE_BEGIN(Tool::DiagnosticsMatcher::ColorMapping)
-	JSON_TO_VALUE_PROPERTY(key)
-	//JSON_TO_VALUE_PROPERTY(color)
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED	
-JSON_TO_VALUE_END
-
-static JSON_TO_VALUE_BEGIN(Tool::DiagnosticsMatcher)
-	JSON_TO_VALUE_PROPERTY(regex)
-	JSON_TO_VALUE_PROPERTY_NAMED("capture-group-file", captureGroupFile)
-	JSON_TO_VALUE_PROPERTY_NAMED("capture-group-line", captureGroupLine)
-	JSON_TO_VALUE_PROPERTY_NAMED("capture-group-color", captureGroupLine)
-	JSON_TO_VALUE_PROPERTY_NAMED("color-mapping", colorMapping)
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED	
-JSON_TO_VALUE_END
-
-static JSON_TO_VALUE_BEGIN(Tool)
-	JSON_TO_VALUE_PROPERTY(name)
-	JSON_TO_VALUE_PROPERTY(command)
-	JSON_TO_VALUE_PROPERTY(description)
-	JSON_TO_VALUE_PROPERTY(flags)
-	JSON_TO_VALUE_PROPERTY(parameters)
-	JSON_TO_VALUE_PROPERTY_NAMED("open-console", consoleOpenFlags)
-	JSON_TO_VALUE_PROPERTY(progress)
-	JSON_TO_VALUE_PROPERTY_NAMED("force-configuration", forceConfiguration)
-	JSON_TO_VALUE_PROPERTY(external)
-	JSON_TO_VALUE_PROPERTY_NAMED("diagnostics", diagnosticsMatcher)
-	
-	if (auto node = properties.extract("enviornment"); !node.empty()) {
-		const JsonTrace trace {parentTrace, "enviornment"};
-		
-		std::unordered_map<std::string, std::string_view> enviornmentMap {};
-		if (!JsonToValue<std::string_view>(&trace, node.mapped(), &enviornmentMap)) return false;
-		
-		for (auto it = enviornmentMap.begin(); it != enviornmentMap.end(); ++it) {
-			result->environment.append(it->first);
-			result->environment.push_back('=');
-			result->environment.append(it->second);
-			result->environment.push_back('\0');
-		}
-		result->environment.push_back('\0');
-	}
-		
-	JSON_TO_VALUE_CHECK_UNRECOGNIZED	
-JSON_TO_VALUE_END

@@ -23,12 +23,14 @@ u64 RegexMatch::Group::Length() const {
 	return end - begin;
 }
 
-void RegexMatch::Prepare(u32 capacity) {
-	if (this->capacity >= capacity) return;
+void RegexMatch::Reserve(u32 captureGroupCount) {
+	const u32 newCapacity = captureGroupCount + 1u;
+	
+	if (this->capacity >= newCapacity) return;
 	
 	pcre2_match_data_free(data);
 	this->data = pcre2_match_data_create(capacity, nullptr);
-	this->capacity = capacity;
+	this->capacity = newCapacity;
 }
 
 void RegexMatch::ClearSubject() {
@@ -132,11 +134,11 @@ bool Regex::Match(std::string_view subject, /*out*/ RegexMatch* match) const {
 	
 	if (match->subject.empty()) {
 		
-		match->Prepare(captureGroupCount + 1);
+		match->Reserve(captureGroupCount);
 		
 		match->subject = subject;
-		match->offset = 0u;
-		match->groupCount = 1 + captureGroupCount;
+		match->offset = 0;
+		match->groupCount = captureGroupCount + 1;
 		
 	} else {
 		ASSERT(subject == match->subject);

@@ -5,11 +5,11 @@
 [ ] scrollbar click is funky
 [ ] short file names don't get displayed correctly
 [ ] delete line does not work with multiple cursors
-
+[ ] delete line messes up tree sitter highlighting (and i think pasting text too)
 
 # MAJOR TASKS
 
-[ ] repalce basic parser with regex parser
+[x] repalce basic parser with regex parser
 [ ] make settings ini files; move json to language-server stuff
 [ ] refactor process so that it no longer spawns a thread; language server should spawn its own thread
 [x] refactor glyph run with advanced text shaping

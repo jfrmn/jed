@@ -73,7 +73,7 @@ void ToolSearchBar::GetItemInfo(u64 i, /*out*/ ItemInfo* itemInfo) {
 	const Item& item = filteredTools[i];
 	*itemInfo = ItemInfo {
 		.text = item.tool->name,
-		.subText = item.tool->description,
+		.subText = item.tool->command,
 		.matchedPosition = item.fuzzyMatchResult.position,
 		.matchedLength = item.fuzzyMatchResult.matchedCount};
 }

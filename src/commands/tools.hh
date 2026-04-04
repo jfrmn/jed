@@ -1,11 +1,13 @@
 #pragma once
 #include "commands/parameter.hh"
 #include "util/color.hh"
+#include "util/regex.hh"
 
 #include <string>
 #include <vector>
 
 struct cJSON;
+namespace toml { class node; }
 
 struct Tool {
 	
@@ -15,7 +17,7 @@ struct Tool {
 	
 	static std::vector<Tool> tools;
 	
-	static bool LoadTools(const cJSON* json);
+	static bool LoadTools(toml::node* toml);
 	
 	//-----------------------------------------------------
 	// types
@@ -28,11 +30,12 @@ struct Tool {
 			 Format_Absolute,
 		};
 		
-		Format format = Format_Percent;
-		std::string regex = {};
+		Regex regex = {};
 		u32 captureGroupValue = 0;
 		u32 captureGroupMax = U32_MAX;
 		s64 maxValue = 100;
+		
+		Format format = Format_Percent;
 		bool hideFromStatusBar = false;
 	};
 	
@@ -52,9 +55,9 @@ struct Tool {
 			Color color = {};
 		};
 		
-		std::string regex = {};
-		u32 captureGroupFile = U32_MAX;
-		u32 captureGroupLine = U32_MAX;
+		Regex regex = {};
+		u32 captureGroupFile  = U32_MAX;
+		u32 captureGroupLine  = U32_MAX;
 		u32 captureGroupColor = U32_MAX;
 		
 		bool linesStartAtOne = false;
@@ -67,16 +70,15 @@ struct Tool {
 	//-----------------------------------------------------
 	
 	std::string name = {};
-	std::string description = {};
 	std::string command = {};
+	std::string environment = {};
 	int flags = 0;
 	
 	std::vector<Parameter> parameters = {};
-	std::string environment = {};
 	
 	ConsoleOpenFlags consoleOpenFlags = ConsoleOpenFlags_Never;
 	Progress progress = {};
-	DiagnosticsMatcher diagnosticsMatcher = {};	
+	DiagnosticsMatcher diagnostics = {};	
 	
 	bool forceConfiguration = false;	
 	bool external = false; // @TODO not implemented
@@ -86,6 +88,4 @@ struct Tool {
 	//-----------------------------------------------------
 	
 	void GetDefaultValues(/*out*/ std::vector<ParameterValue>* parameterValues) const;
-	bool HasProgress() const;
-	bool HasDiagnosticsMatcher() const;
 };

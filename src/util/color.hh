@@ -1,6 +1,7 @@
 #pragma once
 
 struct _D3DCOLORVALUE;
+namespace toml { class node; };
 
 union Color {
 	
@@ -19,7 +20,8 @@ union Color {
 	// functions
 	
 	static Color FromKnown(int d2dIndex);
-	_D3DCOLORVALUE ToD2D() const;	
+	static bool FromToml(const toml::node& node, /*out*/ Color* color);
+	_D3DCOLORVALUE ToD2D() const;
 };
 
 extern const Color COLOR_TRANSPARENT;
