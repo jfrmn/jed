@@ -849,24 +849,21 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	GetProcessDirectory() + "\\settings.toml";
 #endif
 
-	toml::table table;
 	
 	//
 	// parse file
 	//
-	{
-		LogInfo("loading settings from '%'", settingsFilepath);
-		
-		const toml::parse_result result = toml::parse_file(settingsFilepath);
-		
-		if (result.failed()) {
-			const toml::parse_error& error = result.error();
-			LogError("file parse settings file '%'\nerror: % at %", settingsFilepath, error.description(), error.source());
-			return false;
-		}
+	LogInfo("loading settings from '%'", settingsFilepath);
 	
-		table = std::move(result.table());
+	toml::parse_result result = toml::parse_file(settingsFilepath);
+	
+	if (result.failed()) {
+		const toml::parse_error& error = result.error();
+		LogError("file parse settings file '%'\nerror: % at %", settingsFilepath, error.description(), error.source());
+		return false;
 	}
+
+	toml::table& table = result.table();
 	
 	//
 	// load colors

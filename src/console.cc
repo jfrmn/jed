@@ -919,7 +919,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 	s64 newValue = 0;
 	const std::from_chars_result fcrValue = std::from_chars(groupValue.begin, groupValue.end, newValue);
 	if (fcrValue.ec != std::errc()) {
-		WarnMatchedTextParseErr(self, "capture-group-value", groupValue.GetText(), fcrValue);
+		WarnMatchedTextParseErr(self, "group-value", groupValue.GetText(), fcrValue);
 		return;
 	}
 	
@@ -930,7 +930,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 		
 		const std::from_chars_result fcrMax = std::from_chars(groupMax.begin, groupMax.end, newMax);
 		if (fcrMax.ec != std::errc()) {
-			WarnMatchedTextParseErr(self, "max", groupMax.GetText(), fcrMax);
+			WarnMatchedTextParseErr(self, "group-max", groupMax.GetText(), fcrMax);
 			// not aborting, using the default max
 		}
 	}
@@ -1026,7 +1026,7 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 		const std::from_chars_result fcr = std::from_chars(group.begin, group.end, record.line);
 		
 		if (fcr.ec != std::errc()) {
-			WarnMatchedTextParseErr(self, "capture-group-line", group.GetText(), fcr);
+			WarnMatchedTextParseErr(self, "group-line", group.GetText(), fcr);
 			record.line = 0u;
 		}
 		
