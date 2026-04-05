@@ -517,8 +517,8 @@ static void GetCaretInfoTextNormal(StatusBar* self, const TextController& contro
 			selectedLines = 1u;
 		} else {
 			selectedBytes = controller.buffer.GetLineAt(from.line).LengthWithLinebreak() - from.column;
-			for (u64 ln = from.line + 1u; ln < to.line - 1; ln++)
-				selectedBytes += controller.buffer.GetLineAt(from.line).LengthWithLinebreak();
+			for (u64 ln = from.line + 1u; ln < to.line; ln++)
+				selectedBytes += controller.buffer.GetLineAt(ln).LengthWithLinebreak();
 			selectedBytes += to.column;
 			
 			selectedLines = (to.line - from.line) + 1;

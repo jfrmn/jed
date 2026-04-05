@@ -140,7 +140,7 @@ void SyntaxHighlighterTreeSitter::OnOpenFile(Editor* editor, std::string_view bu
 		LogError("failed to set language to tree-sitter parser");
 		return;
 	}
-	
+	 
 	editor->tsTree = ts_parser_parse_string_encoding(editor->tsParser, nullptr, buffer.data(), static_cast<u32>(buffer.size()), TSInputEncodingUTF8);
 	if (!editor->tsTree) {
 		LogError("failed parse tree-sitter tree");
@@ -168,13 +168,16 @@ static FormatArgument F(const TSInputEdit& input) {
 		 .userdata = &input,
 		 .Write = [] (const void* ud, std::ostream* sink) {
 			 auto input = static_cast<const TSInputEdit*>(ud);
-			 (*sink) << input->start_byte << ':' << input->old_end_byte << ':' << input->new_end_byte << ':'
-					 << input->start_point.row << '-' << input->start_point.column << ':'
-					 << input->old_end_point.row << '-' << input->old_end_point.column << ':'
-					 << input->new_end_point.row << '-' << input->new_end_point.column;
+			 (*sink) << '\n'
+			         << "sb: " << input->start_byte << " oeb: " << input->old_end_byte << " neb: " << input->new_end_byte << '\n'
+					 << "sp: " << input->start_point.row << ':' << input->start_point.column << '\n'
+					 << "oep: " << input->old_end_point.row << ':' << input->old_end_point.column << '\n'
+					 << "nep: " << input->new_end_point.row << ':' << input->new_end_point.column;
 		 }
 	};
 }
+
+#define DEBUG_LOG_TREESITTER 0
 
 void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const TextChange* change) {
 	TextBuffer& buffer = editor->GetBuffer();
@@ -194,50 +197,33 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 		
 		if (!operation.insertedText.empty()) {
 			
-			u64 newEndByte = startLineByte;
-			for (u64 i = operation.start.line; i < operation.insertionEnd.line; i++) {
-				const TextBuffer::Line& line = buffer.GetLineAt(i);
-				newEndByte += line.LengthWithLinebreak();
-			}
-			newEndByte += operation.insertionEnd.column;
-			const u64 oldEndByte = startByte;
-			
-			const TSPoint oldEndPoint = startPoint;
-			const TSPoint newEndPoint = ToTsPoint(operation.insertionEnd);
 			const TSInputEdit tsEdit {
 				.start_byte = static_cast<u32>(startByte),
-				.old_end_byte = static_cast<u32>(oldEndByte),
-				.new_end_byte = static_cast<u32>(newEndByte),
+				.old_end_byte = static_cast<u32>(startByte),
+				.new_end_byte = static_cast<u32>(startByte + operation.insertedText.size()),
 				.start_point = startPoint,
-				.old_end_point = oldEndPoint,
-				.new_end_point = newEndPoint};
-			//LogDev("edit: %", F(tsEdit));
+				.old_end_point = startPoint,
+				.new_end_point = ToTsPoint(operation.insertionEnd)};
 			ts_tree_edit(editor->tsTree, &tsEdit);
+#if DEBUG_LOG_TREESITTER
+			LogDev("edit: %", F(tsEdit));	
+#endif		
 		}
 		
 		
 		if (!operation.removedText.empty()) {
 		
-			u64 oldEndByte = startLineByte;	
-			for (u64 i = operation.start.line; i < operation.removalEnd.line; i++) {
-				const TextBuffer::Line& line = buffer.GetLineAt(i);
-				oldEndByte += line.LengthWithLinebreak();
-			}
-			oldEndByte += operation.removalEnd.column;
-			const u64 newEndByte = startByte;
-			
-			const TSPoint oldEndPoint = ToTsPoint(operation.removalEnd);
-			const TSPoint newEndPoint = startPoint;
 			const TSInputEdit tsEdit {
 				.start_byte = static_cast<u32>(startByte),
-				.old_end_byte = static_cast<u32>(oldEndByte),
-				.new_end_byte = static_cast<u32>(newEndByte),
+				.old_end_byte = static_cast<u32>(startByte + operation.removedText.size()),
+				.new_end_byte = static_cast<u32>(startByte),
 				.start_point = startPoint,
-				.old_end_point = oldEndPoint,
-				.new_end_point = newEndPoint};
-		
-			//LogDev("edit: %", F(tsEdit));	
+				.old_end_point = ToTsPoint(operation.removalEnd),
+				.new_end_point = startPoint};
 			ts_tree_edit(editor->tsTree, &tsEdit);
+#if DEBUG_LOG_TREESITTER
+			LogDev("edit: %", F(tsEdit));
+#endif
 		}
 	}
 	
@@ -249,8 +235,17 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 			ASSERT(position.row < buffer->LineCount());
 			
 			const TextBuffer::Line& line = buffer->GetLineAt(position.row);
+			ASSERT(position.column < line.LengthWithLinebreak());
+			
 			*bytesRead = static_cast<u32>(line.LengthWithLinebreak() - position.column);
-			return line.data + position.column;
+			
+			const char* result = line.data + position.column;
+		
+#if DEBUG_LOG_TREESITTER
+			const std::string_view resultForLogging {result, *bytesRead};
+			LogDev("read at %:% (b %) -> % b \"%\"", position.row, position.column, byteIndex, *bytesRead, resultForLogging);
+#endif
+			return result;
 		},
 		.encoding = TSInputEncodingUTF8,
 		.decode = nullptr};
