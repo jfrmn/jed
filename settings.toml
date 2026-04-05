@@ -9,11 +9,8 @@ ui = {
 	
 
 
-[Tool]
-desc = "build project"
-cmd = "pwsh.exe -f .\build.ps1"
+[[Tools]]
+name = "build project"
+command = 'pwsh.exe -f .\build.ps1'
 open-console = "on-start"
-
-
-
 
