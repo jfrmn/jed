@@ -29,7 +29,7 @@ void RegexMatch::Reserve(u32 captureGroupCount) {
 	if (this->capacity >= newCapacity) return;
 	
 	pcre2_match_data_free(data);
-	this->data = pcre2_match_data_create(capacity, nullptr);
+	this->data = pcre2_match_data_create(newCapacity, nullptr);
 	this->capacity = newCapacity;
 }
 
