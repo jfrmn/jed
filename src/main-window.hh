@@ -3,6 +3,7 @@
 #include "console.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
+#include "graphics/glyph-run.hh"
 
 #include <vector>
 #include <string>
@@ -22,9 +23,7 @@ struct MainWindow : public Window {
 	// types
 
 	struct Tab {
-		std::string_view title = {};
-		f32 tabWidth = .0f;
-
+		GlyphRun title = {};
 		Editor* editor = nullptr;
 		u64 panelIndex = U64_MAX;
 	};
@@ -54,7 +53,6 @@ struct MainWindow : public Window {
 
 	SearchBar* searchBar = nullptr;
 	Explorer* explorer = nullptr;
-	ParameterConfigurator* parameterSelection = nullptr; // @DUMMY
 	Console console = {};
 	StatusBar statusBar = {};
 	
@@ -78,8 +76,6 @@ struct MainWindow : public Window {
 	Editor* OpenEditor(std::string path, OpenBehavior openBehavior = OpenBehavior_Default, bool* wasAlreadyOpen = nullptr);
 	void OnUpdate();
 	
-	virtual bool OnMouseDown(MouseEvent event) override;
-	virtual bool OnMouseUp(MouseEvent event) override;
 	virtual bool OnMouseWheel(f32 wheel) override;
 	virtual void OnKeyDown(KeyEvent event) override;
 	virtual void OnChar(const char* data, u64 len) override;

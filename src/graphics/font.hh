@@ -1,19 +1,8 @@
 #pragma once
 #include "basic.hh"
 #include <string>
-#include <memory>
 
 struct IDWriteFontFace1;
-
-struct FontMeasureTextMemory {
-	u32* utf32Text     = nullptr;
-	s32* glyphAdvances = nullptr;
-	u16* glyphIndicies = nullptr;
-	
-	u64 capacity = 0u;
-	u64 size     = 0u;
-	std::unique_ptr<s8[]> memory = {};
-};
 
 struct Font {
 	
@@ -72,8 +61,6 @@ struct Font {
 
 	float GetSpaceAdvance() const;
 	float ConvertFromDesignUnits(s32 designUnits) const;
-
-	float MeasureText(std::string_view text, FontMeasureTextMemory* mem = nullptr) const;
 
 	~Font() noexcept;
 };

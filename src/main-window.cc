@@ -21,7 +21,12 @@
 // #include <d2d1_1.h>
 #include <d2d1_3.h>
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Creation and Shutdown
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool MainWindow::Create() {
 	const bool ok = Window::Create(
 		Window::CreateParams {
@@ -69,10 +74,11 @@ void MainWindow::Shutdown() {
 	::deviceContext = nullptr;
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Helper
 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static bool LoadFileInformation(std::string_view path, /*out*/ BY_HANDLE_FILE_INFORMATION* fileInfo) {
 	
@@ -170,14 +176,14 @@ static float GetStatusBarHeight() {
 }
 
 static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
-	MainWindow::Panel& panel = self->panels[self->focusedPanelIndex];
-	MainWindow::Tab&   oldTab  = self->tabs[panel.tabIndex];
-	MainWindow::Tab&   newTab  = self->tabs[tabIndexToDisplay];
+	MainWindow::Panel& panel  = self->panels[self->focusedPanelIndex];
+	MainWindow::Tab&   oldTab = self->tabs[panel.tabIndex];
+	MainWindow::Tab&   newTab = self->tabs[tabIndexToDisplay];
 			
-	oldTab.panelIndex  = U64_MAX;
-	newTab.panelIndex  = self->focusedPanelIndex;
-	panel.tabIndex     = tabIndexToDisplay;
-	panel.editor       = newTab.editor;
+	oldTab.panelIndex = U64_MAX;
+	newTab.panelIndex = self->focusedPanelIndex;
+	panel.tabIndex    = tabIndexToDisplay;
+	panel.editor      = newTab.editor;
 	
 	panel.editor->OnResize(D2D_RECT_F {
 		.left   = (self->width / self->panels.size()) * self->focusedPanelIndex,
@@ -207,7 +213,12 @@ static void ResizePanels(MainWindow* self) {
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Open Editor
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBehaviour_Default*/, bool* wasAlreadyOpen /*= nullptr*/) {
 	
 	//
@@ -247,12 +258,6 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = false;
 		
-		// @FIXME
-		// this might become a dangling pointer!!
-		// we move the path into the editor which which by itself is not a problem
-		// except when it's a short string and SSO kicks in...
-		const std::string_view title = GetFilenameFromPath(path);
-
 		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent) {
 			
 			MainWindow::Panel& currentPanel = panels[focusedPanelIndex];
@@ -264,8 +269,8 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 				return nullptr;
 			}
 			
-			currentTab.title = title;
-			currentTab.tabWidth = settings.fontUi.MeasureText(title) + settings.fontUi.lineHeight + PADDING_X3;
+			const std::string_view title = GetFilenameFromPath(currentTab.editor->path);	
+			currentTab.title.Shape(title, settings.fontUi);
 			return currentTab.editor;
 		
 		} else {
@@ -278,8 +283,9 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 				return nullptr;
 			
 			MainWindow::Tab& newTab = tabs.emplace_back();
-			newTab.title = title,
-			newTab.tabWidth = settings.fontUi.MeasureText(title) + settings.fontUi.lineHeight + PADDING_X3,
+			
+			const std::string_view title = GetFilenameFromPath(editor->path);	
+			newTab.title.Shape(title, settings.fontUi);
 			newTab.editor = editor.release();
 			
 			if (openBehavior == MainWindow::OpenBehavior_Default) {
@@ -312,45 +318,106 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Update
 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void OnClickTab(void* ud, u64 i) {}
+static void OnActivateTab(void* ud, u64 i) {
+	auto self = static_cast<MainWindow*>(ud);
+	MainWindow::Tab& hitTab = self->tabs[i];
+			
+	// if there is already a panel for the hit tab then this panel gets focused
+	// otherwise the currently focused panel becomes the hit tab item
+		
+	if (hitTab.panelIndex != U64_MAX)
+		self->focusedPanelIndex = hitTab.panelIndex;	
+	else
+		ChangeTabOfFocusedPanel(self, i);
+}
+
+static void OnCloseTab(void* ud, u64 i) {
+	auto self = static_cast<MainWindow*>(ud);
+	
+	MainWindow::Tab& tabToClose = self->tabs[i];
+	
+	//
+	// close editor
+	//
+	const auto FileResult = tabToClose.editor->CloseFile();
+	if (FileResult != Editor::FileResult_Success) {
+		LogFileResult(FileResult);
+		return;
+	}
+	delete tabToClose.editor;
+	
+	//
+	// cleanup panel
+	//
+	if (tabToClose.panelIndex != U64_MAX) {
+	
+		// update panel indicies
+		for (MainWindow::Tab& tab : self->tabs) {
+			if (tab.panelIndex == U64_MAX) continue;
+			if (tab.panelIndex > tabToClose.panelIndex) tab.panelIndex -= 1;
+		}
+		
+		self->panels.erase(self->panels.begin() + tabToClose.panelIndex);
+		if (self->focusedPanelIndex == tabToClose.panelIndex)
+			self->focusedPanelIndex = self->panels.size() - 1; // we can improve this behavior but it's fine for now
+			
+		ResizePanels(self);
+	}
+	
+	//
+	// cleanup tab
+	//
+	self->tabs.erase(self->tabs.begin() + i);
+	
+	// update tab indicies
+	for (MainWindow::Panel& panel : self->panels) {
+		if (panel.tabIndex > i)
+			panel.tabIndex -= 1;
+	}
+	
+}
 
 void MainWindow::OnUpdate() {
 		
 	deviceContext->BeginDraw();
 	deviceContext->Clear(D2D1::ColorF(D2D1::ColorF::Black));
 	
+	const f32 tabHeight = GetTabHeight();
+	
 	//
 	// draw panels
 	//
-	{
-		const float tabHeight = GetTabHeight();
-		
-		for (usize i = 0u; i < panels.size(); i++) {
+	for (const Panel& panel : panels) {
+		panel.editor->OnUpdate();
+	}
+	
+	//
+	// draw panel border
+	//
+	if (panels.size() >= 2) {
+		for (u64 i = 0u; i < panels.size(); i++) {
 			const Panel& panel = panels[i];
 			
-			panel.editor->OnUpdate();
-		
-			const bool drawFocusedPanelBorder = (panels.size() >= 2) && (i == focusedPanelIndex);
-			const bool drawHoverPanelBorder   = (hoveredTabIndex != U64_MAX) && (panel.tabIndex == hoveredTabIndex);
-					
-			if (drawFocusedPanelBorder || drawHoverPanelBorder) {
-										
-				// windows eats a few pixels of the client area when maximized
-				// you can't see the border very well then so we just offset it a little
-				D2D1_RECT_F borderRect = panel.editor->area;
-				borderRect.left += 1.0f;
-				borderRect.right -= 1.0f;
-						
-				if (drawFocusedPanelBorder)
-					deviceContext->DrawRectangle(borderRect, settings.GetBrushSelection(), 2.0f);
-							
-				if (drawHoverPanelBorder)
-					deviceContext->DrawRectangle(borderRect, settings.GetBrushHover(), 2.0f);
+			// windows eats a few pixels of the client area when maximized
+			// so that you can't see the border very well so we just it a little bit
+			const D2D1_RECT_F borderRect {
+				.left = panel.editor->area.left + 1.0f,
+				.top = panel.editor->area.top,
+				.right = panel.editor->area.right - 1.0f,
+				.bottom = panel.editor->area.bottom};
+			
+			
+			if (i == focusedPanelIndex) {
+				deviceContext->DrawRectangle(borderRect, settings.GetBrushDropShadow(), 2.0f);
+			} else if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
+				deviceContext->DrawRectangle(borderRect, settings.GetBrushHover(), 2.0f);
+				if (mouse.event == Mouse::Event_Up) focusedPanelIndex = i;
 			}
 		}
 	}
@@ -359,70 +426,71 @@ void MainWindow::OnUpdate() {
 	// draw tabs
 	//
 	{	
-		const float tabHeight = GetTabHeight();
-	
 		f32 offsetX = .0f;
 		u64 closedTab = U64_MAX;
 		for (u64 i = 0u; i < tabs.size(); i++) {
 			const Tab& tab = tabs[i];
 			
+			const f32 tabWidth = tab.title.width + settings.fontUi.lineHeight + PADDING_X4;
 			const D2D1_RECT_F tabRect {
 				.left   = offsetX,
 				.top    = 0.0f,
-				.right  = offsetX + tab.tabWidth,
-				.bottom = tabHeight };
+				.right  = offsetX + tabWidth,
+				.bottom = tabHeight};
 						
-			if (tab.panelIndex == focusedPanelIndex) {
+			if (tab.panelIndex == focusedPanelIndex)
 				deviceContext->FillRectangle(tabRect, settings.GetBrushDropShadow());
 			
-			} else if (tab.panelIndex != U64_MAX) {
+			else if (tab.panelIndex != U64_MAX)
 				deviceContext->FillRectangle(tabRect, settings.GetBrushUiBackground(false));
-			}
 			
-			staticGlyphRun.ShapeAndDraw(deviceContext,
-			 	tab.title,
-				PADDING + offsetX,
-				PADDING,
-				settings.fontUi,
-				settings.GetBrushUiText());
-						
-			const bool isHovered = mouse.Hittest(tabRect, this, OnClickTab, i);
+			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, settings.fontUi, settings.GetBrushUiText());
 			
-			bool isCloseIconHovered = false;
+			bool isTitleHovered = false;
 			
-			// draw tab icon
+			// check click on title
 			{
+				const D2D_RECT_F areaTitle {
+					.left = offsetX,
+					.top = 0.0f,
+					.right = offsetX + tab.title.width + PADDING_X2,
+					.bottom = tabHeight};
+				
+				if (mouse.Hittest(areaTitle, this, OnActivateTab, i)) {
+					deviceContext->FillRectangle(areaTitle, settings.GetBrushHover(mouse.isDown));
+					isTitleHovered = true;
+				}
+			}
+						
+			// check click on close icon
+			{
+				const D2D1_RECT_F areaIcon {
+					.left   = PADDING + offsetX + tab.title.width + PADDING,
+					.top    = 0.0f,
+					.right  = PADDING + offsetX + tab.title.width + settings.fontUi.lineHeight + PADDING_X3,
+					.bottom = PADDING_X2 + settings.fontUi.lineHeight};
+			
+				const bool isHovered = mouse.Hittest(areaIcon, this, OnCloseTab, i);
+				
 				ID2D1Bitmap* icon = nullptr;
 				if      (tab.editor->modified && isHovered) icon = settings.icons.tabsModifiedHovered;
 				else if (tab.editor->modified)              icon = settings.icons.tabsModified;
-				else if (isHovered)                         icon = settings.icons.tabsHovered;
-					
+				else if (isHovered || isTitleHovered)       icon = settings.icons.tabsHovered;
+				
 				if (icon) {
-					const f32 totalGlyphAdvances = staticGlyphRun.width;
-					const D2D1_RECT_F iconHitbox {
-						.left   = PADDING + offsetX + totalGlyphAdvances,
-						.top    = 0.0f,
-						.right  = PADDING + offsetX + totalGlyphAdvances + settings.fontUi.lineHeight + PADDING_X2,
-						.bottom = PADDING_X2 + settings.fontUi.lineHeight};
-					
 					const D2D1_RECT_F iconTargetRect {
-						.left   = iconHitbox.left   + PADDING,
-						.top    = iconHitbox.top    + PADDING,
-						.right  = iconHitbox.right  - PADDING,
-						.bottom = iconHitbox.bottom - PADDING};
+						.left   = areaIcon.left   + PADDING,
+						.top    = areaIcon.top    + PADDING,
+						.right  = areaIcon.right  - PADDING,
+						.bottom = areaIcon.bottom - PADDING};
 					deviceContext->FillOpacityMask(icon, settings.GetBrushUiText(), &iconTargetRect, nullptr);
 					
-					if (RectContains(iconHitbox, mouse.x, mouse.y)) {
-						deviceContext->FillRectangle(iconHitbox, settings.GetBrushHover(mouse.isDown));
-						isCloseIconHovered = true;
-					}
+					if (isHovered)
+						deviceContext->FillRectangle(areaIcon, settings.GetBrushHover(mouse.isDown));
 				}
 			}
-			
-			if (isHovered && !isCloseIconHovered)
-				deviceContext->FillRectangle(tabRect, settings.GetBrushHover(mouse.isDown));
-			
-			offsetX += tab.tabWidth;
+	
+			offsetX += tabWidth;
 		}
 	}
 	
@@ -473,10 +541,11 @@ void MainWindow::OnUpdate() {
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Resize
+// Input
 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
 	ResizePanels(this);
@@ -489,146 +558,6 @@ void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
 	if (searchBar)
 		searchBar->OnResize();
 }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// Input
-//
-
-static void Hittest(const MainWindow* self, float mx, float my, u64* hitPanel, u64* hitTab, bool* hitCloseButton) {
-	
-	const float tabHeight = GetTabHeight();
-	
-	// y is on tab height
-	if (my > 0.0f && my < tabHeight) {
-		
-		float offsetX = .0f;
-		for (u64 i = 0; i < self->tabs.size(); i++) {
-			const MainWindow::Tab& tab = self->tabs[i];
-			
-			offsetX += tab.tabWidth;
-			if (mx < offsetX) {
-				*hitCloseButton = (mx >= (offsetX - settings.fontUi.lineHeight - PADDING_X2));
-				*hitTab = i;
-				*hitPanel = U64_MAX;
-				return;
-			}
-		}
-	
-	} else if (my > tabHeight && my < self->height) {
-				
-		// @TODO respect status bar
-		for (u64 i = 0; i < self->panels.size(); i++) {
-			const MainWindow::Panel& panel = self->panels[i];
-		
-			if (mx > panel.editor->area.left &&
-				mx < panel.editor->area.right) {
-				
-				*hitCloseButton = false;
-				*hitTab = U64_MAX;
-				*hitPanel = i;
-				return;
-			}
-		}
-	}
-	
-	*hitCloseButton = false;
-	*hitTab = U64_MAX;
-	*hitPanel = U64_MAX;
-}
-
-bool MainWindow::OnMouseDown(MouseEvent event) {
-	u64 hitPanelIndex, hitTabIndex; bool hitCloseButton;
-	Hittest(this, event.x, event.y, &hitPanelIndex, &hitTabIndex, &hitCloseButton);
-	
-	if (hitPanelIndex != U64_MAX) {
-		focusedPanelIndex = hitPanelIndex;
-	 	//panels[hitPanelIndex].editor->OnMouseDown(event);
-		return true;
-	}
-	
-	return false;
-}
-
-bool MainWindow::OnMouseUp(MouseEvent event) {
-
-	u64 hitPanelIndex, hitTabIndex; bool hitCloseButton;
-	Hittest(this, event.x, event.y, &hitPanelIndex, &hitTabIndex, &hitCloseButton);
-	
-	// hit a tab but not its close button
-	if (hitTabIndex != U64_MAX && !hitCloseButton) {
-		Tab& hitTab = tabs[hitTabIndex];
-			
-		// if there is already a panel for the hit tab then this panel gets focused
-		// otherwise the currently focused panel becomes the hit tab item
-			
-		if (hitTab.panelIndex != U64_MAX)
-			focusedPanelIndex = hitTab.panelIndex;	
-		else
-			ChangeTabOfFocusedPanel(this, hitTabIndex);
-		
-		return true;
-	
-	// hit a close button of a tab
-	} else if (hitTabIndex != U64_MAX && hitCloseButton) {
-		auto itHitTab = tabs.begin() + hitTabIndex;
-		
-		//
-		// close editor
-		//
-		const auto FileResult = itHitTab->editor->CloseFile();
-		if (FileResult != Editor::FileResult_Success) {
-			LogFileResult(FileResult);
-			return true;
-		}
-		
-		delete itHitTab->editor;
-		
-		//
-		// cleanup panel
-		//
-		if (itHitTab->panelIndex != U64_MAX && panels.size() >= 2) {
-		
-			// update panel indicies
-			for (Tab& tab : tabs) {
-				if (tab.panelIndex == U64_MAX) continue;
-				if (tab.panelIndex  > itHitTab->panelIndex) tab.panelIndex -= 1;
-			}
-			
-			panels.erase(panels.begin() + itHitTab->panelIndex);
-			if (focusedPanelIndex == itHitTab->panelIndex)
-				focusedPanelIndex  = panels.size() - 1; // we can improve this behavior but it's fine for now
-			
-			// update panel indicies
-			for (Tab& tab : tabs) {
-				if (tab.panelIndex == U64_MAX) continue;
-				if (tab.panelIndex  > itHitTab->panelIndex) tab.panelIndex -= 1;
-			}
-		}
-		
-		//
-		// cleanup tab
-		//
-		tabs.erase(itHitTab);
-		
-		// update tab indicies
-		for (Panel& panel : panels) {
-			if (panel.tabIndex > hitTabIndex)
-				panel.tabIndex -= 1;
-		}
-		
-		return true;
-	
-	// hit a panel
-	} else if (hitPanelIndex != U64_MAX) {
-		focusedPanelIndex = hitPanelIndex;
-		return true;
-	
-	} else {
-		return false;
-	}
-}
-
 
 bool MainWindow::OnMouseWheel(f32 distance) {
 	
@@ -643,13 +572,11 @@ bool MainWindow::OnMouseWheel(f32 distance) {
 	}
 	
 	
-	u64 hitPanelIndex, hitTabIndex; bool hitCloseButton;
-	Hittest(this, mouse.x, mouse.y, &hitPanelIndex, &hitTabIndex, &hitCloseButton);
-	
-	if (hitPanelIndex != U64_MAX) {
-		Panel& panel = panels[hitPanelIndex];
-		panel.editor->OnMouseWheel(distance);
-		return true;
+	for (const Panel& panel : panels) {
+		if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
+			panel.editor->OnMouseWheel(distance);
+			return true;
+		}
 	}
 		
 	return false;	

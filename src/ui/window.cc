@@ -182,12 +182,12 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			if (nMSG == WM_LBUTTONDOWN) {
 				mouse.isDown = true;
 				mouse.event = Mouse::Event_Down;
-				window->OnMouseDown(event);
+				//window->OnMouseDown(event);
 			
 			} else if (nMSG == WM_LBUTTONUP) {
 				mouse.isDown = false;
 				mouse.event = Mouse::Event_Up;
-				window->OnMouseUp(event);
+				//window->OnMouseUp(event);
 			}
 				
 		} break;

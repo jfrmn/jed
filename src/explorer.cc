@@ -136,7 +136,8 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 		
 		ASSERT(itMaxItem != panel->items.end());
 		
-		const float textWidth = settings.fontUi.MeasureText(itMaxItem->filename);
+		staticGlyphRun.Shape(itMaxItem->filename, settings.fontUi);
+		const float textWidth = staticGlyphRun.width;
 		
   		const float width  = MARGIN_X2 + settings.fontUi.lineHeight + textWidth + MARGIN;
 		const float height = panel->items.size() * settings.fontUi.lineHeight;
