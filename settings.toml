@@ -1,11 +1,11 @@
 [Font]
 editor = {
 	name = "Geist Mono",
-	size = 14 }
+	size = 14}
 	
 ui = {
 	name = "Geist",
-	size = 14 }
+	size = 14}
 	
 
 
@@ -13,4 +13,14 @@ ui = {
 name = "build project"
 command = 'pwsh.exe -f .\build.ps1'
 open-console = "on-start"
+diagnostics = {
+	regex = '^([A-Z]:[\w\.\\-]+)\(\d+\): (\w+)(?: C\d+)?: .*$',
+	group-file = 1,
+	group-line = 2,
+	group-color = 3,
+	color-mapping = {
+		error   = [255, 0, 0],
+		warning = [255, 255, 0],
+		note    = [0, 255, 0]}}
+	
 
