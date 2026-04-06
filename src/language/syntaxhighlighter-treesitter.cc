@@ -235,7 +235,7 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 			ASSERT(position.row < buffer->LineCount());
 			
 			const TextBuffer::Line& line = buffer->GetLineAt(position.row);
-			ASSERT(position.column < line.LengthWithLinebreak());
+			ASSERT(position.column <= line.LengthWithLinebreak());
 			
 			*bytesRead = static_cast<u32>(line.LengthWithLinebreak() - position.column);
 			
