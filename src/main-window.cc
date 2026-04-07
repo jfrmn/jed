@@ -637,15 +637,20 @@ found_tab:
 
 static void ActionSwapPanels(MainWindow* self) {
 
-	const u64 indexToSwapWith = IncrementWrapAround(self->focusedPanelIndex, self->panels.size());
+	const u64 panelIndexToSwapWith = IncrementWrapAround(self->focusedPanelIndex, self->panels.size());
+	
+	const u64 focusedTabIndex = self->panels[self->focusedPanelIndex].tabIndex;
+	const u64 tabIndexToSwapWith = self->panels[panelIndexToSwapWith].tabIndex;
+	ASSERT(focusedTabIndex != U64_MAX && tabIndexToSwapWith != U64_MAX)
 		
 	std::swap(
 		self->panels[self->focusedPanelIndex],
-		self->panels[indexToSwapWith]);
+		self->panels[panelIndexToSwapWith]);
 		
-	self->tabs[self->focusedPanelIndex].panelIndex = indexToSwapWith;
-	self->tabs[indexToSwapWith].panelIndex = self->focusedPanelIndex;
-		
+	self->tabs[focusedTabIndex].panelIndex = panelIndexToSwapWith;
+	self->tabs[tabIndexToSwapWith].panelIndex = self->focusedPanelIndex;
+	self->focusedPanelIndex = panelIndexToSwapWith;
+	
 	ResizePanels(self);
 }
 
