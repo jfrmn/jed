@@ -226,6 +226,8 @@ struct Settings {
 	Font fontUi = {};
 	Font fontEditor = {};
 	
+	f32 scrollbarMarkerHoverDistance = 10.0f;
+	
 	//-----------------------------------------------------
 	// functions
 	

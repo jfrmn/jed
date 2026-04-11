@@ -2,6 +2,7 @@
 
 union Color;
 struct ID2D1Bitmap;
+struct ID2D1SolidColorBrush;
 
 namespace Diagnostics {
 	
@@ -19,4 +20,6 @@ namespace Diagnostics {
 	
 	// index to the icon in the style.icons-array
 	extern ID2D1Bitmap** SEVERITY_ICONS[];
+	
+	ID2D1SolidColorBrush* GetServerityBrush(Severity sev);
 };

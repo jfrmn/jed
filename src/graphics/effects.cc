@@ -210,3 +210,5 @@ ID2D1SolidColorBrush* GetBrush(const Color& clr) {
 	brush->SetColor(clr.ToD2D());
 	return brush;
 }
+
+

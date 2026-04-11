@@ -41,8 +41,6 @@ struct EditorDiagnostics {
 	u64 RecordCount() const;
 	bool IsEmpty() const;
 	
-	std::vector<Record>::iterator begin();
-	std::vector<Record>::const_iterator begin() const;
-	std::vector<Record>::iterator end();
-	std::vector<Record>::const_iterator end() const;
+	      Record& operator[](u64 i);
+	const Record& operator[](u64 i) const;
 };

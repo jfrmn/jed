@@ -13,57 +13,54 @@ bool KeyEvent::NoModifiers() const {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-static void ResetHotElementData(Mouse* self) {
-	self->onClickFunc = nullptr,
-	self->onClickUserdata = 0u;
+bool Mouse::Element::operator==(const Element& other) const {
+	return userdata == other.userdata
+		&& onClickFunc == other.onClickFunc;
 }
 
-bool Mouse::Hittest(const D2D_RECT_F& area, void* element, Mouse::OnClickFunction onClick, u64 userdata) {
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bool Mouse::Hittest(const D2D_RECT_F& area, void* userdata, Mouse::OnClickFunction onClick, u64 arg /*= 0*/) {
 	
-	if (draggingElement)
-		return element == draggingElement;
+	const Element newElement {userdata, onClick};
+	
+	if (isDragging)
+		return hotElement == newElement;
 	
 	if (RectContains(area, x, y)) {
-		hotElementNext = element;
-		onClickFunc = onClick,
-		onClickUserdata = userdata;
-		return hotElement == element;
+		hotElementNext = newElement;
+		onClickArg = arg;
+		return hotElement == newElement;
 	}
 	
 	return false;
 }
 
-void Mouse::StartDragging() {
-	dragStartX = x;
-	dragStartY = y;
-	draggingElement = hotElement;
+void Mouse::StartDragging(f32 arg /*= 0.0f*/) {
+	isDragging = true;
+	dragArg = arg;
 	
 	// not sure if this is needed?
-	hotElementNext = nullptr; 
-	onClickFunc = nullptr;
-	onClickUserdata = 0u;
-}
-
-bool Mouse::IsDragging() const {
-	return draggingElement != nullptr;
+	hotElementNext = {}; 
+	onClickArg = 0u;
 }
 
 void Mouse::NextFrame() {
-	
-	hotElement = hotElementNext;
-	hotElementNext = nullptr;
-	
-	if (event == Event_Up) {
-		if (draggingElement) {
-			dragStartX = 0.0f;
-			dragStartY = 0.0f;
-			draggingElement = nullptr;
-		
-		} else {
-			if (onClickFunc)
-				onClickFunc(hotElement, onClickUserdata);
+
+	if (isDragging) {
+		if (event == Event_Up) {
+			dragArg = 0.0f;
+			isDragging = false;
+		}
+
+	} else {
+		hotElement = hotElementNext;
+		hotElementNext = {};
+
+		if (event == Event_Up) {
+			if (hotElement.onClickFunc)
+				hotElement.onClickFunc(hotElement.userdata, onClickArg);
 		}
 	}
+	
 	event = Event_None;
 }

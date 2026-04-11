@@ -1,6 +1,7 @@
 #include "diagnostics.hh"
 #include "basic.hh"
 #include "settings.hh"
+#include "graphics/effects.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -23,3 +24,8 @@ ID2D1Bitmap** Diagnostics::SEVERITY_ICONS[]{
 	&settings.icons.editorDiagnosticsHint};
 
 static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_ICONS) == Diagnostics::Severity_MAX);
+
+ID2D1SolidColorBrush* Diagnostics::GetServerityBrush(Diagnostics::Severity sev) {
+	brush->SetColor(SEVERITY_COLORS[sev].ToD2D());
+	return brush;
+}

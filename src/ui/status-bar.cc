@@ -375,8 +375,8 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 		std::scoped_lock lock {focusedEditor->editorDiagnostics.mutex};
 		if (focusedEditor->editorDiagnostics.IsEmpty()) return posX;
 		
-		for (const EditorDiagnostics::Record& record : focusedEditor->editorDiagnostics)
-			recordCounts[record.severity]++;
+		for (u64 i = 0u; i < focusedEditor->editorDiagnostics.RecordCount(); i++)
+			recordCounts[focusedEditor->editorDiagnostics[i].severity]++;
 	}		
 	
 	//

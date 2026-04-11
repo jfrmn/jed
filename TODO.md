@@ -1,8 +1,8 @@
 # BUGS
 
-[ ] scrollbar hover over diagnstic not working
+[x] scrollbar hover over diagnstic not working
 [ ] find and replace -> Missing ProcessTextChange (lsp never recieves replacements)
-[ ] scrollbar click is funky
+[x] scrollbar click is funky
 [x] short file names don't get displayed correctly
 [ ] delete line does not work with multiple cursors
 [?] delete line messes up tree sitter highlighting (and i think pasting text too) (FIXED?)

@@ -490,7 +490,7 @@ static void RenderOutput(Console* self) {
 			.right = self->area.right,
 			.bottom = self->area.bottom};
 		
-		if (mouse.Hittest(outputArea, self)) {
+		if (mouse.Hittest(outputArea, self, nullptr)) {
 			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
 			
 			const u64 hitLine = std::clamp<u64>(
@@ -521,7 +521,7 @@ static void RenderOutput(Console* self) {
 				self->selectedDiagnosticsRecord = U64_MAX;
 				
 			hit_record: __noop;
-			} else if (mouse.IsDragging()) {
+			} else if (mouse.isDragging) {
 				self->selectionEnd = TextPosition {hitLine, hitColumn};
 			}
 		}

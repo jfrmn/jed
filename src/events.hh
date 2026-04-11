@@ -39,27 +39,32 @@ struct Mouse {
 		 Event_Up      = 2
 	};
 	
-	using OnClickFunction = void (*)(void* hotElement, u64 userdata);
+	using OnClickFunction = void (*)(void* userdata, u64 userint);
+	
+	struct Element {
+		void* userdata = nullptr;
+		OnClickFunction onClickFunc = nullptr;
+		
+		bool operator==(const Element& other) const;
+	};
 	
 	Event event = Event_None;
 	
 	f32 x = 0.0f;
 	f32 y = 0.0f;
 	bool isDown = false;
+	bool isDragging = false;
 	
-	f32 dragStartX = 0.0f;
-	f32 dragStartY = 0.0f;
-	void* draggingElement = nullptr;
+	Element hotElementNext = {};
+	Element hotElement = {};
 	
-	void* hotElementNext = nullptr;
-	void* hotElement = nullptr;
-	OnClickFunction onClickFunc = nullptr;
-	u64 onClickUserdata = 0u;
+	// free variables that can be set by whoever is dragging/clicking
+	f32 dragArg = 0.0f;
+	u64 onClickArg = 0u;
 		
-	bool Hittest(const D2D_RECT_F& area, void* element, OnClickFunction onClick = nullptr, u64 userdata = 0u);
+	bool Hittest(const D2D_RECT_F& area, void* userdata, OnClickFunction onClick, u64 arg = 0u);
 	
-	void StartDragging();
-	bool IsDragging() const;
+	void StartDragging(f32 arg = 0.0f);
 	
 	void NextFrame();
 };

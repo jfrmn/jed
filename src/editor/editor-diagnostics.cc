@@ -17,8 +17,5 @@ bool EditorDiagnostics::IsEmpty() const {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-std::vector<EditorDiagnostics::Record>::iterator EditorDiagnostics::begin() { return records.begin(); }
-std::vector<EditorDiagnostics::Record>::const_iterator EditorDiagnostics::begin() const { return records.begin(); }
-std::vector<EditorDiagnostics::Record>::iterator EditorDiagnostics::end() { return records.end(); }
-std::vector<EditorDiagnostics::Record>::const_iterator EditorDiagnostics::end() const { return records.end(); }
-
+EditorDiagnostics::Record& EditorDiagnostics::operator[](u64 i) { return records[i]; }
+const EditorDiagnostics::Record& EditorDiagnostics::operator[](u64 i) const { return records[i]; }

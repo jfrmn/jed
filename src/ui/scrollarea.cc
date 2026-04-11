@@ -3,6 +3,7 @@
 #include "events.hh"
 #include "settings.hh"
 #include "util/rect-util.hh"
+#include "util/logging.hh"
 
 #include <algorithm>
 
@@ -63,23 +64,24 @@ void Scrollarea::OnUpdate() {
 		.left   = position.x + vpSize.width - barWidth,
 		.top    = position.y + (vpY * ratio),
 		.right  = position.x + vpSize.width,
-		.bottom = position.y + ((vpY + vpSize.height) * ratio) };
+		.bottom = position.y + ((vpY + vpSize.height) * ratio)};
 	
 	deviceContext->FillRectangle(vertBar, settings.GetBrushUiBackground());
 
-	const bool isHot = mouse.Hittest(vertBar, this);
-	if (isHot) {
+	if (mouse.Hittest(vertBar, this, nullptr)) {
 		if (mouse.event == Mouse::Event_Down)
-			mouse.StartDragging();
+			mouse.StartDragging(mouse.y - vertBar.top);
 		
-		const bool isDragging = mouse.IsDragging();
-		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(isDragging));
-	
-		if (isDragging) {
-			vpY = std::clamp(
-				(mouse.y - mouse.dragStartY) / ratio,
-				0.0f,
-				(totalSize.height - vpSize.height));
+		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(mouse.isDragging));
+		
+		if (mouse.isDragging) {
+			const f32 newVpY = -(mouse.dragArg - mouse.y + position.y) / ratio;
+			const f32 max = GetMaxPositionY();
+			//LogDevVar(mouse.dragArg);
+			
+			vpY = std::clamp(newVpY, 0.0f, max);
+			//LogDev("% - % - %", mouse.dragArg, newVpY, vpY);
+				
 		}
 	}
 }
