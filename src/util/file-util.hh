@@ -23,18 +23,23 @@ std::string MakeUriFromPath(std::string_view path);
 // takes a file:///-Uri and extracts the filepath from it, decodes special characeter (e.g. %20 = space)
 std::string MakePathFromUri(std::string_view uri);
 
-// takes a path and returns the filename
+// takes a path and returns the directory/filename/extension
 std::string_view GetFilenameFromPath(std::string_view path);
-
-// takes a path and returns the filename
 std::string_view GetExtensionFromPath(std::string_view path);
-
-// takes a path and returns the directory without the filename
 std::string_view GetDirectoryFromPath(std::string_view path);
+
+// tries to check if 2 paths point to the same file
+bool PathsAreEquivalent(std::string_view pathA, std::string_view pathB);
 
 // get the direcotry path in which the current .exe resides
 // the returned path DOES have a trailing slash
-std::string GetProcessDirectory();
+std::string GetProcessDirectory(); // @TODO remove
+
+// returns the current working directory
+// path has a trailing slash
+// WARNING! uses a static buffer to hold the data
+// not threadsafe!
+std::string_view GetWorkingDirectory();
 
 //---------------------------------------------------------
 // direcotry iterator

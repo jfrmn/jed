@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "settings.hh"
 
+#include "file-watcher.hh"
 #include "file-search-bar.hh"
 #include "explorer.hh"
 #include "console.hh"
@@ -18,7 +19,6 @@
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
-// #include <d2d1_1.h>
 #include <d2d1_3.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,6 +26,8 @@
 // Creation and Shutdown
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void OnDirectoryChange(void* userdata, FileWatcher::Action action, std::string_view fileName);
 
 bool MainWindow::Create() {
 	const bool ok = Window::Create(
@@ -56,6 +58,8 @@ bool MainWindow::Init() {
 		LogError("init status bar failed");
 		return false;
 	}
+	
+	fileWatcher.WatchDirectory(".", FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, OnDirectoryChange, this);
 	
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	return true;
@@ -89,20 +93,17 @@ static bool LoadFileInformation(std::string_view path, /*out*/ BY_HANDLE_FILE_IN
 	}
 	
 	DEFER(CloseHandle(hFile));
-	
+
 	if (!GetFileInformationByHandle(hFile, fileInfo)) {
 		LogError("GetFileInformationByHandle() failed. LastError: %", FLastErr(GetLastError()));
 		return false;
 	}
-	
+		
 	return true;
 }
 
-static bool IsEditorAlreadyOpen(const MainWindow* self, std::string_view path, /*out*/ u64* tabIndex, /*out*/ u64* panelIndex) {
-	
-	bool hasFileInfo = false;
-	
-	
+static bool FindEditor(const MainWindow* self, std::string_view path, /*out*/ u64* tabIndex, /*out*/ u64* panelIndex) {
+		
 	// optimistic approach: just do a string compare first
 	for (u64 i = 0u; i < self->tabs.size(); i++) {
 		const MainWindow::Tab& tab = self->tabs[i];
@@ -122,14 +123,10 @@ static bool IsEditorAlreadyOpen(const MainWindow* self, std::string_view path, /
 		const MainWindow::Tab& tab = self->tabs[i];
 		if (tab.editor->path.empty()) continue;
 		
-		BY_HANDLE_FILE_INFORMATION currentFileInfo {};
-		const bool ok = LoadFileInformation(tab.editor->path, &currentFileInfo);
-		if (!ok) continue;
+		const bool same = toFindFileInfo.dwVolumeSerialNumber == tab.editor->fileInfo.volumeSerialNumber
+					   && toFindFileInfo.nFileSizeHigh == tab.editor->fileInfo.fileIndexHigh
+					   && toFindFileInfo.nFileSizeLow == tab.editor->fileInfo.fileIndexLow;
 		
-		const bool same = toFindFileInfo.dwVolumeSerialNumber == currentFileInfo.dwVolumeSerialNumber
-					   && toFindFileInfo.nFileIndexLow == currentFileInfo.nFileIndexLow
-		               && toFindFileInfo.nFileIndexHigh == currentFileInfo.nFileIndexHigh;
-		               
 		if (same) {
 			*tabIndex = i;
 			*panelIndex = tab.panelIndex;
@@ -225,7 +222,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 	// check if editor already open
 	//	
 	if (u64 tabIndex = U64_MAX, panelIndex = U64_MAX;
-		IsEditorAlreadyOpen(this, path, &tabIndex, &panelIndex)) {
+		FindEditor(this, path, &tabIndex, &panelIndex)) {
 		
 		LogInfo("file already open: '%'", path);
 		
@@ -540,6 +537,32 @@ void MainWindow::OnUpdate() {
 		LogWarning("rendering failed. HRESULT: %", FHr(hr));
 }
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Directory changes
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void OnDirectoryChange(void* userdata, FileWatcher::Action action, std::string_view fileName) {
+	auto self = static_cast<MainWindow*>(userdata);
+	
+	std::string_view actionStr;
+	if (action == FileWatcher::Action_Added) actionStr = "Added";
+	else if (action == FileWatcher::Action_Modified || action == FileWatcher::Action_Removed) {
+		actionStr = action == FileWatcher::Action_Modified ? "Modified" : "Removed";
+		
+		for (MainWindow::Tab& tab : self->tabs) {
+			Editor* editor = tab.editor;
+			if (PathsAreEquivalent(fileName, editor->path))
+				editor->CheckFileModification(action == FileWatcher::Action_Removed);
+		}
+	
+	} else if (action == FileWatcher::Action_RenamedOldName) actionStr = "RenamedOldName";
+	else if (action == FileWatcher::Action_RenamedNewName) actionStr = "RenamedNewName";
+	
+	LogDev("Recieved Action '%' for file '%'", actionStr, fileName);
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //

@@ -5,7 +5,7 @@ struct ID2D1DeviceContext;
 struct D2D_POINT_2F;
 struct MainWindow;
 struct Mouse;
-struct TempAllocator;
+struct FileWatcher;
 
 // current mouse cursor location in client coordiantes
 extern Mouse mouse;
@@ -24,5 +24,5 @@ extern bool needsUpdate;
 // the main window
 extern MainWindow mainWindow;
 
-// allocator that gets reset every frame
-extern TempAllocator tempAllocator;
+// the file watcher
+extern FileWatcher fileWatcher;

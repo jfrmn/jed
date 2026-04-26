@@ -78,11 +78,11 @@ static const char* CommonHResultString(HRESULT hResult) {
 
 static const char* WaitResultString(DWORD res) {
 	switch (res) {
-		case WAIT_ABANDONED: return "WAIT_ABANDONED";
-		case WAIT_OBJECT_0: return "WAIT_OBJECT_0";
-		case WAIT_TIMEOUT: return "WAIT_TIMEOUT";
-		case WAIT_FAILED: return "WAIT_FAILED";
-		default: return "UNKNWON";
+		case WAIT_ABANDONED: return "(WAIT_ABANDONED)";
+		case WAIT_OBJECT_0: return "(WAIT_OBJECT_0)";
+		case WAIT_TIMEOUT: return "(WAIT_TIMEOUT)";
+		case WAIT_FAILED: return "(WAIT_FAILED)";
+		default: return "";
 	}
 }
 
@@ -118,7 +118,7 @@ FormatArgument FWaitRes(unsigned long waitRes) {
 		.Write = [] (const void* userdata, std::ostream* sink) {
 			const auto waitRes = reinterpret_cast<const unsigned long>(userdata);
 			const std::string_view str = WaitResultString(waitRes);
-			(*sink) << str;
+			(*sink) << "0x" << std::hex << waitRes << ' ' << str;
 		}
 	};
 }

@@ -211,6 +211,41 @@ std::string GetProcessDirectory() {
 	return buffer;
 }
 
+std::string_view GetWorkingDirectory() {
+	static char cwdBuffer[_MAX_PATH + 1u];
+	const u64 cwdLen = GetCurrentDirectoryA(_MAX_PATH + 1u, cwdBuffer);
+	
+	return std::string_view {cwdBuffer, cwdLen};
+}
+
+static bool PathsAreEquivalentInternal(std::string_view pathA, std::string_view pathB) {
+	
+	const std::string_view cwd = GetWorkingDirectory();
+	if (pathA.starts_with(".\\")) {
+		
+		// match .\ path and absolute path
+		if (pathB.starts_with(cwd) && pathA.substr(2) == pathB.substr(cwd.length()))
+		 	return true;
+	
+		// match .\ path with relative path (without .\)
+		if (pathA.substr(2) == pathB)
+			return true;
+	}
+	
+	// match relative path with absolute path
+	if (pathB.starts_with(cwd) && pathA == pathB.substr(cwd.length()))
+	 	return true;
+	 
+	 return false;
+}
+
+bool PathsAreEquivalent(std::string_view pathA, std::string_view pathB) {
+	if (pathA == pathB) return true;
+	if (PathsAreEquivalentInternal(pathA, pathB)) return true;
+	if (PathsAreEquivalentInternal(pathB, pathA)) return true;
+	return false;
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool DirectoryIterator::Next() {
 

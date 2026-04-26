@@ -51,6 +51,109 @@ bool Editor::Init() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static void CloseFileInternal(Editor* self) {
+	
+	//
+	// close all the editor features
+	//	
+	if (self->editorCaretAttached) {
+		self->editorCaretAttached->RemoveReference();
+		self->editorCaretAttached = nullptr;
+	}
+	
+	if (self->toolWindow) {
+		delete self->toolWindow;
+		self->toolWindow = nullptr;
+	}
+	
+	self->editorDiagnostics.Reset();
+
+	//
+	// reset language
+	//		
+	if (self->language)
+		self->language->OnCloseFile(self);
+	
+	//
+	// reset file info
+	//
+	self->fileInfo.fileIndexHigh = 0u;
+	self->fileInfo.fileIndexLow = 0u;
+	self->fileInfo.volumeSerialNumber = 0u;
+	self->fileInfo.lastWriteTimeHigh = 0u;
+	self->fileInfo.lastWriteTimeLow = 0u;
+	
+	LogInfo("closed file: '%'", (!self->path.empty() ? self->path.c_str() : "(empty)"));
+}
+
+static bool OpenFileInternal(Editor* self) {
+	
+	LogInfo("opening file '%'", self->path);
+	
+	//
+	// open file
+	//
+	HANDLE hFile = CreateFileA(self->path.data(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		LogError("failed to open file '%'. LastError: %", self->path, FLastErr(GetLastError()));
+		return false;
+	}
+	DEFER(CloseHandle(hFile));
+	
+	//
+	// fill buffer
+	//
+	s64 fileSize = 0u;
+	if (!GetFileSizeEx(hFile, reinterpret_cast<LARGE_INTEGER*>(&fileSize))) {
+		LogError("GetFileSizeEx() failed. LastError: %", FLastErr(GetLastError()));
+		return false;
+	}
+	
+	// @ISSUE
+	// File size is a s64 but ReadFile only takes a DWORD aka u32
+	// Does this mean we can only read 4GB in one go?
+	ASSERT(fileSize < U32_MAX)
+	
+	std::string* buffer = self->textController.buffer.Clear();
+	buffer->resize(fileSize);
+		
+	DWORD numOfBytesRead = 0;
+	const bool ok = ReadFile(hFile, buffer->data(), static_cast<u32>(fileSize), &numOfBytesRead, nullptr);
+	
+	ASSERT(numOfBytesRead == fileSize);
+	if (!ok) LogError("ReadFile() failed. Last Error: %", FLastErr(GetLastError()));
+	
+	self->textController.buffer.RecreateLines();
+	
+	//
+	// set file info
+	//
+	{
+		const std::scoped_lock lock {self->fileInfo.mtx};
+		
+		BY_HANDLE_FILE_INFORMATION byHandleFileInfo {};
+		GetFileInformationByHandle(hFile, &byHandleFileInfo);
+		
+		self->fileInfo.fileIndexHigh  = byHandleFileInfo.nFileIndexHigh;
+		self->fileInfo.fileIndexLow  = byHandleFileInfo.nFileIndexLow;
+		self->fileInfo.volumeSerialNumber = byHandleFileInfo.dwVolumeSerialNumber;
+		self->fileInfo.lastWriteTimeHigh = byHandleFileInfo.ftLastWriteTime.dwHighDateTime;
+		self->fileInfo.lastWriteTimeLow = byHandleFileInfo.ftLastWriteTime.dwLowDateTime;
+	}
+	
+	//
+	// prepare glyph runs
+	//
+	if (!GlyphRun::ShapeBatch(self->textController.buffer, settings.fontEditor, &self->glyphRuns)) {
+		LogError("inital shaping failed!");
+	}
+	
+	if (self->language)
+		self->language->OnOpenFile(self, *buffer);
+	
+	return true;
+}
+
 Editor::FileResult Editor::CloseFile() {
 	
 	//
@@ -74,33 +177,13 @@ Editor::FileResult Editor::CloseFile() {
 
 	ASSERT(!modified);
 	
-	//
-	// close all the editor features
-	//	
-	if (editorCaretAttached) {
-		editorCaretAttached->RemoveReference();
-		editorCaretAttached = nullptr;
-	}
-	
-	if (toolWindow) {
-		delete toolWindow;
-		toolWindow = nullptr;
-	}
-	
-	editorDiagnostics.Reset();
-
-	//
-	// reset language
-	//		
-	if (language)
-		language->OnCloseFile(this);
+	CloseFileInternal(this);	
 	
 	language = nullptr;
 	textDocumentIdentifier.uri.clear();
 	textDocumentIdentifier.version = 0u;
 	
-	LogInfo("closed file: '%'", (!path.empty() ? path.c_str() : "(empty)"));
-	path.clear();
+	path.clear();	
 	
 	return FileResult_Success;
 }
@@ -108,66 +191,27 @@ Editor::FileResult Editor::CloseFile() {
 Editor::FileResult Editor::OpenFile(std::string path) {
 
 	// close old file first
-	if (auto fileResult = CloseFile(); fileResult != Editor::FileResult_Success)
+	if (auto fileResult = CloseFile(); fileResult != FileResult_Success)
 		return fileResult;
-	
-	//
-	// open file
-	//
-	HANDLE hFile = CreateFileA(path.data(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("failed to open file '%'. LastError: %", path, FLastErr(GetLastError()));
-		return FileResult_Failure;
-	}
-	DEFER(CloseHandle(hFile));
-	
-	//
-	// fill buffer
-	//
-	s64 fileSize = 0u;
-	if (!GetFileSizeEx(hFile, reinterpret_cast<LARGE_INTEGER*>(&fileSize))) {
-		LogError("GetFileSizeEx() failed. LastError: %", FLastErr(GetLastError()));
-		return FileResult_Failure;
-	}
-	
-	// @ISSUE
-	// File size is a s64 but ReadFile only takes a DWORD aka u32
-	// Does this mean we can only read 4GB in one go?
-	ASSERT(fileSize < U32_MAX)
-	
-	std::string* buffer = this->textController.buffer.Clear();
-	buffer->resize(fileSize);
-		
-	DWORD numOfBytesRead = 0;
-	const bool ok = ReadFile(hFile, buffer->data(), static_cast<u32>(fileSize), &numOfBytesRead, nullptr);
-	
-	ASSERT(numOfBytesRead == fileSize);
-	if (!ok) LogError("ReadFile() failed. Last Error: %", FLastErr(GetLastError()));
-	
-	//
-	// reset some stuff
-	//
-	textController.buffer.RecreateLines();
-	textController.Reset();
-	scrollarea.ResetViewport();	
 	
 	//
 	// set language
 	//
 	language = Language::GetLanguage(GetExtensionFromPath(path));
-	if (language) {
-		textDocumentIdentifier.uri = MakeUriFromPath(path);
-		textDocumentIdentifier.version = 0u;
-		language->OnOpenFile(this, *buffer);
-	}
+	textDocumentIdentifier.uri = MakeUriFromPath(path);	
 	this->path = std::move(path);
 	
-	//
-	// prepare glyph runs
-	//
-	if (!GlyphRun::ShapeBatch(this->textController.buffer, settings.fontEditor, &glyphRuns)) {
-		LogError("inital shaping failed!");
+	if (!OpenFileInternal(this)) {
+		this->path.clear();	
+		language = nullptr;
+		return FileResult_Failure;
 	}
+			
+	//
+	// reset some stuff
+	//
+	textController.Reset();
+	scrollarea.ResetViewport();	
 	
 	return FileResult_Success;
 }
@@ -179,34 +223,74 @@ bool Editor::SaveFile() {
 
 	LogInfo("saving file '%'", path);
 	
-	const std::string tempFilename = FormatString("%.tmp", path);
+	const std::scoped_lock lock {fileInfo.mtx};
 	
-	HANDLE hFile = CreateFileA(tempFilename.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
+	const std::string tempFilename = FormatString("%.tmp", path);
+	HANDLE hReplacementFile = CreateFileA(tempFilename.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hReplacementFile == INVALID_HANDLE_VALUE) {
 		LogError("CreateFile() failed '%'. Last Error: %", tempFilename, FLastErr(GetLastError()));
 		return false;
 	}
 
-	for (usize i = 0u; i < textController.buffer.LineCount(); i++) {
+	for (u64 i = 0u; i < textController.buffer.LineCount(); i++) {
 		const TextBuffer::Line& line = textController.buffer.lines[i];
 
 		const std::string_view text = line.GetTextWithLinebreak();
 		auto textSize = static_cast<DWORD>(text.size());
 		
 		DWORD bytesWritten = 0u;
-		WriteFile(hFile, text.data(), textSize, &bytesWritten, NULL);
+		WriteFile(hReplacementFile, text.data(), textSize, &bytesWritten, NULL);
 		ASSERT(bytesWritten == textSize);
 	}
 
-	CloseHandle(hFile);
+	CloseHandle(hReplacementFile);
 
 	if (!ReplaceFileA(path.data(), tempFilename.c_str(), NULL, 0, NULL, NULL)) {
 		LogError("ReplaceFile() failed. Last Error: %", FLastErr(GetLastError()));
 		return false;
 	}
 	
+	// update last write time
+	// yes this is technically a race condition because another process could modify the file between
+	// the ReplaceFileA call and OpenFile call. But I have no idea how to circumvent this.
+	HANDLE hActualFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hActualFile == INVALID_HANDLE_VALUE) {
+		LogError("CreateFileA() failed. '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+		return false;
+	}
+	DEFER(CloseHandle(hActualFile));
+	
+	BY_HANDLE_FILE_INFORMATION byHandleFileInfo {};
+	GetFileInformationByHandle(hActualFile, &byHandleFileInfo);
+	
+	fileInfo.volumeSerialNumber = byHandleFileInfo.dwVolumeSerialNumber;
+	fileInfo.fileIndexHigh = byHandleFileInfo.nFileIndexHigh;
+	fileInfo.fileIndexLow = byHandleFileInfo.nFileIndexLow;
+	fileInfo.lastWriteTimeHigh = byHandleFileInfo.ftLastWriteTime.dwHighDateTime;
+	fileInfo.lastWriteTimeLow = byHandleFileInfo.ftLastWriteTime.dwLowDateTime;
+	
 	modified = false;
 	return true;
+}
+
+static void ReloadFile(void* param) {
+	auto self = static_cast<Editor*>(param);
+	CloseFileInternal(self);
+	OpenFileInternal(self);
+	
+	const u64 newLine = std::min(self->textController.carets.front().position.line,   self->textController.buffer.GetMaxLine());
+	self->textController.SetCaretPosition(TextPosition {
+		.line   = newLine,
+		.column = std::min(self->textController.carets.front().position.column, self->textController.buffer.GetLineAt(newLine).length)});
+	self->scrollarea.vpX = std::min(self->scrollarea.vpX, self->scrollarea.GetMaxPositionX());
+	self->scrollarea.vpY = std::min(self->scrollarea.vpY, self->scrollarea.GetMaxPositionY());
+}
+
+void Editor::CheckFileModification(bool deleted /*= false*/) {
+	const std::scoped_lock lock {fileInfo.mtx};
+	
+	if (!deleted)
+		mainWindow.PostFunctionCall(this, ReloadFile);
 }
 
 void Editor::ScrollToLine(u64 line) {

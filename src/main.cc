@@ -9,10 +9,11 @@
 #include "language/language.hh"
 #include "json/json-basic.hh"
 #include "util/logging.hh"
-
+#include "file-watcher.hh"
+ 
 // @DUMMY
 #include "editor/editor.hh"
-
+ 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static bool GetPerformanceFrequency(u64* ticksPerMs) {
 	LARGE_INTEGER freq;
@@ -70,9 +71,14 @@ int main(int argc, char** argv) {
 		LogFatal("init effects failed");
 		return -1;
 	}
-
+	
 	if (!Language::LoadLanguages(".\\config\\languages"))
 		LogError("failed to load languages");
+	
+	if (!fileWatcher.Init()) {
+		LogFatal("init file watcher failed");
+		return -1;
+	}
 		
 	if (!mainWindow.Init()) {
 		LogError("init main window failed");
@@ -114,6 +120,7 @@ int main(int argc, char** argv) {
 	}
 	
 	mainWindow.Shutdown();
+	fileWatcher.Shutdown();
 	ShutdownEffects();
 	ShutdownFactories();	
 	return 0;

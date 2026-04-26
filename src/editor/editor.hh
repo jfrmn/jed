@@ -40,10 +40,26 @@ struct Editor {
 		 FileResult_Canceled = 2,
 	};
 	
+	enum Status {
+		 Status_Normal = 0,
+		 Status_Modified,
+		 Status_MissingOnDisk,
+		 Status_Conflicted
+	};
+	
 	// needed to communicate with lsp-server	
 	struct TextDocumentIdentifier {
 		std::string uri = {};
 		s32 version = 0;
+	};
+	
+	struct FileInformation {
+		u32 fileIndexHigh = 0u;
+		u32 fileIndexLow = 0u;
+		u32 volumeSerialNumber = 0u;
+		u32 lastWriteTimeHigh = 0u;
+		u32 lastWriteTimeLow = 0u;
+		std::mutex mtx = {};
 	};
 
 	//-------------------------------------------
@@ -51,7 +67,9 @@ struct Editor {
 	
 	D2D_RECT_F area = {};
 	
+	FileInformation fileInfo = {};
 	std::string path = {};
+	Status status = Status_Normal;
 	bool modified = false;
 	
 	Encoding encoding = Encoding_Utf8;
@@ -90,6 +108,7 @@ struct Editor {
 	FileResult OpenFile(std::string path);
 	FileResult CloseFile();
 	bool SaveFile();
+	void CheckFileModification(bool deleted = false);
 
 	void ScrollToLine(u64 line);
 	void ProcessTextChange(const TextChange* change);
@@ -109,4 +128,3 @@ struct Editor {
 	void OnResize(D2D1_RECT_F newArea);
 	bool OnClose();	
 };
-

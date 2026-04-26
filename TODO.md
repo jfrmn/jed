@@ -30,6 +30,7 @@
 [ ] refactor animation so that all animations use the same logic
 [ ] rename TextPostion.column to character
 [ ] refactor statu-bar to utilize the new glyph run better (e.g. use draw partial at text pos)
+[ ] remove GetProcessDirectory() and move logic to settings directly
 
 
 # BACKLOG
