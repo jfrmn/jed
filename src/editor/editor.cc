@@ -50,8 +50,13 @@ bool Editor::Init() {
 	return true;
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void CloseFileInternal(Editor* self) {
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Closing and Opening
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void UnloadFile(Editor* self) {
 	
 	//
 	// close all the editor features
@@ -75,18 +80,14 @@ static void CloseFileInternal(Editor* self) {
 		self->language->OnCloseFile(self);
 	
 	//
-	// reset file info
+	// reset lwt
 	//
-	self->fileInfo.fileIndexHigh = 0u;
-	self->fileInfo.fileIndexLow = 0u;
-	self->fileInfo.volumeSerialNumber = 0u;
-	self->fileInfo.lastWriteTimeHigh = 0u;
-	self->fileInfo.lastWriteTimeLow = 0u;
+	self->lastWriteTime = {};
 	
 	LogInfo("closed file: '%'", (!self->path.empty() ? self->path.c_str() : "(empty)"));
 }
 
-static bool OpenFileInternal(Editor* self) {
+static bool LoadFile(Editor* self) {
 	
 	LogInfo("opening file '%'", self->path);
 	
@@ -126,20 +127,9 @@ static bool OpenFileInternal(Editor* self) {
 	self->textController.buffer.RecreateLines();
 	
 	//
-	// set file info
+	// set lwt
 	//
-	{
-		const std::scoped_lock lock {self->fileInfo.mtx};
-		
-		BY_HANDLE_FILE_INFORMATION byHandleFileInfo {};
-		GetFileInformationByHandle(hFile, &byHandleFileInfo);
-		
-		self->fileInfo.fileIndexHigh  = byHandleFileInfo.nFileIndexHigh;
-		self->fileInfo.fileIndexLow  = byHandleFileInfo.nFileIndexLow;
-		self->fileInfo.volumeSerialNumber = byHandleFileInfo.dwVolumeSerialNumber;
-		self->fileInfo.lastWriteTimeHigh = byHandleFileInfo.ftLastWriteTime.dwHighDateTime;
-		self->fileInfo.lastWriteTimeLow = byHandleFileInfo.ftLastWriteTime.dwLowDateTime;
-	}
+	GetFileTime(hFile, nullptr, nullptr, &self->lastWriteTime);
 	
 	//
 	// prepare glyph runs
@@ -156,10 +146,7 @@ static bool OpenFileInternal(Editor* self) {
 
 Editor::FileResult Editor::CloseFile() {
 	
-	//
-	// save file
-	//
-	if (modified) {
+	if (isDirty) {
 		const UINT result = MessageBoxA(mainWindow.hWnd, "This buffer has unsaved changes.\nWould you like to save them?", "Unsaved changes", MB_YESNOCANCEL | MB_ICONWARNING);
 		
 		if (result == IDYES) {
@@ -171,18 +158,17 @@ Editor::FileResult Editor::CloseFile() {
 			return FileResult_Canceled;
 
 		} else {
-			modified = false;
+			isDirty = false;
 		}
 	}
 
-	ASSERT(!modified);
+	ASSERT(!isDirty);
 	
-	CloseFileInternal(this);	
+	UnloadFile(this);
 	
 	language = nullptr;
 	textDocumentIdentifier.uri.clear();
-	textDocumentIdentifier.version = 0u;
-	
+	textDocumentIdentifier.version = 0u;		
 	path.clear();	
 	
 	return FileResult_Success;
@@ -193,7 +179,7 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	// close old file first
 	if (auto fileResult = CloseFile(); fileResult != FileResult_Success)
 		return fileResult;
-	
+			
 	//
 	// set language
 	//
@@ -201,7 +187,7 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	textDocumentIdentifier.uri = MakeUriFromPath(path);	
 	this->path = std::move(path);
 	
-	if (!OpenFileInternal(this)) {
+	if (!LoadFile(this)) {
 		this->path.clear();	
 		language = nullptr;
 		return FileResult_Failure;
@@ -218,13 +204,11 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 
 bool Editor::SaveFile() {
 	
-	if (!modified)
+	if (!isDirty && !fileRemoved)
 		return true;
 
 	LogInfo("saving file '%'", path);
-	
-	const std::scoped_lock lock {fileInfo.mtx};
-	
+		
 	const std::string tempFilename = FormatString("%.tmp", path);
 	HANDLE hReplacementFile = CreateFileA(tempFilename.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hReplacementFile == INVALID_HANDLE_VALUE) {
@@ -250,9 +234,6 @@ bool Editor::SaveFile() {
 		return false;
 	}
 	
-	// update last write time
-	// yes this is technically a race condition because another process could modify the file between
-	// the ReplaceFileA call and OpenFile call. But I have no idea how to circumvent this.
 	HANDLE hActualFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hActualFile == INVALID_HANDLE_VALUE) {
 		LogError("CreateFileA() failed. '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
@@ -260,38 +241,91 @@ bool Editor::SaveFile() {
 	}
 	DEFER(CloseHandle(hActualFile));
 	
-	BY_HANDLE_FILE_INFORMATION byHandleFileInfo {};
-	GetFileInformationByHandle(hActualFile, &byHandleFileInfo);
-	
-	fileInfo.volumeSerialNumber = byHandleFileInfo.dwVolumeSerialNumber;
-	fileInfo.fileIndexHigh = byHandleFileInfo.nFileIndexHigh;
-	fileInfo.fileIndexLow = byHandleFileInfo.nFileIndexLow;
-	fileInfo.lastWriteTimeHigh = byHandleFileInfo.ftLastWriteTime.dwHighDateTime;
-	fileInfo.lastWriteTimeLow = byHandleFileInfo.ftLastWriteTime.dwLowDateTime;
-	
-	modified = false;
+	GetFileTime(hActualFile, nullptr, nullptr, &lastWriteTime);
+	isDirty = false;
 	return true;
 }
 
-static void ReloadFile(void* param) {
-	auto self = static_cast<Editor*>(param);
-	CloseFileInternal(self);
-	OpenFileInternal(self);
+void Editor::OnFileChanged(const FileChangeRecord* fileChangeRecord) {
 	
-	const u64 newLine = std::min(self->textController.carets.front().position.line,   self->textController.buffer.GetMaxLine());
-	self->textController.SetCaretPosition(TextPosition {
-		.line   = newLine,
-		.column = std::min(self->textController.carets.front().position.column, self->textController.buffer.GetLineAt(newLine).length)});
-	self->scrollarea.vpX = std::min(self->scrollarea.vpX, self->scrollarea.GetMaxPositionX());
-	self->scrollarea.vpY = std::min(self->scrollarea.vpY, self->scrollarea.GetMaxPositionY());
+	if (fileChangeRecord->action == FileChangeRecord::Action_Added) {
+		fileRemoved = false;
+	
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_Removed) {
+		fileRemoved = true;
+			
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_Modified) {
+		
+		HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hFile == INVALID_HANDLE_VALUE) {
+			LogError("CreateFileA() failed. '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+			return;
+		}
+		DEFER(CloseHandle(hFile));
+		
+		FILETIME currentLastWriteTime = {};
+		GetFileTime(hFile, nullptr, nullptr, &currentLastWriteTime);
+			
+		LogDetail("checking file modification for '%'...", path);
+		
+		if (lastWriteTime.dwLowDateTime == currentLastWriteTime.dwLowDateTime && lastWriteTime.dwHighDateTime == currentLastWriteTime.dwHighDateTime) {
+			LogDetail("file was not modified.");
+			return;
+		}
+				
+		LogInfo("file was modified externally.");
+		
+		if (isDirty) {
+			const UINT result = MessageBoxA(mainWindow.hWnd,
+				"File has been modified externally.\nWould like to discard all local modification and reload the file?",
+				"File modified",
+				MB_ICONQUESTION | MB_YESNO);
+			
+			if (result == IDNO) {
+				LogDetail("file will not be reloaded");
+				lastWriteTime = currentLastWriteTime;
+				return;
+			}
+			
+			isDirty = false;
+		}
+		
+		LogInfo("reloading file");
+		
+		UnloadFile(this);
+		LoadFile(this);
+		
+		const u64 newLine = std::min(textController.carets.front().position.line, textController.buffer.GetMaxLine());
+		textController.SetCaretPosition(TextPosition {
+			.line   = newLine,
+			.column = std::min(textController.carets.front().position.column, textController.buffer.GetLineAt(newLine).length)});
+		scrollarea.vpX = std::min(scrollarea.vpX, scrollarea.GetMaxPositionX());
+		scrollarea.vpY = std::min(scrollarea.vpY, scrollarea.GetMaxPositionY());	
+	
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_RenamedNew) {
+		
+		if (language)
+			language->OnCloseFile(this);
+		
+		path = std::string(fileChangeRecord->filename, fileChangeRecord->filenameLength);	
+		textDocumentIdentifier.uri = MakeUriFromPath(path);
+			
+		const std::string buffer = textController.buffer.GetText();
+		
+		if (language)
+			language->OnOpenFile(this, buffer);
+	
+	} else {
+		LogError("Unexpected file changed action: %", fileChangeRecord->action);
+		ASSERT_UNREACHABLE;
+	}
 }
 
-void Editor::CheckFileModification(bool deleted /*= false*/) {
-	const std::scoped_lock lock {fileInfo.mtx};
-	
-	if (!deleted)
-		mainWindow.PostFunctionCall(this, ReloadFile);
-}
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Misc
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Editor::ScrollToLine(u64 line) {
 
@@ -311,7 +345,7 @@ void Editor::ScrollToLine(u64 line) {
 void Editor::ProcessTextChange(const TextChange* change) {
 	if (!change) return;
 	
-	modified = true;
+	isDirty = true;
 	textDocumentIdentifier.version++;
 	
 	bool needsFullReshape = false;
@@ -400,7 +434,12 @@ void Editor::StartInsertAnimation() {
 	insertAnimationRunning = true;
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Drawing
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 static void IterateGlyphRange(const Editor* self, TextPosition from, TextPosition to, void (*funcAction) (f32 y, f32 from, f32 to)) {
 
 	const f32 x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth();
@@ -1110,14 +1149,16 @@ void Editor::OnUpdate() {
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Input
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Editor::OnResize(D2D1_RECT_F newArea) {
 	this->area = newArea;
 	this->scrollarea.OnResize(newArea);
 }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Input
 
 void Editor::OnChar(const char* data, u64 len) {
 	
@@ -1284,7 +1325,7 @@ void Editor::OnKeyDown(KeyEvent event) {
 }
 
 bool Editor::OnClose() {
-	if (modified) {
+	if (isDirty) {
 		const FileResult closeResult = CloseFile();
 		if (closeResult == FileResult::FileResult_Failure)
 			return false;

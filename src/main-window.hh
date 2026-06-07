@@ -74,8 +74,11 @@ struct MainWindow : public Window {
 	void Shutdown();
 	
 	Editor* OpenEditor(std::string path, OpenBehavior openBehavior = OpenBehavior_Default, bool* wasAlreadyOpen = nullptr);
+	void RenameEditor(const Editor* editor, std::string_view newName);
+	
 	void OnUpdate();
 	
+	virtual void OnFileChanged(FileChangedEvent* fileChangedEvent) override;
 	virtual bool OnMouseWheel(f32 wheel) override;
 	virtual void OnKeyDown(KeyEvent event) override;
 	virtual void OnChar(const char* data, u64 len) override;

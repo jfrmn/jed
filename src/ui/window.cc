@@ -13,6 +13,7 @@
 static u32 wmUserUpdate       = 0u;
 static u32 wmUserSendFuncCall = 0u;
 static u32 wmUserPostFuncCall = 0u;
+static u32 wmUserFileChanged  = 0u;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static LRESULT WINAPI WindowProc(
@@ -21,7 +22,7 @@ static LRESULT WINAPI WindowProc(
 	WPARAM wParam,
 	LPARAM lParam);
 
-bool Window::Create(const CreateParams &createParams) {
+bool Window::Create(const CreateParams& createParams) {
 
 	HINSTANCE hInstance = GetModuleHandle(0);
 
@@ -95,6 +96,7 @@ bool Window::Create(const CreateParams &createParams) {
 	wmUserUpdate       = RegisterWindowMessageA("WM_USER_UPDATE");
 	wmUserSendFuncCall = RegisterWindowMessageA("WM_USER_SENDFUNCCALL");
 	wmUserPostFuncCall = RegisterWindowMessageA("WM_USER_POSTFUNCCALL");
+	wmUserFileChanged  = RegisterWindowMessageA("WM_USER_FILECHANGED");
 
 	this->hWnd = hWnd;
 	this->renderTarget = hwndRenderTarget;
@@ -140,6 +142,11 @@ void Window::SendUpdate() {
 
 void Window::PostUpdate() {
 	PostMessageA(hWnd, wmUserUpdate, 0, 0);
+}
+
+void Window::PostFileChangedEvent(FileChangedEvent* fileChangedEvent) {
+	const auto lparam = reinterpret_cast<LPARAM>(fileChangedEvent);
+	PostMessageA(hWnd, wmUserFileChanged, 0, lparam);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -287,7 +294,12 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		auto func = reinterpret_cast<void (*)(void*)>(lParam);
 		func(userdata);
 		return 1;
-	}
-
+	
+	} else if (nMSG == wmUserFileChanged) {
+		auto fileChangedEvent = reinterpret_cast<FileChangedEvent*>(lParam);
+		window->OnFileChanged(fileChangedEvent);
+		free(fileChangedEvent);
+	} 
+	
 	return DefWindowProc(hWnd, nMSG, wParam, lParam);
 }

@@ -17,6 +17,7 @@ struct ID2D1SolidColorBrush;
 struct Language;
 struct TextChange;
 struct MouseEvent;
+struct FileChangeRecord;
 
 struct EditorCaretAttached;
 struct EditorToolWindow;
@@ -40,26 +41,10 @@ struct Editor {
 		 FileResult_Canceled = 2,
 	};
 	
-	enum Status {
-		 Status_Normal = 0,
-		 Status_Modified,
-		 Status_MissingOnDisk,
-		 Status_Conflicted
-	};
-	
 	// needed to communicate with lsp-server	
 	struct TextDocumentIdentifier {
 		std::string uri = {};
 		s32 version = 0;
-	};
-	
-	struct FileInformation {
-		u32 fileIndexHigh = 0u;
-		u32 fileIndexLow = 0u;
-		u32 volumeSerialNumber = 0u;
-		u32 lastWriteTimeHigh = 0u;
-		u32 lastWriteTimeLow = 0u;
-		std::mutex mtx = {};
 	};
 
 	//-------------------------------------------
@@ -67,10 +52,10 @@ struct Editor {
 	
 	D2D_RECT_F area = {};
 	
-	FileInformation fileInfo = {};
 	std::string path = {};
-	Status status = Status_Normal;
-	bool modified = false;
+	FILETIME lastWriteTime = {};
+	bool fileRemoved = false;
+	bool isDirty = false;
 	
 	Encoding encoding = Encoding_Utf8;
 
@@ -108,7 +93,6 @@ struct Editor {
 	FileResult OpenFile(std::string path);
 	FileResult CloseFile();
 	bool SaveFile();
-	void CheckFileModification(bool deleted = false);
 
 	void ScrollToLine(u64 line);
 	void ProcessTextChange(const TextChange* change);
@@ -119,9 +103,10 @@ struct Editor {
 	void PrepareInsertAnimation(u64 capacity = 0);
 	void AddInsertAnimationData(TextPosition from, TextPosition to);
 	void StartInsertAnimation();
-
+	
 	void OnUpdate();
 	
+	void OnFileChanged(const FileChangeRecord* changeRecord);
 	void OnChar(const char* str, u64 len);
 	void OnMouseWheel(f32 scrollValue);
 	void OnKeyDown(KeyEvent event);

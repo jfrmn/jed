@@ -223,13 +223,13 @@ static bool PathsAreEquivalentInternal(std::string_view pathA, std::string_view 
 	const std::string_view cwd = GetWorkingDirectory();
 	if (pathA.starts_with(".\\")) {
 		
-		// match .\ path and absolute path
-		if (pathB.starts_with(cwd) && pathA.substr(2) == pathB.substr(cwd.length()))
-		 	return true;
-	
 		// match .\ path with relative path (without .\)
 		if (pathA.substr(2) == pathB)
 			return true;
+			
+		// match .\ path and absolute path
+		if (pathB.starts_with(cwd) && pathA.substr(2) == pathB.substr(cwd.length()))
+		 	return true;
 	}
 	
 	// match relative path with absolute path

@@ -130,6 +130,7 @@ bool Font::Init(const Description& desc) {
 		this->designUnitsPerEm = metrics.designUnitsPerEm;
 		this->baselineOffset = ConvertFromDesignUnits(metrics.ascent);
 		this->underlineOffset = this->baselineOffset - ConvertFromDesignUnits(metrics.underlinePosition);
+		this->strikethroughOffset = this->baselineOffset - ConvertFromDesignUnits(metrics.strikethroughPosition);
 		this->lineHeight = ConvertFromDesignUnits(metrics.ascent + metrics.descent + metrics.lineGap);
 		this->glyphIndexSpace = glyphIndexSpace;
 	}

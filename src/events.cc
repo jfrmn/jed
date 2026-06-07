@@ -1,6 +1,7 @@
 #include "events.hh"
 #include "util/rect-util.hh"
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool KeyEvent::operator==(KeyEvent other) const {
 	return this->vkeycode == other.vkeycode
 		&& this->ctrl     == other.ctrl

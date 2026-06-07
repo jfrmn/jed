@@ -51,6 +51,7 @@ struct Font {
 	f32 lineHeight = .0f;
 	f32 baselineOffset = .0f;
 	f32 underlineOffset = .0f;
+	f32 strikethroughOffset = .0f;
 
 	//-----------------------------------------------------
 	// functions

@@ -49,6 +49,8 @@ struct Window {
 	void SendUpdate();
 	void PostUpdate();
 	
+	void PostFileChangedEvent(FileChangedEvent* fileChangedEvent);
+	
 	virtual bool OnMouseDown(MouseEvent event)     { return false; }
 	virtual bool OnMouseUp(MouseEvent event)       { return false; }
 	virtual bool OnMouseWheel(float wheel)         { return false; }
@@ -57,6 +59,7 @@ struct Window {
 	virtual void OnChar(const char* utf8, u64 len) {}
 	virtual void OnResize(f32 newW, f32 newH)      {}
 	virtual bool OnClose()                         { return true; }
+	virtual void OnFileChanged(FileChangedEvent* fileChangedEvent) {}
 	
 protected:
 	bool Create(const CreateParams& createParams);

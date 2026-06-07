@@ -19,7 +19,7 @@
 [ ] implement commands
 [ ] synatx highlighting in scrollbar preview and file preview
 [ ] open explorer at current file (maybe a command?)
-[ ] detect file changes
+[.] detect file changes -> watch settings and external files
 
 
 # MINOR TASKS

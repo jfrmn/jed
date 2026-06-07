@@ -3,29 +3,14 @@
 #include <vector>
 #include <string_view>
 
-struct WatchJob;
+struct WatchedDirectory;
 
 struct FileWatcher {
 	
 	//-------------------------------------------
-	// types
-	
-	// should match the constants in windows.h
-	enum Action {
-		 Action_None,
-		 Action_Added,
-		 Action_Removed,
-		 Action_Modified,
-		 Action_RenamedOldName,
-		 Action_RenamedNewName
-	};
-		
-	using OnChangeHandler = void (*) (void* userdata, Action action, std::string_view fileName);
-
-	//-------------------------------------------
 	// data
 	
-	std::vector<WatchJob*> watchJobs = {};
+	std::vector<WatchedDirectory*> watchedDirectories = {};
 	
 	void* hThread = nullptr;
 	void* hEventExitThread = nullptr;
@@ -38,7 +23,8 @@ struct FileWatcher {
 	bool Init();
 	void Shutdown();
 	
-	bool WatchDirectory(std::string_view path, u32 notifyFilter, OnChangeHandler OnChange, void* userdata = nullptr);
+	bool SubscribeDirectoryOfFile(std::string_view filepath);
+	bool UnsubscribeDirectoryOfFile(std::string_view filepath);
 };
 
 extern FileWatcher fileWatcher;

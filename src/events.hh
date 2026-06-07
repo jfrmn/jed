@@ -28,6 +28,36 @@ struct KeyEvent {
 };
 
 //-----------------------------------------------------------------------------
+// File changed event
+//-----------------------------------------------------------------------------
+
+struct FileChangeRecord {
+	// should match the constants in windows.h
+	enum Action {
+	 	 Action_Unknown    = 0,
+	 	 Action_Added      = 1,
+	 	 Action_Removed    = 2,
+	 	 Action_Modified   = 3,
+	 	 Action_RenamedOld = 4,
+	 	 Action_RenamedNew = 5,
+	};
+
+	Action action = Action_Unknown;
+	char*  filename = nullptr;
+	u64    filenameLength = 0u;
+};
+
+struct FileChangedEvent {
+	
+	char* directory = nullptr;
+	u64   directoryLength = 0u;
+	u64   longestFilenameLength = 0u;
+	
+	u64 recordCount = 0u;
+	FileChangeRecord records[1] = {};	
+};
+
+//-----------------------------------------------------------------------------
 // Mouse
 //-----------------------------------------------------------------------------
 

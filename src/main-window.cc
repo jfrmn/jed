@@ -2,8 +2,8 @@
 #include "basic.hh"
 #include "globals.hh"
 #include "settings.hh"
-
 #include "file-watcher.hh"
+
 #include "file-search-bar.hh"
 #include "explorer.hh"
 #include "console.hh"
@@ -26,8 +26,6 @@
 // Creation and Shutdown
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void OnDirectoryChange(void* userdata, FileWatcher::Action action, std::string_view fileName);
 
 bool MainWindow::Create() {
 	const bool ok = Window::Create(
@@ -58,9 +56,7 @@ bool MainWindow::Init() {
 		LogError("init status bar failed");
 		return false;
 	}
-	
-	fileWatcher.WatchDirectory(".", FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, OnDirectoryChange, this);
-	
+		
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	return true;
 }
@@ -116,16 +112,18 @@ static bool FindEditor(const MainWindow* self, std::string_view path, /*out*/ u6
 	}
 	
 	BY_HANDLE_FILE_INFORMATION toFindFileInfo {};
-	const bool ok = LoadFileInformation(path, &toFindFileInfo);
-	if (!ok) return false;
+	if (!LoadFileInformation(path, &toFindFileInfo)) return false;
 	
 	for (u64 i = 0u; i < self->tabs.size(); i++) {
 		const MainWindow::Tab& tab = self->tabs[i];
 		if (tab.editor->path.empty()) continue;
 		
-		const bool same = toFindFileInfo.dwVolumeSerialNumber == tab.editor->fileInfo.volumeSerialNumber
-					   && toFindFileInfo.nFileSizeHigh == tab.editor->fileInfo.fileIndexHigh
-					   && toFindFileInfo.nFileSizeLow == tab.editor->fileInfo.fileIndexLow;
+		BY_HANDLE_FILE_INFORMATION fileInfo {};
+		if (!LoadFileInformation(tab.editor->path, &fileInfo)) continue;
+		
+		const bool same = toFindFileInfo.dwVolumeSerialNumber == fileInfo.dwVolumeSerialNumber
+					   && toFindFileInfo.nFileSizeHigh == fileInfo.nFileIndexHigh
+					   && toFindFileInfo.nFileSizeLow == fileInfo.nFileIndexLow;
 		
 		if (same) {
 			*tabIndex = i;
@@ -268,6 +266,9 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			
 			const std::string_view title = GetFilenameFromPath(currentTab.editor->path);	
 			currentTab.title.Shape(title, settings.fontUi);
+			
+			fileWatcher.SubscribeDirectoryOfFile(currentTab.editor->path);
+			
 			return currentTab.editor;
 		
 		} else {
@@ -284,6 +285,8 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			const std::string_view title = GetFilenameFromPath(editor->path);	
 			newTab.title.Shape(title, settings.fontUi);
 			newTab.editor = editor.release();
+			
+			fileWatcher.SubscribeDirectoryOfFile(newTab.editor->path);
 			
 			if (openBehavior == MainWindow::OpenBehavior_Default) {
 				ChangeTabOfFocusedPanel(this, tabs.size() - 1);
@@ -443,6 +446,13 @@ void MainWindow::OnUpdate() {
 			
 			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, settings.fontUi, settings.GetBrushUiText());
 			
+			if (tab.editor->fileRemoved) {
+				deviceContext->DrawLine(
+					D2D_POINT_2F {PADDING + offsetX,                   PADDING + settings.fontUi.strikethroughOffset},
+					D2D_POINT_2F {PADDING + offsetX + tab.title.width, PADDING + settings.fontUi.strikethroughOffset},
+					settings.GetBrushUiText());
+			}
+			
 			bool isTitleHovered = false;
 			
 			// check click on title
@@ -470,9 +480,9 @@ void MainWindow::OnUpdate() {
 				const bool isHovered = mouse.Hittest(areaIcon, this, OnCloseTab, i);
 				
 				ID2D1Bitmap* icon = nullptr;
-				if      (tab.editor->modified && isHovered) icon = settings.icons.tabsModifiedHovered;
-				else if (tab.editor->modified)              icon = settings.icons.tabsModified;
-				else if (isHovered || isTitleHovered)       icon = settings.icons.tabsHovered;
+				if      (tab.editor->isDirty && isHovered) icon = settings.icons.tabsModifiedHovered;
+				else if (tab.editor->isDirty)              icon = settings.icons.tabsModified;
+				else if (isHovered || isTitleHovered)      icon = settings.icons.tabsHovered;
 				
 				if (icon) {
 					const D2D1_RECT_F iconTargetRect {
@@ -537,38 +547,54 @@ void MainWindow::OnUpdate() {
 		LogWarning("rendering failed. HRESULT: %", FHr(hr));
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Directory changes
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void OnDirectoryChange(void* userdata, FileWatcher::Action action, std::string_view fileName) {
-	auto self = static_cast<MainWindow*>(userdata);
-	
-	std::string_view actionStr;
-	if (action == FileWatcher::Action_Added) actionStr = "Added";
-	else if (action == FileWatcher::Action_Modified || action == FileWatcher::Action_Removed) {
-		actionStr = action == FileWatcher::Action_Modified ? "Modified" : "Removed";
-		
-		for (MainWindow::Tab& tab : self->tabs) {
-			Editor* editor = tab.editor;
-			if (PathsAreEquivalent(fileName, editor->path))
-				editor->CheckFileModification(action == FileWatcher::Action_Removed);
-		}
-	
-	} else if (action == FileWatcher::Action_RenamedOldName) actionStr = "RenamedOldName";
-	else if (action == FileWatcher::Action_RenamedNewName) actionStr = "RenamedNewName";
-	
-	LogDev("Recieved Action '%' for file '%'", actionStr, fileName);
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Input
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
+	
+	char buffer[_MAX_PATH] {0};
+	memcpy(buffer, fileChangedEvent->directory, fileChangedEvent->directoryLength);
+	buffer[fileChangedEvent->directoryLength] = '\\';
+	
+	Tab* renamedTab = nullptr;
+	for (u64 i = 0u; i < fileChangedEvent->recordCount; i++) {
+		const FileChangeRecord& record = fileChangedEvent->records[i];
+		
+		const std::string_view fn {record.filename, record.filenameLength};
+		LogInfo("Action % -> %", static_cast<int>(record.action), fn);
+				
+		memcpy(buffer + fileChangedEvent->directoryLength + 1u, record.filename, record.filenameLength);
+		const std::string_view recordFilepath {buffer, fileChangedEvent->directoryLength + 1u + record.filenameLength};
+		
+		if (record.action == FileChangeRecord::Action_RenamedOld) {
+			for (MainWindow::Tab& tab : tabs) {
+				if (tab.editor->path == recordFilepath) {
+					renamedTab = &tab;
+					break;
+			 	}
+		 	}
+		 	
+		} else if (record.action == FileChangeRecord::Action_RenamedNew && renamedTab) {
+			renamedTab->editor->OnFileChanged(&record);
+			
+			const std::string_view newTitle = GetFilenameFromPath(recordFilepath);
+			renamedTab->title.Shape(newTitle, settings.fontUi);
+			
+			renamedTab = nullptr;
+		
+		} else {
+			for (MainWindow::Tab& tab : tabs) {
+				if (tab.editor->path == recordFilepath) {
+					tab.editor->OnFileChanged(&record);
+					break;
+			 	}
+			}
+		}
+	}
+}
 
 void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
 	ResizePanels(this);
@@ -593,7 +619,6 @@ bool MainWindow::OnMouseWheel(f32 distance) {
 		searchBar->OnMouseWheel(distance);
 		return true;
 	}
-	
 	
 	for (const Panel& panel : panels) {
 		if (RectContains(panel.editor->area, mouse.x, mouse.y)) {

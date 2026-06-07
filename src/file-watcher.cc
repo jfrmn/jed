@@ -1,6 +1,7 @@
 #include "file-watcher.hh"
 #include "util/logging.hh"
 #include "util/string-util.hh"
+#include "main-window.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -10,40 +11,38 @@
 static constexpr u64 BUFFER_SIZE = 1024;
 static_assert(sizeof(FileWatcher::buffer) == BUFFER_SIZE);
 
-static_assert(FileWatcher::Action_Added == FILE_ACTION_ADDED);
-static_assert(FileWatcher::Action_Removed == FILE_ACTION_REMOVED);
-static_assert(FileWatcher::Action_Modified == FILE_ACTION_MODIFIED);
-static_assert(FileWatcher::Action_RenamedOldName == FILE_ACTION_RENAMED_OLD_NAME);
-static_assert(FileWatcher::Action_RenamedNewName == FILE_ACTION_RENAMED_NEW_NAME);
+static_assert(FileChangeRecord::Action_Added == FILE_ACTION_ADDED);
+static_assert(FileChangeRecord::Action_Removed == FILE_ACTION_REMOVED);
+static_assert(FileChangeRecord::Action_Modified == FILE_ACTION_MODIFIED);
+static_assert(FileChangeRecord::Action_RenamedOld == FILE_ACTION_RENAMED_OLD_NAME);
+static_assert(FileChangeRecord::Action_RenamedNew == FILE_ACTION_RENAMED_NEW_NAME);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OVERLAPPED* overlapped);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-struct WatchJob {
-	void* hDirectory = nullptr;
-	u8* buffer = nullptr;
+struct WatchedDirectory {
+	std::string path = {};
 	
-	void* userdata = nullptr;
-	FileWatcher::OnChangeHandler OnChange = nullptr;
+	HANDLE hDirectory = nullptr;
+	OVERLAPPED overlapped = {};	
 	
-	OVERLAPPED overlapped = {};
-	
-	u32 notifyFilter = 0u;
-	
+	u64 references = 0u;
+	std::mutex mtx = {};
+		
 	bool StartReadingDirectoryChanges() {
 		const bool res = ReadDirectoryChangesW(
 			/* hDirectory */          hDirectory,
-			/* lpBuffer */            buffer,
+			/* lpBuffer */            fileWatcher.buffer,
 			/* nBufferLength */       BUFFER_SIZE,
-			/* bWatchSubtree */       true,
-			/* dwNotifyFilter */      notifyFilter,
+			/* bWatchSubtree */       false,
+			/* dwNotifyFilter */      FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
 			/* lpBytesReturned */     nullptr,
 			/* lpOverlapped */        &overlapped,
 			/* lpCompletionRoutine */ CompletionRoutine);
 			
 		if (!res) {
-			LogError("ReadDirectoryChangesW() failed. Last Error: %", FLastErr(GetLastError()));
+			LogWarning("ReadDirectoryChangesW() failed. Last Error: %", FLastErr(GetLastError()));
 			return false;
 		}
 		
@@ -53,10 +52,19 @@ struct WatchJob {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static void StartReadingDirectoryChanges(ULONG_PTR parameter) {
-	auto self = reinterpret_cast<WatchJob*>(parameter);
+	auto self = reinterpret_cast<WatchedDirectory*>(parameter);
 	self->StartReadingDirectoryChanges();
 }
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static void CloseDirectory(ULONG_PTR parameter) {
+	auto self = reinterpret_cast<WatchedDirectory*>(parameter);
+	CancelIo(self->hDirectory);
+	CloseHandle(self->hDirectory);
+	delete self;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OVERLAPPED* overlapped) {
 	
 	if (errorCode == ERROR_OPERATION_ABORTED) return;
@@ -65,28 +73,84 @@ static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OV
 		return;
 	}
 	
-	auto self = static_cast<WatchJob*>(overlapped->hEvent);
+	auto self = static_cast<WatchedDirectory*>(overlapped->hEvent);
+	const std::scoped_lock lock {self->mtx};
 	
-	u64 offset = 0u;
-	auto fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(self->buffer);
-	while (true) {
-		const u64 wFileNameLength = fileNotifyInfo->FileNameLength / sizeof(wchar);
-		const std::wstring_view wFileName {fileNotifyInfo->FileName, wFileNameLength};
-		
-		char utf8Buf[_MAX_PATH] {0}; u64 utf8Len = 0u;
-		ToUtf8(wFileName, utf8Buf, &utf8Len);
-		const std::string_view fileName {utf8Buf, utf8Len};
-		
-		self->OnChange(self->userdata, static_cast<FileWatcher::Action>(fileNotifyInfo->Action), fileName);
-		
-		if (fileNotifyInfo->NextEntryOffset == 0u)
-			break;
+	//
+	// figure out the required size
+	//
+	u64 recordCount = 0u;
+	u64 requiredSize = sizeof(FileChangedEvent) - sizeof(FileChangeRecord);
+	{
+		auto fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(fileWatcher.buffer);
+		u64 offset = 0u;
+		while (true) {			
+			recordCount += 1u;
+			requiredSize += sizeof(FileChangeRecord);
 			
-		offset += fileNotifyInfo->NextEntryOffset;
-		fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(self->buffer + offset);
+			u64 utf8FilenameLen = 0u;
+			ToUtf8(fileNotifyInfo->FileName, {}, &utf8FilenameLen);
+			requiredSize += utf8FilenameLen;
+			
+			if (fileNotifyInfo->NextEntryOffset == 0u) break;
+			offset += fileNotifyInfo->NextEntryOffset;
+			fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(fileWatcher.buffer + offset);
+		}
+		
+		requiredSize += self->path.size();
 	}
 	
-	memset(self->buffer, 0, BUFFER_SIZE);
+	u8* buffer = static_cast<u8*>(malloc(requiredSize));
+	
+	auto fileChangedEvent = reinterpret_cast<FileChangedEvent*>(buffer);
+	fileChangedEvent->recordCount = recordCount;
+	
+	char* fileNameData = reinterpret_cast<char*>(&fileChangedEvent->records[recordCount]);
+	char* fileNameDataEnd = reinterpret_cast<char*>(buffer + requiredSize);
+	
+	//
+	// copy the directory path
+	//
+	{
+		memcpy(fileNameData, self->path.data(), self->path.size());
+		fileChangedEvent->directory = fileNameData;
+		fileChangedEvent->directoryLength = self->path.size();
+		fileNameData += self->path.size();
+	}
+	
+	//
+	// fill the records
+	//	
+	{
+		auto fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(fileWatcher.buffer);
+		u64 offset = 0u;
+		FileChangeRecord* record = fileChangedEvent->records;
+		while (true) {
+			record->action = static_cast<FileChangeRecord::Action>(fileNotifyInfo->Action);
+			
+			ToUtf8(fileNotifyInfo->FileName, {fileNameData, fileNameDataEnd}, &record->filenameLength);
+			record->filename = fileNameData;
+			
+			fileNameData += record->filenameLength;
+			record++;
+			
+			if (fileNotifyInfo->NextEntryOffset == 0u) break;
+			
+			offset += fileNotifyInfo->NextEntryOffset;
+			fileNotifyInfo = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(fileWatcher.buffer + offset);
+		}
+	}
+	ASSERT(fileNameData == fileNameDataEnd);
+	
+	//
+	// send event
+	//
+	mainWindow.PostFileChangedEvent(fileChangedEvent);
+	
+	//
+	// reset and restart reading
+	//
+	memset(fileWatcher.buffer, 0, BUFFER_SIZE);
 	self->StartReadingDirectoryChanges();
 }
 
@@ -103,9 +167,13 @@ static DWORD WINAPI ThreadProc(LPVOID userdata) {
 		}
 	}
 	
+	for (WatchedDirectory* watchedDir : self->watchedDirectories) {
+		CancelIo(watchedDir->hDirectory);
+		CloseHandle(watchedDir->hDirectory);
+		delete watchedDir;
+	}
 	return 0l;
 }
-
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool FileWatcher::Init() {
@@ -128,34 +196,47 @@ bool FileWatcher::Init() {
 		LogError("failed to create file-watcher thread. Last Error: %", FLastErr(GetLastError()));
 		return false;
 	}
-
+	
 	return true;
 }
 
 void FileWatcher::Shutdown() {
 
-	for (WatchJob* job : watchJobs)
-		CancelIo(job->hDirectory);
-		
 	SetEvent(hEventExitThread);
 	
 	const u32 waitRes = WaitForSingleObject(hThread, 5000);
 	if (waitRes != WAIT_OBJECT_0)
 		LogWarning("file-watcher thread did not return in time. Result: %", FWaitRes(waitRes));
 	
-	for (WatchJob* job : watchJobs) {
-		CloseHandle(job->hDirectory);
-		delete job;
-	}
-	
 	CloseHandle(hEventExitThread);
 	CloseHandle(hThread);
 }
 
-bool FileWatcher::WatchDirectory(std::string_view path, u32 notifyFilter, FileWatcher::OnChangeHandler OnChange, void* userdata /*= nullptr*/) {
+bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
+	const u64 posDelimiter = filepath.find_last_of("/\\");
 	
+	// @TODO could be improved
+	// if no delimiter is found than the entire path is the filename and the directory is the cwd
+	ASSERT(posDelimiter != std::string::npos)
+	ASSERT(posDelimiter + 1u <= filepath.length());
+	
+	// need to copy the directory to a buffer because the CreateFile() function takes a null-terminated string
+	char directoryBuffer[_MAX_PATH + 1] {0};
+	memcpy(directoryBuffer, filepath.data(), posDelimiter);
+	directoryBuffer[posDelimiter] = '\0';
+	
+	const std::string_view directory {directoryBuffer, posDelimiter};
+	
+	for (WatchedDirectory* watchedDirectory : watchedDirectories) {
+		if (watchedDirectory->path == directory) {
+			watchedDirectory->references++;
+			return true;
+		}
+	}
+	
+	// create new watchedDirectory	
 	HANDLE hDir = CreateFile(
-		/*lpFileName*/            path.data(),
+		/*lpFileName*/            directoryBuffer,
 		/*dwDesiredAccess*/       FILE_LIST_DIRECTORY,
 		/*dwShareMode*/           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 		/*lpSecurityAttributes*/  NULL,
@@ -163,22 +244,62 @@ bool FileWatcher::WatchDirectory(std::string_view path, u32 notifyFilter, FileWa
 		/*dwFlagsAndAttributes*/  FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
 		/*hTemplateFile*/         NULL);
 	
-	if (hDir == NULL) {
+	if (hDir == INVALID_HANDLE_VALUE) {
 		LogError("CreateFile() failed. Last Error: %", FLastErr(GetLastError()));
 		return false;
 	}
 	
-	WatchJob* job = new WatchJob {
+	auto newWatchedDirectory = new WatchedDirectory {
+		.path = std::string {directory},
 		.hDirectory = hDir,
-		.buffer = buffer,
-		.userdata = userdata,
-		.OnChange = OnChange,
 		.overlapped = OVERLAPPED {},
-		.notifyFilter = notifyFilter};
-	job->overlapped.hEvent = job;
-	const DWORD ok = QueueUserAPC(StartReadingDirectoryChanges, hThread, reinterpret_cast<ULONG_PTR>(job));
-	if (ok == 0u) LogError("QueueUserAPC() failed. Last Error: %", FLastErr(GetLastError()));
+		.references = 1u,
+		.mtx = {}};
+	newWatchedDirectory->overlapped.hEvent = newWatchedDirectory;
 	
-	watchJobs.push_back(job);
+	watchedDirectories.push_back(newWatchedDirectory);	
+	
+	const DWORD ok = QueueUserAPC(StartReadingDirectoryChanges, hThread, reinterpret_cast<ULONG_PTR>(newWatchedDirectory));
+	if (ok == 0u) {
+		LogError("QueueUserAPC() failed. Last Error: %", FLastErr(GetLastError()));
+		return false;
+	}
+	
 	return true;
 }
+
+bool FileWatcher::UnsubscribeDirectoryOfFile(std::string_view filepath) {
+	
+	const u64 posDelimiter = filepath.find_last_of("/\\");
+	
+	// @TODO see above -- could be improved
+	// if no delimiter is found than the entire path is the filename and the directory is the cwd
+	ASSERT(posDelimiter != std::string::npos)
+	ASSERT(posDelimiter + 1u < filepath.length());
+	
+	const std::string_view directory = filepath.substr(0u, posDelimiter);
+	const std::string_view filename = filepath.substr(posDelimiter + 1u);
+	
+	for (u64 i = 0u; i < watchedDirectories.size(); i++) {
+		WatchedDirectory* watchedDirectory = watchedDirectories[i];
+		
+		if (watchedDirectory->path == directory) {
+			if (--watchedDirectory->references > 0u) return true;
+			
+			std::swap(watchedDirectories[i], watchedDirectories.back());
+			watchedDirectories.pop_back();
+			
+			const DWORD ok = QueueUserAPC(CloseDirectory, hThread, reinterpret_cast<ULONG_PTR>(watchedDirectory));
+			if (ok == 0u) {
+				LogError("QueueUserAPC() failed. Last Error: %", FLastErr(GetLastError()));
+				return false;
+			}
+			
+			return true;
+		}
+	}
+	
+	LogError("directory '%' is not watched", filepath);
+	return false;
+}
+
