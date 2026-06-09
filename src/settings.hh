@@ -227,7 +227,7 @@ struct Settings {
 	Font fontEditor = {};
 	
 	f32 scrollbarMarkerHoverDistance = 10.0f;
-	bool backupFileBeforeSaving = false;
+	bool backupFileBeforeSaving = false; // @TODO not implemented
 	
 	//-----------------------------------------------------
 	// functions

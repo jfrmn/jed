@@ -41,7 +41,7 @@
 [ ] make panels resizeable
 [ ] langauge server capabilites could be encoded as bitmask
 [ ] own vector and string classes -> auto clean without capacity; clear without calling dtor on elems
-
+[ ] implement backupFileBeforeSaving
 
 ## COMMAND IDEAS
 

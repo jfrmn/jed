@@ -208,14 +208,17 @@ bool Editor::SaveFile() {
 		return true;
 
 	LogInfo("saving file '%'", path);
-		
-	const std::string tempFilename = FormatString("%.tmp", path);
-	HANDLE hReplacementFile = CreateFileA(tempFilename.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hReplacementFile == INVALID_HANDLE_VALUE) {
-		LogError("CreateFile() failed '%'. Last Error: %", tempFilename, FLastErr(GetLastError()));
+	
+	if (settings.backupFileBeforeSaving) {
+		// @TODO
+	}
+	
+	HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		LogError("CreateFile() failed '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
 		return false;
 	}
-
+	
 	for (u64 i = 0u; i < textController.buffer.LineCount(); i++) {
 		const TextBuffer::Line& line = textController.buffer.lines[i];
 
@@ -223,26 +226,26 @@ bool Editor::SaveFile() {
 		auto textSize = static_cast<DWORD>(text.size());
 		
 		DWORD bytesWritten = 0u;
-		WriteFile(hReplacementFile, text.data(), textSize, &bytesWritten, NULL);
+		WriteFile(hFile, text.data(), textSize, &bytesWritten, NULL);
 		ASSERT(bytesWritten == textSize);
 	}
 
-	CloseHandle(hReplacementFile);
-
-	if (!ReplaceFileA(path.data(), tempFilename.c_str(), NULL, 0, NULL, NULL)) {
-		LogError("ReplaceFile() failed. Last Error: %", FLastErr(GetLastError()));
-		return false;
-	}
+	CloseHandle(hFile);
 	
-	HANDLE hActualFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hActualFile == INVALID_HANDLE_VALUE) {
-		LogError("CreateFileA() failed. '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+	hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		LogError("Failed to reopen file. CreateFile() failed '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
 		return false;
-	}
-	DEFER(CloseHandle(hActualFile));
+	}	
+	GetFileTime(hFile, nullptr, nullptr, &lastWriteTime);
+	CloseHandle(hFile);
 	
-	GetFileTime(hActualFile, nullptr, nullptr, &lastWriteTime);
 	isDirty = false;
+	
+	if (settings.backupFileBeforeSaving) {
+		// @TODO
+	}
+	
 	return true;
 }
 
