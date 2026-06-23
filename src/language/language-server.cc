@@ -1,176 +1,135 @@
 #include "language-server.hh"
 #include "util/logging.hh"
-#include "json/json-mapping.hh"
 
 #include <cJSON/cJSON.h>
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
-#undef SendMessage
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #define STATIC_PRINT_BUFFER_SIZE 1024
 #define TIMEOUT_INIT_AND_SHUTDOWN_REQUESTS 5000
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static bool SendMessage(LanguageServer* self, std::string_view method, cJSON* params, u64 requestId = U64_MAX, bool hintLargeMessage = false) {
-	
-	if (requestId < U64_MAX)
-		LogInfo("sending request % '%'", requestId, method);
-	else
-		LogInfo("sending notification '%'", method);
-
-	cJSON *jrpc = cJSON_CreateObject();
-
-	//
-	// build json
-	//
-	{
-		cJSON_AddItemToObjectCS(jrpc,
-			Lsp::JSONRPC_VERSION.data(),
-			cJSON_CreateStringReference("2.0"));
-
-		if (requestId < U64_MAX) {
-			cJSON_AddItemToObjectCS(jrpc,
-				Lsp::JSONRPC_ID.data(),
-				cJSON_CreateNumber(static_cast<double>(requestId)));
-		}
-
-		cJSON_AddItemToObjectCS(jrpc,
-			Lsp::JSONRPC_METHOD.data(),
-			cJSON_CreateStringReference(method.data()));
-
-		cJSON_AddItemToObjectCS(jrpc,
-			Lsp::JSONRPC_PARAMS.data(),
-			params);
-	}
-
-
-	char staticBuffer[STATIC_PRINT_BUFFER_SIZE] {'\0'};
-	std::string_view contentString {};
-
-	//
-	// json to string
-	//
-	{
-		if (!hintLargeMessage) {
-
-			const bool successfull = cJSON_PrintPreallocated(jrpc, staticBuffer, STATIC_PRINT_BUFFER_SIZE, FALSE);
-
-			if (successfull) {
-				contentString = std::string_view {staticBuffer, strlen(staticBuffer)};
-				goto send;
-			}
-
-			LogWarning("static print buffer too small. using dynamic allocation...");
-		}
-
-		contentString = cJSON_PrintUnformatted(jrpc);
-		ASSERT(!contentString.empty());
-	}
-
-
-	//
-	// send the message
-	//
-send:
-	activeLogger->LogWithArgs(LogLevel_Detail, contentString, {});
-
-	char headerBuffer[32] {};
-	const u64  headerSize = FormatToBuffer(headerBuffer, "Content-Length: %\r\n\r\n", contentString.length());
-
-	bool res = true;
-	res &= self->process.WriteToStdin(std::string_view {headerBuffer, headerSize});
-	res &= self->process.WriteToStdin(contentString);
-
-	if (!res) {
-		LogError("writing message failed");
-		return false;
-	}
-
-	return res;
-}
-
 template<class TReq, class TResp>
-static bool SendRequest(LanguageServer* self, const TReq& request, void* userdata, LanguageServer::FuncOnResponse<TResp> funcOnResp, bool hintLarge = false) {
+static bool SendRequest(LanguageServer* self, const TReq& request, void* userdata, LanguageServer::FuncOnResponse<TResp> funcOnResp) {
 	
 	if constexpr (!std::is_same<TReq, Lsp::InitializeRequest>::value) {
 		if (self->state != LanguageServer::State_Running)
 			return false;
 	}
-
-	//
-	// params to json
-	//
-	JsonAllocator* prevJsonAlloc = SetActiveJsonAllocator(&self->writeAllocator);
-	DEFER({
-		activeJsonAllocator->Reset();
-		activeJsonAllocator = prevJsonAlloc; });
-
-	cJSON* params = JsonFromValue(request);
-	if (!params) {
- 		LogError("json serialization failed");
-		return false;
-	}
-
+	
+	Logger* prevLogger = SetActiveLogger(&self->logger);
+	DEFER(activeLogger = prevLogger);
+	
 	const u64 requestId = self->requestIdCounter++;
+	LogInfo("sending request % '%'", requestId, TReq::METHOD);
 
 	//
 	// place pending request
 	//
 	{	
-		bool (*ParseFunction) (const JsonTrace*, const cJSON*, TResp*) = ::JsonToValue;
+		bool (*ReadResponseJson) (const cJSON*, TResp*) = ::ReadJson;
 
 		LanguageServer::PendingRequest pendingRequest;
 		pendingRequest.userdata = userdata,
 		pendingRequest.OnResponse = reinterpret_cast<void(*)(void*, void*, Lsp::ErrorResponse*)>(funcOnResp),
-		pendingRequest.ParseResponse = reinterpret_cast<bool(*)(const JsonTrace*, const cJSON*, void*)>(ParseFunction),
+		pendingRequest.ReadResponseJson = reinterpret_cast<bool(*)(const cJSON*, void*)>(ReadResponseJson),
 		pendingRequest.responseData.reset(new TResp());
 
-		const auto pairResult = self->pendingRequests.emplace(requestId, std::move(pendingRequest)); 
+		const auto pairResult = self->pendingRequests.emplace(requestId, std::move(pendingRequest));
 		ASSERT(pairResult.second);
 	}
 
+	 char staticBuffer[STATIC_PRINT_BUFFER_SIZE] {0};	
+	JsonWriteBuffer writeBuffer {staticBuffer};
+	
 	//
-	// send the message
+	// create json
 	//
-	if (!SendMessage(self, TReq::METHOD, params, requestId, hintLarge)) {
-		LogError("SendMessage() failed");
-		self->pendingRequests.erase(requestId);
-		return false;
+	{
+		writeBuffer.WriteObjectStart();
+		writeBuffer.WriteProperty(Lsp::JSONRPC_VERSION)->WriteRawString("2.0");
+		writeBuffer.WriteProperty(Lsp::JSONRPC_ID)->WriteUnsigned(requestId);
+		writeBuffer.WriteProperty(Lsp::JSONRPC_METHOD)->WriteRawString(TReq::METHOD);
+		writeBuffer.WriteProperty(Lsp::JSONRPC_PARAMS);
+		WriteJson(&request, &writeBuffer);
+		writeBuffer.WriteObjectEnd();
+	}
+	
+	//
+	// send message
+	//	
+	{
+		const std::string_view contentString = writeBuffer.GetString();
+		activeLogger->LogWithArgs(LogLevel_Detail, contentString, {});
+
+		char headerBuffer[32] {};
+		const u64 headerSize = FormatToBuffer(headerBuffer, "Content-Length: %\r\n\r\n", contentString.length());
+	
+		bool res = true;
+		res &= self->process.WriteToStdin(std::string_view {headerBuffer, headerSize});
+		res &= self->process.WriteToStdin(contentString);
+	
+		if (!res) {
+			LogError("writing message failed");
+			self->pendingRequests.erase(requestId);
+			return false;
+		}
 	}
 	
 	return true;
 }
 
 template<class TNotif>
-static bool SendNotification(LanguageServer* self, const TNotif& notification, bool hintLarge = false) {
+static bool SendNotification(LanguageServer* self, const TNotif& notification) {
 
 	if constexpr (!std::is_same<TNotif, Lsp::InitializedNotification>::value) {
 		if (self->state != LanguageServer::State_Running)
 			return false;
 	}
 	
-	JsonAllocator* prevAlloc = SetActiveJsonAllocator(&self->writeAllocator);
-	DEFER({
-		activeJsonAllocator->Reset();
-		activeJsonAllocator = prevAlloc; });
-		
+	LogInfo("sending notification '%'", TNotif::METHOD);
+			
 	Logger* prevLogger = SetActiveLogger(&self->logger);
 	DEFER(activeLogger = prevLogger);
 
-	cJSON *params = JsonFromValue(notification);
-	if (!params) {
- 		LogError("json serialization failed");
-		return false;
+	char staticBuffer[STATIC_PRINT_BUFFER_SIZE] {0};	
+	JsonWriteBuffer writeBuffer {staticBuffer};
+	
+	//
+	// create json
+	//
+	{
+		writeBuffer.WriteObjectStart();
+		writeBuffer.WriteProperty(Lsp::JSONRPC_VERSION)->WriteRawString("2.0");
+		writeBuffer.WriteProperty(Lsp::JSONRPC_METHOD)->WriteRawString(TNotif::METHOD);
+		writeBuffer.WriteProperty(Lsp::JSONRPC_PARAMS);
+		WriteJson(&notification, &writeBuffer);
+		writeBuffer.WriteObjectEnd();
 	}
+	
+	//
+	// send message
+	//	
+	{
+		const std::string_view contentString = writeBuffer.GetString();
+		activeLogger->LogWithArgs(LogLevel_Detail, contentString, {});
 
-	if (!SendMessage(self, TNotif::METHOD, params, U64_MAX, hintLarge)) {
-		LogError("SendMessage() failed");
-		return false;
+		char headerBuffer[32] {};
+		const u64 headerSize = FormatToBuffer(headerBuffer, "Content-Length: %\r\n\r\n", contentString.length());
+	
+		bool res = true;
+		res &= self->process.WriteToStdin(std::string_view {headerBuffer, headerSize});
+		res &= self->process.WriteToStdin(contentString);
+	
+		if (!res) {
+			LogError("writing message failed");
+			return false;
+		}
 	}
-
+	
 	return true;
 }
 
@@ -182,7 +141,7 @@ static bool ParseHeader(LanguageServer* self, std::string_view data, /*out*/ std
 		if (data.starts_with(Lsp::HEADER_CONTENT_LENGTH)) {
 			data.remove_prefix(Lsp::HEADER_CONTENT_LENGTH.length());
 
-			std::from_chars_result fromCharsResult = std::from_chars(data.data(), data.data() + data.length(), header.contentLength);
+			const std::from_chars_result fromCharsResult = std::from_chars(data.data(), data.data() + data.length(), header.contentLength);
 
 			if (fromCharsResult.ec != std::errc()) {
 				LogError("failed to parse content-length: %", data.substr(0, 100));
@@ -198,9 +157,8 @@ static bool ParseHeader(LanguageServer* self, std::string_view data, /*out*/ std
 			auto offsetToDelim = data.find(Lsp::HEADER_DELIMITER);
 			header.contentType = data.substr(0, offsetToDelim);
 			data = data.substr(offsetToDelim + Lsp::HEADER_DELIMITER.length());
-		}
-			
-		else if (data.starts_with(Lsp::HEADER_DELIMITER)) {
+		
+		} else if (data.starts_with(Lsp::HEADER_DELIMITER)) {
 			data.remove_prefix(Lsp::HEADER_DELIMITER.length());
 			content = data;
 			return true;
@@ -226,34 +184,16 @@ static bool ProcessMessage(LanguageServer* self) {
 		LogError("failed to parse message (error at pos %):\n%", errpos - self->readBuffer.data(), self->readBuffer);
 		return false;
 	}
-
-	//
-	// get object map
-	//
-	std::unordered_map<std::string_view, cJSON*> serverMessage;
-	if (!JsonObjectToMap(nullptr, json, &serverMessage)) {
-		LogError("failed to deserialize server message");
-		return false;
-	}
+	JsonObjectReader objectReader {json};
 	
 	//
 	// response?
 	//
-	if (auto itId = serverMessage.find(Lsp::JSONRPC_ID); itId != serverMessage.end()) {
-
-		u64 requestId = 0u;
-		if (double frequestId = cJSON_GetNumberValue(itId->second); !isnan(frequestId)) {
-			requestId = static_cast<u64>(frequestId);
-			LogInfo("recieved response to %", requestId);
-			
-		} else {
-			LogError("id-field of jsonprc is not a number");
-			return false;
-		}
+	if (u64 requestId = 0u; objectReader.ReadUnsigned(Lsp::JSONRPC_ID, &requestId)) {
+		LogInfo("recieved response to %", requestId);
 		
 		LanguageServer::PendingRequest pendingRequest;
-		Lsp::ErrorResponse error;
-		
+				
 		// extract response
 		if (auto node = self->pendingRequests.extract(requestId)) {
 			pendingRequest = std::move(node.mapped());
@@ -266,53 +206,52 @@ static bool ProcessMessage(LanguageServer* self) {
 		//
 		// successfull response?
 		//
-		if (auto itResult = serverMessage.find(Lsp::JSONRPC_RESULT); itResult != serverMessage.end()) {
+		if (const cJSON* jsonResult = objectReader.Get(Lsp::JSONRPC_RESULT)) {
 
-			if (pendingRequest.ParseResponse(nullptr, itResult->second, pendingRequest.responseData.get())) {
+			if (pendingRequest.ReadResponseJson(jsonResult, pendingRequest.responseData.get())) {
 				pendingRequest.OnResponse(pendingRequest.userdata, pendingRequest.responseData.get(), nullptr);
 				return true;
 			
 			} else {
-				error.code = Lsp::ErrorResponse::Code_ClientParseError;
-				error.message = "failed to parse reponse data";
-				goto error_response;
+				Lsp::ErrorResponse error {
+					.code = Lsp::ErrorResponse::Code_ClientParseError,
+					.message = "failed to parse reponse data"};
+				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
 			}
 
 		//
 		// error response?
 		//
-		} else if (auto itError = serverMessage.find(Lsp::JSONRPC_ERROR); itError != serverMessage.end()) {
+		} else if (const cJSON* jsonError = objectReader.Get(Lsp::JSONRPC_ERROR)) {
 
-			if (JsonToValue(nullptr, itError->second, &error)) {
+			if (Lsp::ErrorResponse error; ReadJson(jsonError, &error)) {
 				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
 				return true;
 
 			} else {
-				error.code = Lsp::ErrorResponse::Code_ClientParseError;
-				error.message = "failed to parse error data";
-				goto error_response;
+				error.code = Lsp::ErrorResponse::Code_ClientParseError,
+				error.message = "failed to parse reponse data";
+				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
 			}
 		
 		} else {
-			error.code = Lsp::ErrorResponse::Code_ClientInconclusiveMessage;
-			error.message = "response has an 'id'-property but neither 'result' nor 'error'";
-			goto error_response;
+				Lsp::ErrorResponse error {
+					.code = Lsp::ErrorResponse::Code_ClientParseError,
+					.message = "failed to parse reponse data"};
+				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
 		}
 
-	error_response:
-		pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);		
 		return false;
 
 	//
 	// notification?
 	//
-	} else if (auto itMethod = serverMessage.find(Lsp::JSONRPC_METHOD); itMethod != serverMessage.end()) {
+	} else if (std::string_view method; objectReader.ReadString(Lsp::JSONRPC_METHOD, &method)) {
 
-		const std::string_view method {cJSON_GetStringValue(itMethod->second)};
 		LogInfo("recieved notification '%'", method);
 		
-		auto itParams = serverMessage.find(Lsp::JSONRPC_PARAMS);
-		if (itParams == serverMessage.end()) {
+		const cJSON* jsonParams = objectReader.Get(Lsp::JSONRPC_PARAMS);
+		if (!jsonParams) {
 			LogError("notification is missing property 'params'");
 			return false;
 		}
@@ -322,7 +261,7 @@ static bool ProcessMessage(LanguageServer* self) {
 		if (method == Lsp::PublishDiagnosticsNotification::METHOD) {
 			
 			Lsp::PublishDiagnosticsNotification diagnosticsNotification;
-			if (!JsonToValue(nullptr, itParams->second, &diagnosticsNotification)) {
+			if (!ReadJson(jsonParams, &diagnosticsNotification)) {
 				LogError("failed to parse notification");
 				return false;
 			}
@@ -350,7 +289,7 @@ struct EventUserdata {
 	HANDLE hEvent = NULL;
 };
 
-static void OnInitResponse(void* userdata, Lsp::InitializeResponse* response, Lsp::ErrorResponse* errorResponse ) {
+static void OnInitResponse(void* userdata, Lsp::InitializeResponse* response, Lsp::ErrorResponse* errorResponse) {
 	auto self = static_cast<EventUserdata*>(userdata)->server;
 	auto hEvent = static_cast<EventUserdata*>(userdata)->hEvent;
 
@@ -359,7 +298,7 @@ static void OnInitResponse(void* userdata, Lsp::InitializeResponse* response, Ls
 		self->initResponse = std::move(*response);
 	
 	} else {
-		//LogError("initialize request failed: $", errorResponse);
+		LogError("initialize request failed: %", errorResponse);
 	}
 
 	SetEvent(hEvent);
@@ -396,10 +335,6 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 	LogInfo("server initializing");
 	state = State_Initializing;
 
-	writeAllocator.Init();
-	JsonAllocator* prevAlloc = SetActiveJsonAllocator(&writeAllocator);
-	DEFER(activeJsonAllocator = prevAlloc);
-
 	//
 	// send init request
 	//
@@ -421,7 +356,7 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 
 		EventUserdata userdata {this, hEvent};
 
-		if (!SendRequest(this, initRequest, &userdata, OnInitResponse, true)) {
+		if (!SendRequest(this, initRequest, &userdata, OnInitResponse)) {
 			LogError("sending init-request failed");
 			return false;
 		}
@@ -533,7 +468,7 @@ Lsp::TextDocumentSyncServerCapabilities::SyncKind LanguageServer::GetTextDocumen
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool LanguageServer::SendDidOpenNotification(const Lsp::DidOpenTextDocumentNotification& notification) {
-	return SendNotification(this, notification, true);
+	return SendNotification(this, notification);
 }
 
 bool LanguageServer::SendDidCloseNotification(const Lsp::DidCloseTextDocumentNotification& notification) {
@@ -603,14 +538,13 @@ void LanguageServer::OnStdout(std::string_view data) {
 		
 		expectedSize = 0u;
 		readBuffer.clear();
-		readAllocator.Reset();
+		jsonAllocator.Reset();
 	}
 }
 
 void LanguageServer::OnStarted() {
-	readAllocator.Init();
 	activeLogger = &logger;
-	activeJsonAllocator = &readAllocator;
+	JsonAllocator::activeAllocator = &jsonAllocator;
 }
 
 void LanguageServer::OnExited(int exitCode) {

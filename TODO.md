@@ -7,6 +7,7 @@
 [ ] delete line does not work with multiple cursors
 [?] delete line messes up tree sitter highlighting (and i think pasting text too) (FIXED?)
 [ ] untab at beginning of produces textChange with 0 operations
+[ ] multicursor let's you remove all cursors - leading to a crash
 
 # MAJOR TASKS
 

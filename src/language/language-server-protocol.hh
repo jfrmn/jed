@@ -8,6 +8,7 @@
 #include <array>
 
 struct cJSON;
+struct JsonWriteBuffer;
 
 namespace LanguageServerProtocol {
 
@@ -39,7 +40,6 @@ namespace LanguageServerProtocol {
 	struct ErrorResponse {
 		
 		enum Code {
-		
 			// NOTE: not part of the official sepcs
 			Code_Success = 0,
 			
@@ -64,9 +64,9 @@ namespace LanguageServerProtocol {
 		};
 
 		// NOTE: should be an integer
-		s64 code = Code_Success;
+		int code = Code_Success;
 		std::string_view message = {};
-		cJSON *data = nullptr;
+		const cJSON* data = nullptr;
 	};
 
 	//=============================================================================
@@ -112,8 +112,8 @@ namespace LanguageServerProtocol {
 
 	struct MarkupString {
 		MarkupKind kind = MarkupKind_Plaintext;
-		std::string language = {};
-		std::string value = {};
+		std::string_view language = {};
+		std::string_view value = {};
 	};
 
 	struct TextEdit {
@@ -280,13 +280,13 @@ namespace LanguageServerProtocol {
 		ItemKinds completionItemKind = {};
 		bool contextSupport = true;
 
-		int inserTextMode = InsertTextMode_AsIs;
+		int insertTextMode = InsertTextMode_AsIs;
 	};
 
 	struct CompletionServerCapabilities {
 		
-		std::vector<std::string> triggerCharacters = {};
-		std::vector<std::string> allCommitCharacters = {};
+		std::vector<std::string_view> triggerCharacters = {};
+		std::vector<std::string_view> allCommitCharacters = {};
 		bool resolveProvider = false;
 
 		struct CompletionItem {
@@ -544,7 +544,7 @@ namespace LanguageServerProtocol {
 			};
 			
 			int triggerKind = TriggerKind_Unknown;
-			std::string triggerCharacter = {};
+			std::string_view triggerCharacter = {};
 		};
 
 		TextDocumentIdentifier textDocument = {};
@@ -563,7 +563,7 @@ namespace LanguageServerProtocol {
 					bool isSubstring = false;
 					union {
 						std::string_view string;
-						std::array<int, 2> substring;
+						std::pair<int, int> substring;
 					};
 				};
 				
@@ -571,7 +571,7 @@ namespace LanguageServerProtocol {
 				MarkupString documentation = {};
 			};
 			
-			std::string label = {};
+			std::string_view label = {};
 			MarkupString documentation = {};
 			std::vector<Parameter> parameters = {};
 			int activeParameter = -1;
@@ -625,7 +625,7 @@ namespace LanguageServerProtocol {
 		
 		// The version number of this document (it will increase after each
 		// change, including undo/redo).
-		s64 version = 0;
+		s32 version = 0;
 
 		std::string_view text = {};
 	};
@@ -713,7 +713,7 @@ namespace LanguageServerProtocol {
 	};
 
 	//==============================================================================
-	// Window Features
+	// WINDOW FEATURES
 	//==============================================================================
 
 	//-----------------------------------------------------------------------------
@@ -744,9 +744,10 @@ namespace LanguageServerProtocol {
 			MessageType_Warning = 2,
 			MessageType_Info = 3,
 			MessageType_Log = 4
-		} type = MessageType_Unspecified;
-
-		std::string message = {};
+		}; 
+		
+		MessageType type = MessageType_Unspecified;
+		std::string_view message = {};
 	};
 
 	//-----------------------------------------------------------------------------
@@ -767,8 +768,8 @@ namespace LanguageServerProtocol {
 
 	struct LogTraceNotification {
 		static constexpr std::string_view METHOD = "$/logTrace";
-		std::string message;
-		std::string verbose;
+		std::string_view message;
+		std::string_view verbose;
 	};
 
 	struct SetTraceParams {
@@ -776,7 +777,7 @@ namespace LanguageServerProtocol {
 	};
 
 	//==============================================================================
-	// Lifecycle
+	// LIFECYCLE
 	//==============================================================================
 
 	struct InitializeRequest {
@@ -785,8 +786,8 @@ namespace LanguageServerProtocol {
 		int processId = 0;
 
 		struct ClientInfo {
-			std::string name = {};
-			std::string version = {};
+			std::string_view name = {};
+			std::string_view version = {};
 		} clientInfo = {};
 
 		// The locale the client is currently showing the user interface
@@ -795,9 +796,9 @@ namespace LanguageServerProtocol {
 		//
 		// Uses IETF language tags as the value's syntax
 		// (See https://en.wikipedia.org/wiki/IETF_language_tag)
-		std::string locale = "en";
+		std::string_view locale = "en";
 
-		std::string rootPath = {};
+		std::string_view rootPath = {};
 
 		// User provided initialization options.
 		//initializationOptions?: LSPAny;
@@ -897,8 +898,8 @@ namespace LanguageServerProtocol {
 		} capabilities = {};
 
 		struct ServerInfo {
-			std::string name = {}; 
-			std::string version = {};
+			std::string_view name = {}; 
+			std::string_view version = {};
 		} serverInfo = {};
 	};
 
@@ -928,109 +929,115 @@ namespace Lsp = LanguageServerProtocol;
 
 struct JsonTrace;
 
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::ErrorResponse* result);
+// GERNERAL STRUCTURES
+bool ReadJson(const cJSON* json, Lsp::ErrorResponse* value);
+bool ReadJson (const cJSON* json, Lsp::Position* value);
+void WriteJson(const Lsp::Position* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::Range* value);
+void WriteJson(const Lsp::Range* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::Location* value);
+void WriteJson(const Lsp::Location* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::PositionEncodingKind* value);
+void WriteJson(const Lsp::PositionEncodingKind* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::TextDocumentIdentifier* value);
+void WriteJson(const Lsp::TextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::VersionedTextDocumentIdentifier* value);
+void WriteJson(const Lsp::VersionedTextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::MarkupKind* value);
+void WriteJson(const Lsp::MarkupKind* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::MarkupString* value);
+void WriteJson(const Lsp::MarkupString* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::TextEdit* value);
+void WriteJson(const Lsp::TextEdit* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::CompletionItemKind* value);
+void WriteJson(const Lsp::CompletionItemKind* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::TraceValue* value);
+void WriteJson(const Lsp::TraceValue* value, JsonWriteBuffer* writeBuffer);
 
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::Position* result);
-cJSON* JsonFromValue(const Lsp::Position& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::Range* result);
-cJSON* JsonFromValue(const Lsp::Range& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::Location* result);
-cJSON* JsonFromValue(const Lsp::Location& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::PositionEncodingKind* result);
-cJSON* JsonFromValue(const Lsp::PositionEncodingKind& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TextDocumentIdentifier* result);
-cJSON* JsonFromValue(const Lsp::TextDocumentIdentifier& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::VersionedTextDocumentIdentifier* result);
-cJSON* JsonFromValue(const Lsp::VersionedTextDocumentIdentifier& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::MarkupKind* result);
-cJSON* JsonFromValue(const Lsp::MarkupKind& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::MarkupString* result);
-cJSON* JsonFromValue(const Lsp::MarkupString& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TextEdit* result);
-cJSON* JsonFromValue(const Lsp::TextEdit& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::CompletionItemKind* result);
-cJSON* JsonFromValue(const Lsp::CompletionItemKind& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TraceValue* result);
-cJSON* JsonFromValue(const Lsp::TraceValue& value);
+// LANGUAGE FEATURES
+void WriteJson(const Lsp::GotoClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::GotoServerCapabilities* value);
+void WriteJson(const Lsp::GotoDeclerationRequest* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::GotoDefinitionRequest* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::GotoTypeDefinitionRequest* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::GotoImplementationRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::GotoResponse* value);
+void WriteJson(const Lsp::GotoReferencesClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::GotoReferencesRequest* value, JsonWriteBuffer* writeBuffer);
 
-cJSON* JsonFromValue(const Lsp::GotoClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::GotoServerCapabilities* result);
-cJSON* JsonFromValue(const Lsp::GotoDeclerationRequest& value);
-cJSON* JsonFromValue(const Lsp::GotoDefinitionRequest& value);
-cJSON* JsonFromValue(const Lsp::GotoTypeDefinitionRequest& value);
-cJSON* JsonFromValue(const Lsp::GotoImplementationRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::GotoResponse* result);
-cJSON* JsonFromValue(const Lsp::GotoReferencesClientCapabilities& value);
-cJSON* JsonFromValue(const Lsp::GotoReferencesRequest& value);
+// Completion
+void WriteJson(const Lsp::CompletionClientCapabilities::CompletionItem* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::CompletionClientCapabilities::ItemKinds* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::CompletionClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::CompletionServerCapabilities::CompletionItem* value);
+bool ReadJson (const cJSON* json, Lsp::CompletionServerCapabilities* value);
+void WriteJson(const Lsp::CompletionRequest::CompletionRequest::Context* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::CompletionRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::CompletionResponse::Item* value);
+bool ReadJson (const cJSON* json, Lsp::CompletionResponse* value);
 
-cJSON* JsonFromValue(const Lsp::CompletionClientCapabilities::CompletionItem& value);
-cJSON* JsonFromValue(const Lsp::CompletionClientCapabilities::ItemKinds& value);
-cJSON* JsonFromValue(const Lsp::CompletionClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::CompletionServerCapabilities::CompletionItem* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::CompletionServerCapabilities* result);
-cJSON* JsonFromValue(const Lsp::CompletionRequest::CompletionRequest::Context& value);
-cJSON* JsonFromValue(const Lsp::CompletionRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::CompletionResponse::Item* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::CompletionResponse* result);
-
-cJSON* JsonFromValue(const Lsp::HoverClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::HoverServerCapabilities* result);
-cJSON* JsonFromValue(const Lsp::HoverRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::HoverResponse* result);
+// Hover
+void WriteJson(const Lsp::HoverClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::HoverServerCapabilities* value);
+void WriteJson(const Lsp::HoverRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::HoverResponse* value);
   
-cJSON* JsonFromValue(const Lsp::DocumentSymbolClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::DocumentSymbolServerCapabilities* result);
-cJSON* JsonFromValue(const Lsp::DocumentSymbolRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::SymbolInformation* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::DocumentSymbolResponse* result);
+// Document symbols
+void WriteJson(const Lsp::DocumentSymbolClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::DocumentSymbolServerCapabilities* value);
+void WriteJson(const Lsp::DocumentSymbolRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::SymbolInformation* value);
+bool ReadJson (const cJSON* json, Lsp::DocumentSymbolResponse* value);
 
-cJSON* JsonFromValue(const Lsp::TextDocumentSyncClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SyncKind* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SaveOptions* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::TextDocumentSyncServerCapabilities* result);
+// Signature Help
+void WriteJson(const Lsp::SignatureHelpClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::SignatureHelpServerCapabilities* value);
+void WriteJson(const Lsp::SignatureHelpRequest* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::SignatureHelpRequest::Context* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::SignatureHelpResponse* value);
 
-cJSON* JsonFromValue(const Lsp::TextDocumentItem& value);
-cJSON* JsonFromValue(const Lsp::DidOpenTextDocumentNotification& value);
-cJSON* JsonFromValue(const Lsp::DidCloseTextDocumentNotification& value);
-cJSON* JsonFromValue(const Lsp::DidChangeTextDocumentNotification::ChangeEvent& value);
-cJSON* JsonFromValue(const Lsp::DidChangeTextDocumentNotification& value);
-cJSON* JsonFromValue(const Lsp::WillSaveTextDocumentNotification::SaveReason& value);
-cJSON* JsonFromValue(const Lsp::WillSaveTextDocumentNotification& value);
-cJSON* JsonFromValue(const Lsp::DidSaveTextDocumentNotification& value);
+// DOCUMENT SYNCHRONIZATION
+void WriteJson(const Lsp::TextDocumentSyncClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SyncKind* value);
+bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SaveOptions* value);
+bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities* value);
 
-cJSON* JsonFromValue(const Lsp::ShowMessageRequestClientCapabilities::MessageActionItem& value);
-cJSON* JsonFromValue(const Lsp::ShowMessageRequestClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::MessageNotification::MessageType* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::MessageNotification* result);
+void WriteJson(const Lsp::TextDocumentItem* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::DidOpenTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::DidCloseTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::DidChangeTextDocumentNotification::ChangeEvent* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::DidChangeTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::WillSaveTextDocumentNotification::SaveReason* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::WillSaveTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::DidSaveTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
 
-cJSON* JsonFromValue(const Lsp::PublishDiagnosticsClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::Diagnostic* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::PublishDiagnosticsNotification* result);
+// WINDOW FEATURES
+void WriteJson(const Lsp::ShowMessageRequestClientCapabilities::MessageActionItem* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::ShowMessageRequestClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::MessageNotification::MessageType* value);
+bool ReadJson (const cJSON* json, Lsp::MessageNotification* value);
 
-cJSON* JsonFromValue(const Lsp::SignatureHelpClientCapabilities& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::SignatureHelpServerCapabilities* result);
-cJSON* JsonFromValue(const Lsp::SignatureHelpRequest& value);
-cJSON* JsonFromValue(const Lsp::SignatureHelpRequest::Context& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::SignatureHelpResponse* result);
+void WriteJson(const Lsp::PublishDiagnosticsClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::Diagnostic* value);
+bool ReadJson (const cJSON* json, Lsp::PublishDiagnosticsNotification* value);
 
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::LogTraceNotification* result);
-cJSON* JsonFromValue(const Lsp::SetTraceParams& value);
+bool ReadJson (const cJSON* json, Lsp::LogTraceNotification* value);
+void WriteJson(const Lsp::SetTraceParams* value, JsonWriteBuffer* writeBuffer);
 
-cJSON* JsonFromValue(const Lsp::InitializeRequest::ClientInfo& value);
-cJSON* JsonFromValue(const Lsp::InitializeRequest::ClientCapabilities& value);
-cJSON* JsonFromValue(const Lsp::InitializeRequest::ClientCapabilities::TextDocumentClientCapabilities& value);
-cJSON* JsonFromValue(const Lsp::InitializeRequest::ClientCapabilities::Window& value);
-cJSON* JsonFromValue(const Lsp::InitializeRequest::ClientCapabilities::General& value);
-cJSON* JsonFromValue(const Lsp::InitializeRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::InitializeResponse::ServerCapabilities* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::InitializeResponse::ServerInfo* result);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::InitializeResponse* result);
-cJSON* JsonFromValue(const Lsp::ShutdownRequest& value);
-bool   JsonToValue  (const JsonTrace* trace, const cJSON* json, Lsp::ShutdownResponse* result);
-cJSON* JsonFromValue(const Lsp::InitializedNotification& value);
-cJSON* JsonFromValue(const Lsp::ExitNotification& value);
+// LIFECYCLE
+void WriteJson(const Lsp::InitializeRequest::ClientInfo* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::TextDocumentClientCapabilities* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::Window* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::General* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::InitializeRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerCapabilities* value);
+bool ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerInfo* value);
+bool ReadJson (const cJSON* json, Lsp::InitializeResponse* value);
+void WriteJson(const Lsp::ShutdownRequest* value, JsonWriteBuffer* writeBuffer);
+bool ReadJson (const cJSON* json, Lsp::ShutdownResponse* value);
+void WriteJson(const Lsp::InitializedNotification* value, JsonWriteBuffer* writeBuffer);
+void WriteJson(const Lsp::ExitNotification* value, JsonWriteBuffer* writeBuffer);
 
 // for logging
 //FormatArgument F(const Lsp::ErrorResponse* err);
-
-

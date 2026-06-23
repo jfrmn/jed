@@ -7,7 +7,7 @@
 #include "graphics/glyph-run.hh"
 
 #include "language/language.hh"
-#include "json/json-basic.hh"
+#include "language/json-helper.hh"
 #include "util/logging.hh"
 #include "file-watcher.hh"
  

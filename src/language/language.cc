@@ -231,7 +231,7 @@ static void OnAutocompleteResponse(void* userdata, Lsp::CompletionResponse* resp
 					.type = static_cast<EditorAutocomplete::Item::Type>(lspItem.kind),
 					.label = std::string {lspItem.label},
 					.details = std::string {lspItem.detail},
-					.documentation = lspItem.documentation.value,
+					.documentation = std::string {lspItem.documentation.value},
 					.insertPosition = ToTextPosition(lspItem.textEdit.range.start),
 					.insertText = std::string {insertText}};
 				
@@ -324,8 +324,8 @@ static void OnSignatureHelpResponse(void* userdata, Lsp::SignatureHelpResponse* 
 					
 					if (lspParameter.label.isSubstring) {
 						parameter.labelIsSubstring = true;
-						parameter.labelOffset   = lspParameter.label.substring[0];
-						parameter.labelLength   = lspParameter.label.substring[1] - parameter.labelOffset;
+						parameter.labelOffset   = lspParameter.label.substring.first;
+						parameter.labelLength   = lspParameter.label.substring.second - parameter.labelOffset;
 					} else {
 						parameter.labelIsSubstring = false;
 						parameter.labelData = new char[lspParameter.label.string.length()];

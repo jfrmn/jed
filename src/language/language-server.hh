@@ -1,6 +1,6 @@
 #pragma once
 #include "language-server-protocol.hh"
-#include "json/json-basic.hh"
+#include "json-helper.hh"
 #include "util/process.hh"
 #include "util/logging.hh"
 
@@ -37,7 +37,7 @@ struct LanguageServer : public Process::Observer {
 		void (*OnResponse) (void* userdata, void* response, Lsp::ErrorResponse* error) = nullptr;
 
 		std::unique_ptr<Lsp::Response> responseData = nullptr;
-		bool (*ParseResponse) (const JsonTrace*, const cJSON*, void*) = nullptr;
+		bool (*ReadResponseJson) (const cJSON*, void*) = nullptr;
 	};
 
 	//-----------------------------------------------------
@@ -49,8 +49,7 @@ struct LanguageServer : public Process::Observer {
 	Process process = {};
 	Lsp::InitializeResponse initResponse = {};
 
-	JsonAllocator readAllocator;
-	JsonAllocator writeAllocator;
+	JsonAllocator jsonAllocator;
 
 	usize expectedSize = 0u;
 	std::string readBuffer = {};

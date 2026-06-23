@@ -1,724 +1,877 @@
 #include "language-server-protocol.hh"
-#include "json/json-mapping.hh"
-#include "json/json-mapping-stl.h"
+#include "json-helper.hh"
 
 #include <cJSON/cJSON.h>
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-template<class T>
-static bool JsonToValue(const JsonTrace* trace, const cJSON* json, std::optional<T>* result) {
-	
-	if (!JsonCheckType(trace, json, cJSON_True | cJSON_False | cJSON_Object))
-		return false;
+#define MARKUP_KIND_MAPPING(X)\
+	X(Lsp::MarkupKind_Plaintext, "plaintext")\
+	X(Lsp::MarkupKind_Markdown, "markdown")
 
-	if (cJSON_IsTrue(json)) {
-		result->emplace();
-		return true;
-	
-	} else if (cJSON_IsFalse(json)) {
+#define POSITION_ENCODING_MAPPING(X)\
+	X(Lsp::PositionEncodingKind_Utf8, "utf-8")\
+	X(Lsp::PositionEncodingKind_Utf16, "utf-16")\
+	X(Lsp::PositionEncodingKind_Utf32, "utf-32")
+
+#define TRACE_VALUE_MAPPING(X)\
+	X(Lsp::TraceValue_Off, "off")\
+	X(Lsp::TraceValue_Messages, "messages")\
+	X(Lsp::TraceValue_Verbose, "verbose")
+
+#define COMPLETION_ITEM_KIND_MAPPING(X)\
+	X(Lsp::CompletionItemKind_Unspecified, "unspecified")\
+	X(Lsp::CompletionItemKind_Text, "text")\
+	X(Lsp::CompletionItemKind_Method, "method")\
+	X(Lsp::CompletionItemKind_Function, "function")\
+	X(Lsp::CompletionItemKind_Constructor, "constructor")\
+	X(Lsp::CompletionItemKind_Field, "field")\
+	X(Lsp::CompletionItemKind_Variable, "variable")\
+	X(Lsp::CompletionItemKind_Class, "class")\
+	X(Lsp::CompletionItemKind_Interface, "interface")\
+	X(Lsp::CompletionItemKind_Module, "module")\
+	X(Lsp::CompletionItemKind_Property, "property")\
+	X(Lsp::CompletionItemKind_Unit, "unit")\
+	X(Lsp::CompletionItemKind_Value, "value")\
+	X(Lsp::CompletionItemKind_Enum, "enum")\
+	X(Lsp::CompletionItemKind_Keyword, "keyword")\
+	X(Lsp::CompletionItemKind_Snippet, "snippet")\
+	X(Lsp::CompletionItemKind_Color, "color")\
+	X(Lsp::CompletionItemKind_File, "file")\
+	X(Lsp::CompletionItemKind_Reference, "reference")\
+	X(Lsp::CompletionItemKind_Folder, "folder")\
+	X(Lsp::CompletionItemKind_EnumMember, "enumMember")\
+	X(Lsp::CompletionItemKind_Constant, "constant")\
+	X(Lsp::CompletionItemKind_Struct, "struct")\
+	X(Lsp::CompletionItemKind_Event, "event")\
+	X(Lsp::CompletionItemKind_Operator, "operator")\
+	X(Lsp::CompletionItemKind_TypeParameter, "typeParameter")
+
+#define ENUM_TO_STRING(enumValue, strValue)\
+	if (value == enumValue) {\
+		*str = strValue;\
+		return true;\
+	}
+
+#define ENUM_FROM_STRING(enumValue, strValue)\
+	if (str && strcmp(str, strValue) == 0) {\
+		*value = enumValue;\
+		return true;\
+	}
+
+//=============================================================================
+// GERNERAL STRUCTURES
+//=============================================================================
+
+bool ReadJson(const cJSON* json, Lsp::ErrorResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadInteger("code", &value->code);
+	reader.ReadString("message", &value->message);
+	value->data = reader.Get("data");
+	return reader.ok;
+}
+
+bool ReadJson(const cJSON* json, Lsp::Position* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadUnsigned("line", &value->line);
+	reader.ReadUnsigned("character", &value->character);
+	return reader.ok;
+}
+
+void WriteJson(const Lsp::Position* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("line")->WriteUnsigned(value->line);
+	writeBuffer->WriteProperty("character")->WriteUnsigned(value->character);
+	writeBuffer->WriteObjectEnd();
+}
+
+bool ReadJson(const cJSON* json, Lsp::Range* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("start", &value->start);
+	reader.ReadValue("end", &value->end);
+	return reader.ok;
+}
+
+void WriteJson(const Lsp::Range* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("start")->WriteValue(&value->start);
+	writeBuffer->WriteProperty("end")->WriteValue(&value->end);
+	writeBuffer->WriteObjectEnd();
+}
+
+bool ReadJson(const cJSON* json, Lsp::Location* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("uri", &value->uri);
+	reader.ReadValue("range", &value->range);
+	return reader.ok;
+}
+
+void WriteJson(const Lsp::Location* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("uri")->WriteString(value->uri);
+	writeBuffer->WriteProperty("range")->WriteValue(&value->range);
+	writeBuffer->WriteObjectEnd();
+}
+
+bool ReadJson(const cJSON* json, Lsp::PositionEncodingKind* value) {
+	if (!JsonExpectType(json, cJSON_String)) return false;
+	POSITION_ENCODING_MAPPING(READ_ENUM_STRING);
+	return false;
+}
+
+void WriteJson(const Lsp::PositionEncodingKind* value, JsonWriteBuffer* writeBuffer) {
+	POSITION_ENCODING_MAPPING(WRITE_ENUM_STRING);
+	writeBuffer->WriteNull();
+}
+
+bool ReadJson(const cJSON* json, Lsp::TextDocumentIdentifier* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("uri", &value->uri);
+	return reader.ok;
+}
+
+void WriteJson(const Lsp::TextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("uri")->WriteString(value->uri);
+	writeBuffer->WriteObjectEnd();
+}
+
+bool ReadJson(const cJSON* json, Lsp::VersionedTextDocumentIdentifier* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("uri", &value->uri);
+	if (const cJSON* jsonVersion = reader.Get("version"))
+		value->version = static_cast<s32>(jsonVersion->valuedouble);
+	return reader.ok;
+}
+
+void WriteJson(const Lsp::VersionedTextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("uri")->WriteString(value->uri);
+	writeBuffer->WriteProperty("version")->WriteInteger(value->version);
+	writeBuffer->WriteObjectEnd();
+}
+
+void WriteJson(const Lsp::MarkupKind* value, JsonWriteBuffer* writeBuffer) {
+	MARKUP_KIND_MAPPING(WRITE_ENUM_STRING);
+}
+
+bool ReadJson(const cJSON* json, Lsp::MarkupKind* value) {
+	if (!JsonExpectType(json, cJSON_String)) return false;
+	MARKUP_KIND_MAPPING(READ_ENUM_STRING);
+	return false;
+}
+
+bool ReadJson(const cJSON* json, Lsp::MarkupString* value) {
+	if (!JsonExpectType(json, cJSON_Object | cJSON_String)) return false;
+	if (cJSON_IsString(json)) {
+		value->kind = Lsp::MarkupKind_Plaintext;
+		value->value = json->valuestring ? json->valuestring : "";
 		return true;
 	
 	} else if (cJSON_IsObject(json)) {
-		return JsonToValue(trace, json, &result->emplace());
-
+		JsonObjectReader reader {json};
+		reader.ReadValue("kind", &value->kind);
+		reader.ReadString("language", &value->language);
+		reader.ReadString("value", &value->value);
+		return reader.ok;
+	
 	} else {
 		ASSERT_UNREACHABLE;
 		return false;
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-//=============================================================================
-// GERNERAL STRUCTURES
-//=============================================================================
-
-// Error Response
-
-JSON_TO_VALUE_BEGIN(Lsp::ErrorResponse)
-	JSON_TO_VALUE_PROPERTY(code)
-	JSON_TO_VALUE_PROPERTY(message)
-JSON_TO_VALUE_END
-
-
-// Position
-
-#define Position_Properties(X)\
-	X(line)\
-	X(character)
-
-JSON_TO_VALUE_BEGIN(Lsp::Position)
-	Position_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::Position)
-	Position_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
-
-// Range
-
-#define Range_Properties(X)\
-	X(start)\
-	X(end)
-
-JSON_TO_VALUE_BEGIN(Lsp::Range)
-	Range_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::Range)
-	Range_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
-
-// Location
-
-#define Location_Properties(X)\
-	X(uri)\
-	X(range)
-
-JSON_TO_VALUE_BEGIN(Lsp::Location)
-	Location_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::Location)
-	Location_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
-
-// PositionEncoding
-
-#define PositionEncodingKind_Properties(X)\
-	X("utf-8", PositionEncodingKind_Utf8)\
-	X("utf-16", PositionEncodingKind_Utf16)\
-	X("utf-32", PositionEncodingKind_Utf32)
-
-JSON_TO_ENUM_BEGIN(Lsp::PositionEncodingKind)
-	PositionEncodingKind_Properties(JSON_TO_ENUM_MEMBER)
-JSON_TO_ENUM_END
-
-JSON_FROM_ENUM_BEGIN(Lsp::PositionEncodingKind)
-	PositionEncodingKind_Properties(JSON_FROM_ENUM_MEMBER)
-JSON_FROM_ENUM_END
-
-
-// TextDocumentIdentifier
-
-#define TextDocumenIdentifier_Properties(X)\
-	X(uri)
-
-JSON_TO_VALUE_BEGIN(Lsp::TextDocumentIdentifier)
-	TextDocumenIdentifier_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::TextDocumentIdentifier)
-	TextDocumenIdentifier_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
-
-// TextDocumentIdentifier
-
-#define VersionedTextDocumenIdentifier_Properties(X)\
-	X(uri)\
-	X(version)
-
-JSON_TO_VALUE_BEGIN(Lsp::VersionedTextDocumentIdentifier)
-	VersionedTextDocumenIdentifier_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::VersionedTextDocumentIdentifier)
-	VersionedTextDocumenIdentifier_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
-// MarkupKind
-
-#define MarkupKind_Properties(X)\
-	X("plaintext", MarkupKind_Plaintext)\
-	X("markdown", MarkupKind_Markdown)
-
-JSON_TO_ENUM_BEGIN(Lsp::MarkupKind)
-	MarkupKind_Properties(JSON_TO_ENUM_MEMBER)
-JSON_TO_ENUM_END
-
-JSON_FROM_ENUM_BEGIN(Lsp::MarkupKind)
-	MarkupKind_Properties(JSON_FROM_ENUM_MEMBER)
-JSON_FROM_ENUM_END
-
-
-// MarkupString
-
-#define MarkupString_Properties(X)\
-	X(kind)\
-	X(language)\
-	X(value)
-
-bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json, Lsp::MarkupString* result) {
-
-	if (cJSON_IsObject(json)) {
-
-		std::unordered_map<std::string_view, cJSON*> properties {};
-		if (!JsonObjectToMap(parentTrace, json, &properties))
-			return false;
-
-		MarkupString_Properties(JSON_TO_VALUE_PROPERTY)
-		return true;
-	
-	} else if (cJSON_IsString(json)) {
-		if (!JsonToValue(parentTrace, json, &result->value)) return false;
-
-		result->kind = Lsp::MarkupKind::MarkupKind_Plaintext;
-		return true;
-	
-	} else {
-		JsonLogError(parentTrace, "expected json to be an [object] or a [string] but was [%]", JsonTypeToString(json->type));
-		return false;
-	}
+void WriteJson(const Lsp::MarkupString* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("kind")->WriteValue(&value->kind);
+	writeBuffer->WriteProperty("value")->WriteString(value->value);
+	if (value->kind == Lsp::MarkupKind_Markdown)
+		writeBuffer->WriteProperty("language")->WriteString(value->language);
+	writeBuffer->WriteObjectEnd();
 }
 
-JSON_FROM_VALUE_BEGIN(Lsp::MarkupString)
-	MarkupString_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::TextEdit* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("range", &value->range);
+	reader.ReadString("newText", &value->newText);
+	return reader.ok;
+}
 
+void WriteJson(const Lsp::TextEdit* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("range")->WriteValue(&value->range);
+	writeBuffer->WriteProperty("newText")->WriteString(value->newText);
+	writeBuffer->WriteObjectEnd();
+}
 
-// TextEdit
+bool ReadJson(const cJSON* json, Lsp::CompletionItemKind* value) {
+	if (!JsonExpectType(json, cJSON_String)) return false;
+	COMPLETION_ITEM_KIND_MAPPING(READ_ENUM_STRING);
+	return false;
+}
 
-#define TextEdit_Properties(X)\
-	X(range)\
-	X(newText)
+void WriteJson(const Lsp::CompletionItemKind* value, JsonWriteBuffer* writeBuffer) {
+	COMPLETION_ITEM_KIND_MAPPING(WRITE_ENUM_STRING);
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::TextEdit)
-	TextEdit_Properties(JSON_TO_VALUE_PROPERTY)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::TraceValue* value) {
+	if (!JsonExpectType(json, cJSON_String)) return false;
+	TRACE_VALUE_MAPPING(READ_ENUM_STRING);
+	return false;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::TextEdit)
-	TextEdit_Properties(JSON_FROM_VALUE_PROPERTY)
-JSON_FROM_VALUE_END
-
+void WriteJson(const Lsp::TraceValue* value, JsonWriteBuffer* writeBuffer) {
+	TRACE_VALUE_MAPPING(WRITE_ENUM_STRING);
+}
 
 //=============================================================================
 // LANGUAGE FEATURES
 //=============================================================================
 
-// Goto
+void WriteJson(const Lsp::GotoClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("linkSupport")->WriteBoolean(value->linkSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(linkSupport)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::GotoServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadBoolean("workDoneProgress", &value->workDoneProgress);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoReferencesClientCapabilities)
-JSON_FROM_VALUE_END
+template<class TGotoRequest>
+static void WriteGotoRequest(const TGotoRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("position")->WriteValue(&value->position);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::GotoServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(workDoneProgress)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::GotoDeclerationRequest* value, JsonWriteBuffer* writeBuffer) {
+	WriteGotoRequest(value, writeBuffer);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoDeclerationRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::GotoDefinitionRequest* value, JsonWriteBuffer* writeBuffer) {
+	WriteGotoRequest(value, writeBuffer);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoDefinitionRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::GotoTypeDefinitionRequest* value, JsonWriteBuffer* writeBuffer) {
+	WriteGotoRequest(value, writeBuffer);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoTypeDefinitionRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::GotoImplementationRequest* value, JsonWriteBuffer* writeBuffer) {
+	WriteGotoRequest(value, writeBuffer);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::GotoImplementationRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-JSON_FROM_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::LocationLink)
-	if (!properties.contains("originSelectionRange") && !properties.contains("targetRange") && !properties.contains("targetUri"))
-		result->isSimpleLocation = true;
+static bool ReadJson(const cJSON* json, Lsp::LocationLink* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
 	
-	JSON_TO_VALUE_PROPERTY(originSelectionRange)
-	JSON_TO_VALUE_PROPERTY(targetUri)
-	JSON_TO_VALUE_PROPERTY(targetRange)
-	JSON_TO_VALUE_PROPERTY(targetSelectionRange)
-	JSON_TO_VALUE_PROPERTY_NAMED("range", targetSelectionRange)
-	JSON_TO_VALUE_PROPERTY_NAMED("uri", targetUri)
-JSON_TO_VALUE_END
-
-bool JsonToValue(const JsonTrace* parentTrace, const cJSON *json, Lsp::GotoResponse* result) {
+	JsonObjectReader reader {json};
+	if (!reader.Contains("originSelectionRange") && !reader.Contains("targetRange") && !reader.Contains("targetUri")) {
+		value->isSimpleLocation = true;
+		reader.ReadString("uri", &value->targetUri);
+		reader.ReadValue("range", &value->targetSelectionRange);
 	
-	ASSERT(json && result);
+	} else {
+		value->isSimpleLocation = false;
+		reader.ReadValue("originSelectionRange", &value->originSelectionRange);
+		reader.ReadString("targetUri", &value->targetUri);
+		reader.ReadValue("targetRange", &value->targetRange);
+		reader.ReadValue("targetSelectionRange", &value->targetSelectionRange);
+	}
+	return reader.ok;
+}
+
+bool ReadJson(const cJSON* json, Lsp::GotoResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object | cJSON_Array | cJSON_NULL)) return false;
 	
 	if (cJSON_IsObject(json)) {
-		Lsp::LocationLink &location = result->locations.emplace_back();
-		return JsonToValue(parentTrace, json, &location);
+		Lsp::LocationLink& link = value->locations.emplace_back();
+		return ReadJson(json, &link);
 	
 	} else if (cJSON_IsArray(json)) {
-		return JsonToValue(parentTrace, json, &result->locations);
-	
+		bool ok = true;
+		for (cJSON* elem = json->child; elem; elem = elem->next)
+			ok &= ReadJson(elem, &value->locations.emplace_back());
+		return ok;
+
 	} else if (cJSON_IsNull(json)) {
 		return true;
 	
 	} else {
-		JsonLogError(parentTrace, "expected value to be either an [object], [array] or [null] but was [%]", JsonTypeToString(json->type));
+		ASSERT_UNREACHABLE;
 		return false;
 	}
 }
 
-// Completion
+void WriteJson(const Lsp::GotoReferencesClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteObjectEnd();
+}
 
-#define CompletionItemKind_Properties(X)\
-	X("unspecified", CompletionItemKind_Unspecified)\
-	X("text", CompletionItemKind_Text)\
-	X("method", CompletionItemKind_Method)\
-	X("function", CompletionItemKind_Function)\
-	X("constructor", CompletionItemKind_Constructor)\
-	X("field", CompletionItemKind_Field)\
-	X("variable", CompletionItemKind_Variable)\
-	X("class", CompletionItemKind_Class)\
-	X("interface", CompletionItemKind_Interface)\
-	X("module", CompletionItemKind_Module)\
-	X("property", CompletionItemKind_Property)\
-	X("unit", CompletionItemKind_Unit)\
-	X("value", CompletionItemKind_Value)\
-	X("enum", CompletionItemKind_Enum)\
-	X("keyword", CompletionItemKind_Keyword)\
-	X("snippet", CompletionItemKind_Snippet)\
-	X("color", CompletionItemKind_Color)\
-	X("file", CompletionItemKind_File)\
-	X("reference", CompletionItemKind_Reference)\
-	X("folder", CompletionItemKind_Folder)\
-	X("enumMember", CompletionItemKind_EnumMember)\
-	X("constant", CompletionItemKind_Constant)\
-	X("struct", CompletionItemKind_Struct)\
-	X("event", CompletionItemKind_Event)\
-	X("operator", CompletionItemKind_Operator)\
-	X("typeParameter", CompletionItemKind_TypeParameter)
+void WriteJson(const Lsp::GotoReferencesRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("position")->WriteValue(&value->position);
+	writeBuffer->WriteProperty("context")
+		->WriteObjectStart()
+		->WriteProperty("includeDeclaration")->WriteBoolean(value->context.includeDecleration)
+		->WriteObjectEnd();
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_ENUM_BEGIN(Lsp::CompletionItemKind)
-	CompletionItemKind_Properties(JSON_TO_ENUM_MEMBER)
-JSON_TO_ENUM_END
+void WriteJson(const Lsp::CompletionClientCapabilities::CompletionItem* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("snippetSupport")->WriteBoolean(value->snippetSupport);
+	writeBuffer->WriteProperty("commitCharactersSupport")->WriteBoolean(value->commitCharactersSupport);
+	writeBuffer->WriteProperty("documentationFormat")->WriteArrayStart();
+	for (const Lsp::MarkupKind& kind : value->documentationFormat)
+		writeBuffer->WriteValue(&kind);
+	writeBuffer->WriteArrayEnd();
+	writeBuffer->WriteProperty("deprecatedSupport")->WriteBoolean(value->deprecatedSupport);
+	writeBuffer->WriteProperty("preselectSupport")->WriteBoolean(value->preselectSupport);
+	writeBuffer->WriteProperty("insertReplaceSupport")->WriteBoolean(value->insertReplaceSupport);
+	writeBuffer->WriteProperty("labelDetailsSupport")->WriteBoolean(value->labelDetailsSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_ENUM_BEGIN(Lsp::CompletionItemKind)
-	CompletionItemKind_Properties(JSON_FROM_ENUM_MEMBER)
-JSON_FROM_ENUM_END
+void WriteJson(const Lsp::CompletionClientCapabilities::ItemKinds* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("valueSet")->WriteArrayStart();
+	for (const int item : value->valueSet)
+		writeBuffer->WriteInteger(item);
+	writeBuffer->WriteArrayEnd();
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::CompletionClientCapabilities::ItemKinds)
-	JSON_FROM_VALUE_PROPERTY(valueSet)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::CompletionClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("completionItem")->WriteValue(&value->completionItem);
+	writeBuffer->WriteProperty("completionItemKind")->WriteValue(&value->completionItemKind);
+	writeBuffer->WriteProperty("contextSupport")->WriteBoolean(value->contextSupport);
+	writeBuffer->WriteProperty("insertTextMode")->WriteInteger(value->insertTextMode);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::CompletionClientCapabilities::CompletionItem)
-	JSON_FROM_VALUE_PROPERTY(snippetSupport)
-	JSON_FROM_VALUE_PROPERTY(commitCharactersSupport)
-	JSON_FROM_VALUE_PROPERTY(documentationFormat)
-	JSON_FROM_VALUE_PROPERTY(deprecatedSupport)
-	JSON_FROM_VALUE_PROPERTY(preselectSupport)
-	JSON_FROM_VALUE_PROPERTY(insertReplaceSupport)
-	JSON_FROM_VALUE_PROPERTY(labelDetailsSupport)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::CompletionServerCapabilities::CompletionItem* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadBoolean("labelDetailsSupport", &value->labelDetailsSupport);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::CompletionClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(completionItem)
-	JSON_FROM_VALUE_PROPERTY(completionItemKind)
-	JSON_FROM_VALUE_PROPERTY(contextSupport)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::CompletionServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	for (const cJSON* elem = reader.GetArray("triggerCharacters"); elem; elem = elem->next)
+		if (elem->valuestring) value->triggerCharacters.push_back(elem->valuestring);
+	
+	for (const cJSON* elem = reader.GetArray("allCommitCharacters"); elem; elem = elem->next)
+		if (elem->valuestring) value->allCommitCharacters.push_back(elem->valuestring);
+	
+	reader.ReadBoolean("resolveProvider", &value->resolveProvider);
+	reader.ReadValue("completionItem", &value->completionItem);
+	return reader.ok;
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::CompletionServerCapabilities::CompletionItem)
-	JSON_TO_VALUE_PROPERTY(labelDetailsSupport)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::CompletionRequest::Context* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("triggerKind")->WriteInteger(value->triggerKind);
+	writeBuffer->WriteProperty("triggerCharacter")->WriteString(value->triggerCharacter);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::CompletionServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(triggerCharacters)
-	JSON_TO_VALUE_PROPERTY(allCommitCharacters)
-	JSON_TO_VALUE_PROPERTY(completionItem)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::CompletionRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("position")->WriteValue(&value->position);
+	writeBuffer->WriteProperty("context")->WriteValue(&value->context);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::CompletionRequest::CompletionRequest::Context)
-	JSON_FROM_VALUE_PROPERTY(triggerKind)
-	JSON_FROM_VALUE_PROPERTY(triggerCharacter)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::CompletionResponse::Item* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("label", &value->label);
+	reader.ReadInteger("kind", &value->kind);
+	reader.ReadString("detail", &value->detail);
+	reader.ReadValue("documentation", &value->documentation);
+	reader.ReadBoolean("deprecated", &value->deprecated);
+	reader.ReadBoolean("preselect", &value->preselect);
+	reader.ReadString("insertText", &value->insertText);
+	reader.ReadString("filterText", &value->filterText);
+	reader.ReadValue("textEdit", &value->textEdit);
+	reader.ReadFloat("score", &value->clangdScore);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::CompletionRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-	JSON_FROM_VALUE_PROPERTY(context)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::CompletionResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadBoolean("isIncomplete", &value->isIncomplete);
+	
+	for (const cJSON* elem = reader.GetArray("items"); elem; elem = elem->next)
+		reader.ok &= ReadJson(elem, &value->items.emplace_back());
+	
+	return reader.ok;
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::CompletionResponse::Item)
-	JSON_TO_VALUE_PROPERTY(label)
-	JSON_TO_VALUE_PROPERTY(kind)
-	JSON_TO_VALUE_PROPERTY(detail)
-	JSON_TO_VALUE_PROPERTY(documentation)
-	JSON_TO_VALUE_PROPERTY(deprecated)
-	JSON_TO_VALUE_PROPERTY(preselect)
-	JSON_TO_VALUE_PROPERTY(insertText)
-	JSON_TO_VALUE_PROPERTY(filterText)
-	JSON_TO_VALUE_PROPERTY(textEdit)
-	JSON_TO_VALUE_PROPERTY_NAMED("score", clangdScore)
-	//JSON_TO_VALUE_PROPERTY(additionalTextEdits)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::HoverClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("contentFormat")->WriteArrayStart();
+	for (const auto& format : value->contentFormat)
+		writeBuffer->WriteValue(&format);
+	writeBuffer->WriteArrayEnd();
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::CompletionResponse)
-	JSON_TO_VALUE_PROPERTY(isIncomplete)
-	JSON_TO_VALUE_PROPERTY(items)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::HoverServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadBoolean("workDoneProgress", &value->workDoneProgress);
+	return reader.ok;
+}
 
+void WriteJson(const Lsp::HoverRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("position")->WriteValue(&value->position);
+	writeBuffer->WriteObjectEnd();
+}
 
-// Hover
+bool ReadJson(const cJSON* json, Lsp::HoverResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("contents", &value->contents);
+	reader.ReadValue("range", &value->range);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::HoverClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(contentFormat)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DocumentSymbolClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("symbolKind")->WriteObjectStart()->WriteProperty("valueSet")->WriteArrayStart();
+	for (const int symbol : value->symbolKind.valueSet)
+		writeBuffer->WriteInteger(symbol);
+	writeBuffer->WriteArrayEnd()->WriteObjectEnd();
+	writeBuffer->WriteProperty("hierarchicalDocumentSymbolSupport")->WriteBoolean(value->hierarchicalDocumentSymbolSupport);
+	writeBuffer->WriteProperty("tagSupport")->WriteBoolean(value->tagSupport);
+	writeBuffer->WriteProperty("labelSupport")->WriteBoolean(value->labelSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::HoverServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(workDoneProgress)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::DocumentSymbolServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("workDoneProgress", &value->label);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::HoverRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DocumentSymbolRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::HoverResponse)
-	JSON_TO_VALUE_PROPERTY(contents)
-	JSON_TO_VALUE_PROPERTY(range)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::SymbolInformation* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("name", &value->name);
+	reader.ReadInteger("kind", &value->kind);
+	reader.ReadValue("location", &value->location);
+	reader.ReadBoolean("deprecated", &value->deprecated);
+	reader.ReadString("containerName", &value->containerName);
+	return reader.ok;
+}
 
+bool ReadJson(const cJSON* json, Lsp::DocumentSymbolResponse* value) {
+	if (!JsonExpectType(json, cJSON_Array)) return false;
+	bool ok = true;
+	for (const cJSON* elem = json->child; elem; elem = elem->next)
+		ok &= ReadJson(elem, &value->symbols.emplace_back());
+	return ok;
+}
 
-// Document Symbol
+void WriteJson(const Lsp::SignatureHelpClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("signatureInformation")->WriteObjectStart();
+	writeBuffer->WriteProperty("parameterInformation")->WriteObjectStart();
+	writeBuffer->WriteProperty("labelOffsetSupport")->WriteBoolean(value->signatureInformation.parameterInformation.labelOffsetSupport);
+	writeBuffer->WriteObjectEnd();
+	writeBuffer->WriteProperty("documentationFormat")->WriteArrayStart();
+	for (const Lsp::MarkupKind& kind : value->signatureInformation.documentationFormat)
+		writeBuffer->WriteValue(&kind);
+	writeBuffer->WriteArrayEnd();
+	writeBuffer->WriteProperty("activeParameterSupport")->WriteBoolean(value->signatureInformation.activeParameterSupport);
+	writeBuffer->WriteProperty("contextSupport")->WriteBoolean(value->contextSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DocumentSymbolClientCapabilities::SymbolKinds)
-	JSON_FROM_VALUE_PROPERTY(valueSet)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::SignatureHelpServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	for (const cJSON* elem = reader.GetArray("triggerCharacters"); elem; elem = elem->next)
+		if (elem->valuestring) value->triggerCharacters.push_back(elem->valuestring);
+	for (const cJSON* elem = reader.GetArray("retriggerCharacters"); elem; elem = elem->next)
+		if (elem->valuestring) value->triggerCharacters.push_back(elem->valuestring);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DocumentSymbolClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(symbolKind)
-	JSON_FROM_VALUE_PROPERTY(hierarchicalDocumentSymbolSupport)
-	JSON_FROM_VALUE_PROPERTY(tagSupport)
-	JSON_FROM_VALUE_PROPERTY(labelSupport)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::SignatureHelpRequest::Context* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	if (value->triggerKind != Lsp::SignatureHelpRequest::Context::TriggerKind_Unknown)
+		writeBuffer->WriteProperty("triggerKind")->WriteInteger(value->triggerKind);
+	if (!value->triggerCharacter.empty())
+		writeBuffer->WriteProperty("triggerCharacter")->WriteString(value->triggerCharacter);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::DocumentSymbolServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(label)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::SignatureHelpRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("position")->WriteValue(&value->position);
+	writeBuffer->WriteProperty("context")->WriteValue(&value->context);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DocumentSymbolRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-JSON_FROM_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::SymbolInformation)
-	JSON_TO_VALUE_PROPERTY(name)
-	JSON_TO_VALUE_PROPERTY(kind)
-	JSON_TO_VALUE_PROPERTY(deprecated)
-	JSON_TO_VALUE_PROPERTY(location)
-	JSON_TO_VALUE_PROPERTY(containerName)
-JSON_TO_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::DocumentSymbolResponse)
-	if (!JsonToValue(parentTrace, json, &result->symbols))
-		return false;
-JSON_TO_VALUE_END
-
-// Signature Help
-
-JSON_FROM_VALUE_BEGIN(Lsp::SignatureHelpClientCapabilities::SignatureInformation::ParameterInformation)
-	JSON_FROM_VALUE_PROPERTY(labelOffsetSupport)
-JSON_FROM_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::SignatureHelpClientCapabilities::SignatureInformation)
-	JSON_FROM_VALUE_PROPERTY(parameterInformation)
-	JSON_FROM_VALUE_PROPERTY(documentationFormat)
-	JSON_FROM_VALUE_PROPERTY(activeParameterSupport)
-JSON_FROM_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::SignatureHelpClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(signatureInformation)
-	JSON_FROM_VALUE_PROPERTY(contextSupport)
-JSON_FROM_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::SignatureHelpServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(triggerCharacters)
-	JSON_TO_VALUE_PROPERTY(retriggerCharacters)
-JSON_TO_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::SignatureHelpRequest::Context)
-	JSON_FROM_VALUE_PROPERTY(triggerKind)
-	JSON_FROM_VALUE_PROPERTY(triggerCharacter)
-JSON_FROM_VALUE_END
-
-JSON_FROM_VALUE_BEGIN(Lsp::SignatureHelpRequest)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(position)
-	JSON_FROM_VALUE_PROPERTY(context)
-JSON_FROM_VALUE_END
-
-bool JsonToValue(const JsonTrace* parentTrace, const cJSON* json, Lsp::SignatureHelpResponse::Signature::Parameter::Label* result) {
-
+bool ReadJson(const cJSON* json, Lsp::SignatureHelpResponse::Signature::Parameter::Label* value) {
+	if (!JsonExpectType(json, cJSON_String | cJSON_Array)) return false;
 	if (cJSON_IsString(json)) {
-		result->isSubstring = false;
-		result->string = cJSON_GetStringValue(json);
+		value->isSubstring = false;
+		value->string = json->valuestring ? json->valuestring : "";
 		return true;
-
+	
 	} else if (cJSON_IsArray(json)) {
-		result->isSubstring = true;
-		return JsonToValue(parentTrace, json, &result->substring);
-		 
+		const cJSON* first = json->child;
+		const cJSON* second = first ? first->next : nullptr;
+		if (!first || !second) return false;
+		if (!JsonExpectType(first, cJSON_Number) || !JsonExpectType(second, cJSON_Number)) return false;
+		value->isSubstring = true;
+		value->substring.first = static_cast<int>(first->valuedouble);
+		value->substring.second = static_cast<int>(second->valuedouble);
+		return true;
+		
 	} else {
-		JsonLogError(parentTrace, "expected value to be either an [array] or a [string] but was [%]", JsonTypeToString(json->type));
+		ASSERT_UNREACHABLE;
 		return false;
 	}
 }
 
-JSON_TO_VALUE_BEGIN(Lsp::SignatureHelpResponse::Signature::Parameter)
-	JSON_TO_VALUE_PROPERTY(label)
-	JSON_TO_VALUE_PROPERTY(documentation)
-JSON_TO_VALUE_END
+static bool ReadJson(const cJSON* json, Lsp::SignatureHelpResponse::Signature::Parameter* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("label", &value->label);
+	reader.ReadValue("documentation", &value->documentation);
+	return reader.ok;
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::SignatureHelpResponse::Signature)
-	JSON_TO_VALUE_PROPERTY(label)
-	JSON_TO_VALUE_PROPERTY(documentation)
-	JSON_TO_VALUE_PROPERTY(parameters)
-	JSON_TO_VALUE_PROPERTY(activeParameter)
-JSON_TO_VALUE_END
+static bool ReadJson(const cJSON* json, Lsp::SignatureHelpResponse::Signature* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("label", &value->label);
+	reader.ReadValue("documentation", &value->documentation);
+	for (const cJSON* elem = reader.GetArray("parameters"); elem; elem = elem->next)
+		reader.ok &= ReadJson(elem, &value->parameters.emplace_back());
+	reader.ReadInteger("activeParameter", &value->activeParameter);
+	return reader.ok;
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::SignatureHelpResponse)
-	JSON_TO_VALUE_PROPERTY(signatures)
-	JSON_TO_VALUE_PROPERTY(activeSignature)
-	JSON_TO_VALUE_PROPERTY(activeParameter)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::SignatureHelpResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	for (const cJSON* elem = reader.GetArray("signatures"); elem; elem = elem->next)
+		reader.ok &= ReadJson(elem, &value->signatures.emplace_back());
+	reader.ReadInteger("activeSignature", &value->activeSignature);
+	reader.ReadInteger("activeParameter", &value->activeParameter);
+	return reader.ok;
+}
 
-//==============================================================================
+//=============================================================================
 // DOCUMENT SYNCHRONIZATION
-//==============================================================================
+//=============================================================================
 
-JSON_FROM_VALUE_BEGIN(Lsp::TextDocumentSyncClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(willSave)
-	JSON_FROM_VALUE_PROPERTY(willSaveWaitUntil)
-	JSON_FROM_VALUE_PROPERTY(didSave)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::TextDocumentSyncClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("willSave")->WriteBoolean(value->willSave);
+	writeBuffer->WriteProperty("willSaveWaitUntil")->WriteBoolean(value->willSaveWaitUntil);
+	writeBuffer->WriteProperty("didSave")->WriteBoolean(value->didSave);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::TextDocumentSyncServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(openClose)
-	JSON_TO_VALUE_PROPERTY(change)
-	JSON_TO_VALUE_PROPERTY(willSave)
-	JSON_TO_VALUE_PROPERTY(save)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SaveOptions* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadBoolean("includeText", &value->includeText);
+	return reader.ok;
+}
 
-// JSON_TO_ENUM_BEGIN(Lsp::TextDocumentSyncServerCapabilities::SyncKind)
-// 	JSON_TO_ENUM_MEMBER(SyncKind_None, "none")
-// 	JSON_TO_ENUM_MEMBER(SyncKind_Full, "full")
-// 	JSON_TO_ENUM_MEMBER(SyncKind_Incremental, "incremental")
-// JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::TextDocumentSyncServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object | cJSON_Object)) return false;
+	if (cJSON_IsNumber(json)) {
+		value->change = static_cast<int>(json->valuedouble);
+		return true;
+	
+	} else if (cJSON_IsObject(json)) {
+		JsonObjectReader reader {json};
+		reader.ReadBoolean("openClose", &value->openClose);
+		reader.ReadInteger("change", &value->change);
+		reader.ReadBoolean("willSave", &value->willSave);
+		reader.ReadValue("save", &value->save.emplace());
+		return reader.ok;
+	
+	} else {
+		ASSERT_UNREACHABLE;
+		return false;
+	}
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::TextDocumentSyncServerCapabilities::SaveOptions)
-	JSON_TO_VALUE_PROPERTY(includeText)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::TextDocumentItem* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("uri")->WriteString(value->uri);
+	writeBuffer->WriteProperty("languageId")->WriteString(value->languageId);
+	writeBuffer->WriteProperty("version")->WriteInteger(value->version);
+	writeBuffer->WriteProperty("text")->WriteString(value->text);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::TextDocumentItem)
-	JSON_FROM_VALUE_PROPERTY(uri)
-	JSON_FROM_VALUE_PROPERTY(languageId)
-	JSON_FROM_VALUE_PROPERTY(version)
-	JSON_FROM_VALUE_PROPERTY(text)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DidOpenTextDocumentNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DidOpenTextDocumentNotification)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DidCloseTextDocumentNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DidCloseTextDocumentNotification)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DidChangeTextDocumentNotification::ChangeEvent* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	if (value->range.has_value())
+		writeBuffer->WriteProperty("range")->WriteValue(&value->range.value());
+	writeBuffer->WriteProperty("text")->WriteString(value->text);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DidChangeTextDocumentNotification::ChangeEvent)
-	JSON_FROM_VALUE_PROPERTY(range)
-	JSON_FROM_VALUE_PROPERTY(text)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::DidChangeTextDocumentNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("contentChanges")->WriteArrayStart();
+	for (const Lsp::DidChangeTextDocumentNotification::ChangeEvent& change : value->contentChanges)
+		writeBuffer->WriteValue(&change);
+	writeBuffer->WriteArrayEnd();
+	if (value->clangdWantDiagnostics.has_value())
+		writeBuffer->WriteProperty("wantDiagnostics")->WriteBoolean(value->clangdWantDiagnostics.value());
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DidChangeTextDocumentNotification)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(contentChanges)
-	JSON_FROM_VALUE_PROPERTY_NAMED("wantDiagnostics", clangdWantDiagnostics)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::WillSaveTextDocumentNotification::SaveReason* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteInteger(*value);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::WillSaveTextDocumentNotification)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(saveReason)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::WillSaveTextDocumentNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("reason")->WriteValue(&value->saveReason);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_ENUM_BEGIN(Lsp::WillSaveTextDocumentNotification::SaveReason)
-	JSON_FROM_ENUM_MEMBER("manual", SaveReason_Manual)
-	JSON_FROM_ENUM_MEMBER("afterDelay", SaveReason_AfterDelay)
-	JSON_FROM_ENUM_MEMBER("focusOut", SaveReason_FocusOut)
-JSON_FROM_ENUM_END
+void WriteJson(const Lsp::DidSaveTextDocumentNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	if (value->text.has_value())
+		writeBuffer->WriteProperty("text")->WriteString(value->text.value());
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::DidSaveTextDocumentNotification)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(text)
-JSON_FROM_VALUE_END
+//=============================================================================
+// WINDOW FEATURES
+//=============================================================================
 
-JSON_FROM_VALUE_BEGIN(Lsp::PublishDiagnosticsClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(relatedInforamtion)
-	JSON_FROM_VALUE_PROPERTY(versionSupport)
-	JSON_FROM_VALUE_PROPERTY(codeDescriptionSupport)
-	JSON_FROM_VALUE_PROPERTY(dataSupport)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::ShowMessageRequestClientCapabilities::MessageActionItem* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("additionalPropertiesSupport")->WriteBoolean(value->additionalPropertiesSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::Diagnostic)
-	JSON_TO_VALUE_PROPERTY(range)
-	JSON_TO_VALUE_PROPERTY(severity)
-	JSON_TO_VALUE_PROPERTY(code)
-	JSON_TO_VALUE_PROPERTY(message)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::ShowMessageRequestClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("messageActionItem")->WriteValue(&value->messageActionItem);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::PublishDiagnosticsNotification)
-	JSON_TO_VALUE_PROPERTY(uri)
-	JSON_TO_VALUE_PROPERTY(version)
-	JSON_TO_VALUE_PROPERTY(diagnostics)
-JSON_TO_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::MessageNotification* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadInteger("type", reinterpret_cast<int*>(&value->type));
+	reader.ReadString("message", &value->message);
+	return reader.ok;
+}
 
-//==============================================================================
-// Window Features
-//==============================================================================
+void WriteJson(const Lsp::PublishDiagnosticsClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("relatedInformation")->WriteBoolean(value->relatedInforamtion);
+	writeBuffer->WriteProperty("versionSupport")->WriteBoolean(value->versionSupport);
+	writeBuffer->WriteProperty("codeDescriptionSupport")->WriteBoolean(value->codeDescriptionSupport);
+	writeBuffer->WriteProperty("dataSupport")->WriteBoolean(value->dataSupport);
+	writeBuffer->WriteObjectEnd();
+}
 
-#define TraceValue_Properties(X)\
-	X("off", TraceValue_Off)\
-	X("messages", TraceValue_Messages)\
-	X("verbose", TraceValue_Verbose)
+bool ReadJson(const cJSON* json, Lsp::Diagnostic* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("range", &value->range);
+	reader.ReadInteger("severity", &value->severity);
+	reader.ReadString("code", &value->code);
+	reader.ReadString("message", &value->message);
+	return reader.ok;
+}
 
-JSON_TO_ENUM_BEGIN(Lsp::TraceValue)
-	TraceValue_Properties(JSON_TO_ENUM_MEMBER)
-JSON_TO_ENUM_END
+bool ReadJson(const cJSON* json, Lsp::PublishDiagnosticsNotification* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("uri", &value->uri);
+	reader.ReadInteger("version", &value->version);
+	for (const cJSON* elem = reader.GetArray("diagnostics"); elem; elem = elem->next)
+		reader.ok &= ReadJson(elem, &value->diagnostics.emplace_back());
+	return reader.ok;
+}
 
-JSON_FROM_ENUM_BEGIN(Lsp::TraceValue)
-	TraceValue_Properties(JSON_FROM_ENUM_MEMBER)
-JSON_FROM_ENUM_END
+bool ReadJson(const cJSON* json, Lsp::LogTraceNotification* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("message", &value->message);
+	reader.ReadString("verbose", &value->verbose);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::ShowMessageRequestClientCapabilities::MessageActionItem)
-	JSON_FROM_VALUE_PROPERTY(additionalPropertiesSupport)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::SetTraceParams* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("value")->WriteValue(&value->value);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::ShowMessageRequestClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(messageActionItem)
-JSON_FROM_VALUE_END
+//=============================================================================
+// LIFECYCLE
+//=============================================================================
 
-JSON_TO_ENUM_BEGIN(Lsp::MessageNotification::MessageType)
-	JSON_TO_ENUM_MEMBER("unspecified", MessageType_Unspecified)
-	JSON_TO_ENUM_MEMBER("error", MessageType_Error)
-	JSON_TO_ENUM_MEMBER("warning", MessageType_Warning)
-	JSON_TO_ENUM_MEMBER("info", MessageType_Info)
-	JSON_TO_ENUM_MEMBER("log", MessageType_Log)
-JSON_TO_ENUM_END
+void WriteJson(const Lsp::InitializeRequest::ClientInfo* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("name")->WriteString(value->name);
+	if (!value->version.empty())
+		writeBuffer->WriteProperty("version")->WriteString(value->version);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::MessageNotification)
-	JSON_TO_VALUE_PROPERTY(type)
-	JSON_TO_VALUE_PROPERTY(message)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::TextDocumentClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("synchronization")->WriteValue(&value->synchronization);
+	writeBuffer->WriteProperty("completion")->WriteValue(&value->completion);
+	writeBuffer->WriteProperty("hover")->WriteValue(&value->hover);
+	writeBuffer->WriteProperty("declaration")->WriteValue(&value->declaration);
+	writeBuffer->WriteProperty("definition")->WriteValue(&value->definition);
+	writeBuffer->WriteProperty("typeDefinition")->WriteValue(&value->typeDefinition);
+	writeBuffer->WriteProperty("implementation")->WriteValue(&value->implementation);
+	writeBuffer->WriteProperty("references")->WriteValue(&value->references);
+	writeBuffer->WriteProperty("publishDiagnostics")->WriteValue(&value->publishDiagnostics);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::LogTraceNotification)
-	JSON_TO_VALUE_PROPERTY(message)
-	JSON_TO_VALUE_PROPERTY(verbose)
-JSON_TO_VALUE_END
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::Window* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("workDoneProgress")->WriteBoolean(value->workDoneProgress);
+	writeBuffer->WriteProperty("showMessage")->WriteValue(&value->showMessage);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::SetTraceParams)
-	JSON_FROM_VALUE_PROPERTY(value)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::General* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("positionEncodings")->WriteArrayStart();
+	for (const Lsp::PositionEncodingKind& encoding : value->positionEncodings)
+		writeBuffer->WriteValue(&encoding);
+	writeBuffer->WriteArrayEnd();
+	writeBuffer->WriteObjectEnd();
+}
 
+void WriteJson(const Lsp::InitializeRequest::ClientCapabilities* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("textDocument")->WriteValue(&value->textDocument);
+	writeBuffer->WriteProperty("window")->WriteValue(&value->window);
+	writeBuffer->WriteProperty("general")->WriteValue(&value->general);
+	writeBuffer->WriteObjectEnd();
+}
 
-//==============================================================================
-// Lifecycle
-//==============================================================================
+void WriteJson(const Lsp::InitializeRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteProperty("processId")->WriteInteger(value->processId);
+	writeBuffer->WriteProperty("clientInfo")->WriteValue(&value->clientInfo);
+	writeBuffer->WriteProperty("locale")->WriteString(value->locale);
+	writeBuffer->WriteProperty("rootPath")->WriteString(value->rootPath);
+	writeBuffer->WriteProperty("capabilities")->WriteValue(&value->capabilities);
+	if (value->clangdOffsetEncoding.has_value()) {
+		writeBuffer->WriteProperty("offsetEncoding")->WriteArrayStart();
+		for (const Lsp::PositionEncodingKind& encoding : value->clangdOffsetEncoding.value())
+			writeBuffer->WriteValue(&encoding);
+		writeBuffer->WriteArrayEnd();
+	}
+	writeBuffer->WriteProperty("trace")->WriteValue(&value->trace);
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest::ClientInfo)
-	JSON_FROM_VALUE_PROPERTY(name)
-	JSON_FROM_VALUE_PROPERTY(version)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::InitializeResponse::ServerCapabilities* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("positionEncoding", &value->positionEncoding);
+	reader.ReadValue("textDocumentSync", &value->textDocumentSync.emplace());
+	reader.ReadValue("completionProvider", &value->completionProvider.emplace());
+	reader.ReadValue("hoverProvider", &value->hoverProvider.emplace());
+	reader.ReadValue("signatureHelpProvider", &value->signatureHelpProvider.emplace());
+	reader.ReadValue("declarationProvider", &value->declarationProvider.emplace());
+	reader.ReadValue("definitionProvider", &value->definitionProvider.emplace());
+	reader.ReadValue("typeDefinitionProvider", &value->typeDefinitionProvider.emplace());
+	reader.ReadValue("implementationProvider", &value->implementationProvider.emplace());
+	reader.ReadValue("referencesProvider", &value->referencesProvider.emplace());
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest::ClientCapabilities::TextDocumentClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(synchronization)
-	JSON_FROM_VALUE_PROPERTY(completion)
-	JSON_FROM_VALUE_PROPERTY(hover)
-	JSON_FROM_VALUE_PROPERTY(declaration)
-	JSON_FROM_VALUE_PROPERTY(definition)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::InitializeResponse::ServerInfo* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadString("name", &value->name);
+	reader.ReadString("version", &value->version);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest::ClientCapabilities::General)
-	JSON_FROM_VALUE_PROPERTY(positionEncodings)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::InitializeResponse* value) {
+	if (!JsonExpectType(json, cJSON_Object)) return false;
+	JsonObjectReader reader {json};
+	reader.ReadValue("capabilities", &value->capabilities);
+	reader.ReadValue("serverInfo", &value->serverInfo);
+	return reader.ok;
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest::ClientCapabilities::Window)
-	JSON_FROM_VALUE_PROPERTY(workDoneProgress)
-	JSON_FROM_VALUE_PROPERTY(showMessage)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::ShutdownRequest* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest::ClientCapabilities)
-	JSON_FROM_VALUE_PROPERTY(textDocument)
-	JSON_FROM_VALUE_PROPERTY(window)
-	JSON_FROM_VALUE_PROPERTY(general)
-JSON_FROM_VALUE_END
+bool ReadJson(const cJSON* json, Lsp::ShutdownResponse* value) {
+	return JsonExpectType(json, cJSON_NULL | cJSON_Object);
+}
 
-JSON_FROM_VALUE_BEGIN(Lsp::InitializeRequest)
-	JSON_FROM_VALUE_PROPERTY(processId)
-	JSON_FROM_VALUE_PROPERTY(clientInfo)
-	JSON_FROM_VALUE_PROPERTY(locale)
-	JSON_FROM_VALUE_PROPERTY(rootPath)
-	JSON_FROM_VALUE_PROPERTY(capabilities)
-	JSON_FROM_VALUE_PROPERTY_NAMED("offsetEncoding", clangdOffsetEncoding)
-	JSON_FROM_VALUE_PROPERTY(trace)
-JSON_FROM_VALUE_END
+void WriteJson(const Lsp::InitializedNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteObjectEnd();
+}
 
-JSON_TO_VALUE_BEGIN(Lsp::InitializeResponse::ServerInfo)
-	JSON_TO_VALUE_PROPERTY(name)
-	JSON_TO_VALUE_PROPERTY(version)
-JSON_TO_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::InitializeResponse::ServerCapabilities)
-	JSON_TO_VALUE_PROPERTY(positionEncoding)
-	JSON_TO_VALUE_PROPERTY(textDocumentSync)
-	JSON_TO_VALUE_PROPERTY(completionProvider)
-	JSON_TO_VALUE_PROPERTY(hoverProvider)
-	JSON_TO_VALUE_PROPERTY(signatureHelpProvider)
-	JSON_TO_VALUE_PROPERTY(declarationProvider)
-	JSON_TO_VALUE_PROPERTY(definitionProvider)
-	JSON_TO_VALUE_PROPERTY(typeDefinitionProvider)
-	JSON_TO_VALUE_PROPERTY(implementationProvider)
-	JSON_TO_VALUE_PROPERTY(referencesProvider)
-JSON_TO_VALUE_END
-
-JSON_TO_VALUE_BEGIN(Lsp::InitializeResponse)
-	JSON_TO_VALUE_PROPERTY(capabilities)
-	JSON_TO_VALUE_PROPERTY(serverInfo)
-JSON_TO_VALUE_END
-
-cJSON* JsonFromValue(const Lsp::InitializedNotification&) { return cJSON_CreateNull(); }
-cJSON* JsonFromValue(const Lsp::ShutdownRequest&) { return cJSON_CreateNull(); }
-bool   JsonToValue(const JsonTrace* trace, const cJSON *json, Lsp::ShutdownResponse*) { return true; }
-cJSON* JsonFromValue(const Lsp::ExitNotification&) { return cJSON_CreateNull(); }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/* static FormatArgument F(const Lsp::ErrorResponse* err) {
-	return FormatArgument {
-		.userptr = err,
-		.Write = [] (const FormatArgument* self, std::ostream* target) {
-			auto error = static_cast<const Lsp::ErrorResponse*>(self->userptr);
-			
-			std::string_view knwonCode {};
-			switch (error->code) {
-				case Lsp::ErrorResponse::Code_ClientParseError: knwonCode = "(ClientParseError)"; break;
-				case Lsp::ErrorResponse::Code_ClientInconclusiveMessage: knwonCode = "(ClientInconclusiveMessage)"; break;
-				case Lsp::ErrorResponse::Code_ParseError: knwonCode = "(ParseError)"; break;
-				case Lsp::ErrorResponse::Code_InvalidRequest: knwonCode = "(InvalidRequest)"; break;
-				case Lsp::ErrorResponse::Code_MethodNotFound: knwonCode = "(MethodNotFound)"; break;
-				case Lsp::ErrorResponse::Code_InvalidParams: knwonCode = "(InvalidParams)"; break;
-				case Lsp::ErrorResponse::Code_InternalError: knwonCode = "(InternalError)"; break;
-				case Lsp::ErrorResponse::Code_ServerNotInitialized: knwonCode = "(ServerNotInitialized)"; break;
-				case Lsp::ErrorResponse::Code_UnknownErrorCode: knwonCode = "(UnknownErrorCode)"; break;
-				case Lsp::ErrorResponse::Code_RequestFailed: knwonCode = "(RequestFailed)"; break;
-				case Lsp::ErrorResponse::Code_ServerCancelled: knwonCode = "(ServerCancelled)"; break;
-				case Lsp::ErrorResponse::Code_ContentModified: knwonCode = "(ContentModified)"; break;
-				case Lsp::ErrorResponse::Code_RequestCancelled: knwonCode = "(RequestCancelled)"; break;
-				default: knwonCode = ""; break;
-			}
-			
-			(*target) << error->code << knwonCode << error->message;
-		}};
-}*/
-
+void WriteJson(const Lsp::ExitNotification* value, JsonWriteBuffer* writeBuffer) {
+	writeBuffer->WriteObjectStart();
+	writeBuffer->WriteObjectEnd();
+}

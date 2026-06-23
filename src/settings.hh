@@ -229,6 +229,9 @@ struct Settings {
 	f32 scrollbarMarkerHoverDistance = 10.0f;
 	bool backupFileBeforeSaving = false; // @TODO not implemented
 	
+	u64 jsonAllocatorNodeCapacity = 64u;
+	u64 jsonAllocatorStringCapacity = 512u;
+	
 	//-----------------------------------------------------
 	// functions
 	
