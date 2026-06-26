@@ -930,77 +930,71 @@ namespace Lsp = LanguageServerProtocol;
 struct JsonTrace;
 
 // GERNERAL STRUCTURES
-bool ReadJson(const cJSON* json, Lsp::ErrorResponse* value);
-bool ReadJson (const cJSON* json, Lsp::Position* value);
+void ReadJson(const cJSON* json, Lsp::ErrorResponse* value);
+void ReadJson (const cJSON* json, Lsp::Position* value);
 void WriteJson(const Lsp::Position* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::Range* value);
+void ReadJson (const cJSON* json, Lsp::Range* value);
 void WriteJson(const Lsp::Range* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::Location* value);
+void ReadJson (const cJSON* json, Lsp::Location* value);
 void WriteJson(const Lsp::Location* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::PositionEncodingKind* value);
+void ReadJson (const cJSON* json, Lsp::PositionEncodingKind* value);
 void WriteJson(const Lsp::PositionEncodingKind* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::TextDocumentIdentifier* value);
+void ReadJson (const cJSON* json, Lsp::TextDocumentIdentifier* value);
 void WriteJson(const Lsp::TextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::VersionedTextDocumentIdentifier* value);
+void ReadJson (const cJSON* json, Lsp::VersionedTextDocumentIdentifier* value);
 void WriteJson(const Lsp::VersionedTextDocumentIdentifier* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::MarkupKind* value);
+void ReadJson (const cJSON* json, Lsp::MarkupKind* value);
 void WriteJson(const Lsp::MarkupKind* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::MarkupString* value);
+void ReadJson (const cJSON* json, Lsp::MarkupString* value);
 void WriteJson(const Lsp::MarkupString* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::TextEdit* value);
+void ReadJson (const cJSON* json, Lsp::TextEdit* value);
 void WriteJson(const Lsp::TextEdit* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::CompletionItemKind* value);
+void ReadJson (const cJSON* json, Lsp::CompletionItemKind* value);
 void WriteJson(const Lsp::CompletionItemKind* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::TraceValue* value);
+void ReadJson (const cJSON* json, Lsp::TraceValue* value);
 void WriteJson(const Lsp::TraceValue* value, JsonWriteBuffer* writeBuffer);
 
 // LANGUAGE FEATURES
 void WriteJson(const Lsp::GotoClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::GotoServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::GotoServerCapabilities* value);
 void WriteJson(const Lsp::GotoDeclerationRequest* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::GotoDefinitionRequest* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::GotoTypeDefinitionRequest* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::GotoImplementationRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::GotoResponse* value);
+void ReadJson (const cJSON* json, Lsp::GotoResponse* value);
 void WriteJson(const Lsp::GotoReferencesClientCapabilities* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::GotoReferencesRequest* value, JsonWriteBuffer* writeBuffer);
 
 // Completion
-void WriteJson(const Lsp::CompletionClientCapabilities::CompletionItem* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::CompletionClientCapabilities::ItemKinds* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::CompletionClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::CompletionServerCapabilities::CompletionItem* value);
-bool ReadJson (const cJSON* json, Lsp::CompletionServerCapabilities* value);
-void WriteJson(const Lsp::CompletionRequest::CompletionRequest::Context* value, JsonWriteBuffer* writeBuffer);
+void ReadJson (const cJSON* json, Lsp::CompletionServerCapabilities* value);
 void WriteJson(const Lsp::CompletionRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::CompletionResponse::Item* value);
-bool ReadJson (const cJSON* json, Lsp::CompletionResponse* value);
+void ReadJson (const cJSON* json, Lsp::CompletionResponse* value);
 
 // Hover
 void WriteJson(const Lsp::HoverClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::HoverServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::HoverServerCapabilities* value);
 void WriteJson(const Lsp::HoverRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::HoverResponse* value);
+void ReadJson (const cJSON* json, Lsp::HoverResponse* value);
   
 // Document symbols
 void WriteJson(const Lsp::DocumentSymbolClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::DocumentSymbolServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::DocumentSymbolServerCapabilities* value);
 void WriteJson(const Lsp::DocumentSymbolRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::SymbolInformation* value);
-bool ReadJson (const cJSON* json, Lsp::DocumentSymbolResponse* value);
+void ReadJson (const cJSON* json, Lsp::SymbolInformation* value);
+void ReadJson (const cJSON* json, Lsp::DocumentSymbolResponse* value);
 
 // Signature Help
 void WriteJson(const Lsp::SignatureHelpClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::SignatureHelpServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::SignatureHelpServerCapabilities* value);
 void WriteJson(const Lsp::SignatureHelpRequest* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::SignatureHelpRequest::Context* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::SignatureHelpResponse* value);
+void ReadJson (const cJSON* json, Lsp::SignatureHelpResponse* value);
 
 // DOCUMENT SYNCHRONIZATION
 void WriteJson(const Lsp::TextDocumentSyncClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SyncKind* value);
-bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SaveOptions* value);
-bool ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SyncKind* value);
+void ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities::SaveOptions* value);
+void ReadJson (const cJSON* json, Lsp::TextDocumentSyncServerCapabilities* value);
 
 void WriteJson(const Lsp::TextDocumentItem* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::DidOpenTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
@@ -1012,30 +1006,23 @@ void WriteJson(const Lsp::WillSaveTextDocumentNotification* value, JsonWriteBuff
 void WriteJson(const Lsp::DidSaveTextDocumentNotification* value, JsonWriteBuffer* writeBuffer);
 
 // WINDOW FEATURES
-void WriteJson(const Lsp::ShowMessageRequestClientCapabilities::MessageActionItem* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::ShowMessageRequestClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::MessageNotification::MessageType* value);
-bool ReadJson (const cJSON* json, Lsp::MessageNotification* value);
+void ReadJson (const cJSON* json, Lsp::MessageNotification* value);
 
 void WriteJson(const Lsp::PublishDiagnosticsClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::Diagnostic* value);
-bool ReadJson (const cJSON* json, Lsp::PublishDiagnosticsNotification* value);
+void ReadJson (const cJSON* json, Lsp::Diagnostic* value);
+void ReadJson (const cJSON* json, Lsp::PublishDiagnosticsNotification* value);
 
-bool ReadJson (const cJSON* json, Lsp::LogTraceNotification* value);
+void ReadJson (const cJSON* json, Lsp::LogTraceNotification* value);
 void WriteJson(const Lsp::SetTraceParams* value, JsonWriteBuffer* writeBuffer);
 
 // LIFECYCLE
-void WriteJson(const Lsp::InitializeRequest::ClientInfo* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::InitializeRequest::ClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::TextDocumentClientCapabilities* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::Window* value, JsonWriteBuffer* writeBuffer);
-void WriteJson(const Lsp::InitializeRequest::ClientCapabilities::General* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::InitializeRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerCapabilities* value);
-bool ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerInfo* value);
-bool ReadJson (const cJSON* json, Lsp::InitializeResponse* value);
+void ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerCapabilities* value);
+void ReadJson (const cJSON* json, Lsp::InitializeResponse::ServerInfo* value);
+void ReadJson (const cJSON* json, Lsp::InitializeResponse* value);
 void WriteJson(const Lsp::ShutdownRequest* value, JsonWriteBuffer* writeBuffer);
-bool ReadJson (const cJSON* json, Lsp::ShutdownResponse* value);
+void ReadJson (const cJSON* json, Lsp::ShutdownResponse* value);
 void WriteJson(const Lsp::InitializedNotification* value, JsonWriteBuffer* writeBuffer);
 void WriteJson(const Lsp::ExitNotification* value, JsonWriteBuffer* writeBuffer);
 

@@ -37,7 +37,7 @@ struct LanguageServer : public Process::Observer {
 		void (*OnResponse) (void* userdata, void* response, Lsp::ErrorResponse* error) = nullptr;
 
 		std::unique_ptr<Lsp::Response> responseData = nullptr;
-		bool (*ReadResponseJson) (const cJSON*, void*) = nullptr;
+		void (*ReadResponseJson) (const cJSON*, void*) = nullptr;
 	};
 
 	//-----------------------------------------------------

@@ -30,12 +30,12 @@ static bool SendRequest(LanguageServer* self, const TReq& request, void* userdat
 	// place pending request
 	//
 	{	
-		bool (*ReadResponseJson) (const cJSON*, TResp*) = ::ReadJson;
+		void (*ReadResponseJson) (const cJSON*, TResp*) = ::ReadJson;
 
 		LanguageServer::PendingRequest pendingRequest;
 		pendingRequest.userdata = userdata,
 		pendingRequest.OnResponse = reinterpret_cast<void(*)(void*, void*, Lsp::ErrorResponse*)>(funcOnResp),
-		pendingRequest.ReadResponseJson = reinterpret_cast<bool(*)(const cJSON*, void*)>(ReadResponseJson),
+		pendingRequest.ReadResponseJson = reinterpret_cast<void(*)(const cJSON*, void*)>(ReadResponseJson),
 		pendingRequest.responseData.reset(new TResp());
 
 		const auto pairResult = self->pendingRequests.emplace(requestId, std::move(pendingRequest));
@@ -208,37 +208,25 @@ static bool ProcessMessage(LanguageServer* self) {
 		//
 		if (const cJSON* jsonResult = objectReader.Get(Lsp::JSONRPC_RESULT)) {
 
-			if (pendingRequest.ReadResponseJson(jsonResult, pendingRequest.responseData.get())) {
-				pendingRequest.OnResponse(pendingRequest.userdata, pendingRequest.responseData.get(), nullptr);
-				return true;
-			
-			} else {
-				Lsp::ErrorResponse error {
-					.code = Lsp::ErrorResponse::Code_ClientParseError,
-					.message = "failed to parse reponse data"};
-				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
-			}
+			pendingRequest.ReadResponseJson(jsonResult, pendingRequest.responseData.get());
+			pendingRequest.OnResponse(pendingRequest.userdata, pendingRequest.responseData.get(), nullptr);
+			return true;
 
 		//
 		// error response?
 		//
 		} else if (const cJSON* jsonError = objectReader.Get(Lsp::JSONRPC_ERROR)) {
 
-			if (Lsp::ErrorResponse error; ReadJson(jsonError, &error)) {
-				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
-				return true;
-
-			} else {
-				error.code = Lsp::ErrorResponse::Code_ClientParseError,
-				error.message = "failed to parse reponse data";
-				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
-			}
+			Lsp::ErrorResponse error {};
+			ReadJson(jsonError, &error);
+			pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
+			return true;
 		
 		} else {
-				Lsp::ErrorResponse error {
-					.code = Lsp::ErrorResponse::Code_ClientParseError,
-					.message = "failed to parse reponse data"};
-				pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
+			Lsp::ErrorResponse error {
+				.code = Lsp::ErrorResponse::Code_ClientParseError,
+				.message = "failed to parse reponse data"};
+			pendingRequest.OnResponse(pendingRequest.userdata, nullptr, &error);
 		}
 
 		return false;
@@ -261,11 +249,7 @@ static bool ProcessMessage(LanguageServer* self) {
 		if (method == Lsp::PublishDiagnosticsNotification::METHOD) {
 			
 			Lsp::PublishDiagnosticsNotification diagnosticsNotification;
-			if (!ReadJson(jsonParams, &diagnosticsNotification)) {
-				LogError("failed to parse notification");
-				return false;
-			}
-		
+			ReadJson(jsonParams, &diagnosticsNotification);
 			self->notficationHandler->OnPublishDiagnostics(&diagnosticsNotification);
 			return true;
 		

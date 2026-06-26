@@ -43,30 +43,36 @@ void JsonWriteBuffer::Put(char ch) {
 	*head++ = ch;
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteObjectStart() {	
-	if (head == end) Reallocate(this);
-	*head++ = '{';
-	return this;
+void JsonWriteBuffer::WriteObjectStart() {	
+	Put('{');
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteObjectEnd() {
+void JsonWriteBuffer::WriteObjectEnd() {
 	ASSERT(head != begin)
-	if (head[-1] == ',') head[-1] = '}';
-	else Put('}');
-	return this;
+	if (head[-1] == ',') {
+		head[-1] = '}';
+		Put(',');
+	} else {
+		Reserve(this, 2u);
+		*head++ = '}';
+		*head++ = ',';
+	}
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteArrayStart() {
-	if (head == end) Reallocate(this);
-	*head++ = '[';
-	return this;
+void JsonWriteBuffer::WriteArrayStart() {
+	Put('[');
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteArrayEnd() {
+void JsonWriteBuffer::WriteArrayEnd() {
 	ASSERT(head != begin)
-	if (head[-1] == ',') head[-1] = ']';
-	else Put(']');
-	return this;
+	if (head[-1] == ',') {
+		head[-1] = ']';
+		Put(',');
+	} else {
+		Reserve(this, 2u);
+		*head++ = ']';
+		*head++ = ',';
+	}
 }
 
 JsonWriteBuffer* JsonWriteBuffer::WriteProperty(std::string_view property) {
@@ -87,14 +93,12 @@ static void WriteLiteral(JsonWriteBuffer* self, std::string_view literal) {
 	*self->head++ = ',';
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteBoolean(bool value) {
+void JsonWriteBuffer::WriteBoolean(bool value) {
 	WriteLiteral(this, value ? "true" : "false");
-	return this;
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteNull() {
+void JsonWriteBuffer::WriteNull() {
 	WriteLiteral(this, "null");
-	return this;
 }
 
 template<class T>
@@ -110,25 +114,23 @@ static void WriteNumber(JsonWriteBuffer* self, T value) {
 		return;
 	}
 	
-	self->head = tcr.ptr;	
+	self->head = tcr.ptr;
+	self->Put(',');	
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteUnsigned(u64 value) {
-	::WriteNumber(this, value);	
-	return this;
+void JsonWriteBuffer::WriteUnsigned(u64 value) {
+	WriteNumber(this, value);	
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteInteger(int value) {
-	::WriteNumber(this, value);	
-	return this;
+void JsonWriteBuffer::WriteInteger(int value) {
+	WriteNumber(this, value);	
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteFloat(f64 value) {
-	::WriteNumber(this, value);	
-	return this;
+void JsonWriteBuffer::WriteFloat(f64 value) {
+	WriteNumber(this, value);	
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteString(std::string_view value) {
+void JsonWriteBuffer::WriteString(std::string_view value) {
 	
 	Reserve(this, 1u);
 	*head++ = '"';
@@ -142,7 +144,7 @@ JsonWriteBuffer* JsonWriteBuffer::WriteString(std::string_view value) {
 			*head++ = ch;
 		
 		// control characeter with escape sequence
-		} else if (ch <= '\b' && ch >= '\r') {
+		} else if (ch >= '\b' && ch <= '\r') {
 			constexpr char escapeCharacters[] = "btnvfr";
 			Reserve(this, 2);
 			*head++ = '\\';
@@ -170,22 +172,33 @@ JsonWriteBuffer* JsonWriteBuffer::WriteString(std::string_view value) {
 		}
 	}
 	
-	Reserve(this, 1u);
-	*head++ = '"';	
-	return this;
+	Reserve(this, 2u);
+	*head++ = '"';
+	*head++ = ',';	
 }
 
-JsonWriteBuffer* JsonWriteBuffer::WriteRawString(std::string_view value) {
+void JsonWriteBuffer::WriteRawString(std::string_view value) {
+	Reserve(this, value.size() + 3u);
+	*head++ = '"';
+	memcpy(head, value.data(), value.size());
+	head += value.size();
+	*head++ = '"';
+	*head++ = ',';
+}
+
+
+void JsonWriteBuffer::WriteEnumString(std::string_view value) {
 	Reserve(this, value.size() + 2u);
 	*head++ = '"';
 	memcpy(head, value.data(), value.size());
 	head += value.size();
 	*head++ = '"';
-	return this;
 }
 
 std::string_view JsonWriteBuffer::GetString() const {
-	return std::string_view {begin, head};
+	const char* stringEnd = head;
+	if (head[-1] == ',') stringEnd = head-1;
+	return std::string_view {begin, stringEnd};
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,8 +211,8 @@ static cJSON* LookupProperty(JsonObjectReader* self, std::string_view property, 
 	auto it = self->properties.find(property);
 	if (it == self->properties.end()) return nullptr;
 		
-	if (std::string err; JsonExpectType(it->second, type, &err)) {
-		LogWarning("json: property '%%%' %", err, self->object->string, (self->object->string ? "." : ""), property);
+	if (std::string err; !JsonExpectType(it->second, type, &err)) {
+		LogWarning("json: property '%%%' %", err, (self->object->string ? self->object->string : ""), (self->object->string ? "." : ""), property);
 		return nullptr;
 	}
 	
@@ -208,7 +221,7 @@ static cJSON* LookupProperty(JsonObjectReader* self, std::string_view property, 
 
 JsonObjectReader::JsonObjectReader(const cJSON* object) {
 	this->object = object;
-	for (cJSON* prop = object->child; prop->next != nullptr; prop = prop->next) {
+	for (cJSON* prop = object->child; prop != nullptr; prop = prop->next) {
 		properties.insert({std::string_view {prop->string}, prop});
 	}
 }
@@ -253,12 +266,21 @@ bool JsonObjectReader::Contains(std::string_view property) const {
 }
 
 const cJSON* JsonObjectReader::GetArray(std::string_view property) {
-	return LookupProperty(const_cast<JsonObjectReader*>(this), property, cJSON_Array);
+	const cJSON* json = LookupProperty(const_cast<JsonObjectReader*>(this), property, cJSON_Array);
+	if (!json) return nullptr;
+	return json->child;
 }
 
 const cJSON* JsonObjectReader::Get(std::string_view property) {
 	auto it = properties.find(property);
 	if (it == properties.end()) return nullptr;
+	return it->second;
+}
+
+const cJSON* JsonObjectReader::GetObject(std::string_view property) {
+	auto it = properties.find(property);
+	if (it == properties.end()) return nullptr;
+	if (!JsonExpectType(it->second, cJSON_Object)) return nullptr;
 	return it->second;
 }
 
@@ -388,7 +410,7 @@ bool JsonExpectType(const cJSON* json, int types, /*out*/ std::string* errorStr 
 		const int typeToTest = (1 << i);
 		if ((types & typeToTest) == typeToTest) {
 			
-			if (!errorString.empty()) errorString.append(" or");
+			if (errorString.size() > 9) errorString.append(" or ");
 			errorString.push_back('[');
 			errorString.append(JsonTypeToString(typeToTest));
 			errorString.push_back(']');

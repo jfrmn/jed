@@ -30,29 +30,30 @@ struct JsonWriteBuffer {
 	explicit JsonWriteBuffer(std::span<char> staticBuffer) noexcept;
 	~JsonWriteBuffer() noexcept;
 	
-	JsonWriteBuffer* WriteObjectStart();
-	JsonWriteBuffer* WriteObjectEnd();
+	void WriteObjectStart();
+	void WriteObjectEnd();
 	
-	JsonWriteBuffer* WriteArrayStart();
-	JsonWriteBuffer* WriteArrayEnd();
+	void WriteArrayStart();
+	void WriteArrayEnd();
 	
 	JsonWriteBuffer* WriteProperty(std::string_view property);
-	JsonWriteBuffer* WriteComma();
 		
-	JsonWriteBuffer* WriteNull();
-	JsonWriteBuffer* WriteBoolean(bool value);
-	JsonWriteBuffer* WriteUnsigned(u64 value);
-	JsonWriteBuffer* WriteInteger(int value);
-	JsonWriteBuffer* WriteFloat(f64 value);
-	JsonWriteBuffer* WriteString(std::string_view value);
-	JsonWriteBuffer* WriteRawString(std::string_view value);
-
+	void WriteNull();
+	void WriteBoolean(bool value);
+	void WriteUnsigned(u64 value);
+	void WriteInteger(int value);
+	void WriteFloat(f64 value);
+	void WriteString(std::string_view value);
+	void WriteRawString(std::string_view value);
+	
+	void WriteEnumString(std::string_view enumValue);
+	
 	template<class T>
-	JsonWriteBuffer* WriteValue(const T* value) {
+	void WriteCustom(const T* value) {
 		WriteJson(value, this);
-		return this;
 	}
-		
+	
+	void Put(char ch);		
 	std::string_view GetString() const;
 };
 
@@ -85,14 +86,15 @@ struct JsonObjectReader {
 	bool ReadBoolean(std::string_view property, bool* value);
 	
 	template<class T>
-	bool ReadValue(std::string_view property, T* value) {
-		const cJSON* prop = Get(property);
-		if (!prop) return false;
-		ok &= ReadJson(prop, value);
+ 	bool ReadValue(std::string_view property, T* value) {
+		const cJSON* json = Get(property);
+		if (!json) return false;
+		ReadJson(json, value);
 		return true;
 	}
 	
 	bool Contains(std::string_view property) const;
+	const cJSON* GetObject(std::string_view property);
 	const cJSON* GetArray(std::string_view property);
 	const cJSON* Get(std::string_view property);
 };
