@@ -67,5 +67,25 @@ target_include_directories (slick-edit PRIVATE "src")
 file (GLOB_RECURSE Sources "src/*")
 target_sources (slick-edit PRIVATE ${Sources})
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Test target for doctest
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+add_executable (slick-edit-tests)
+
+target_include_directories (slick-edit-tests PRIVATE "deps/doctest")
+target_include_directories (slick-edit-tests PRIVATE "deps")
+target_include_directories (slick-edit-tests PRIVATE "src")
+
+target_link_libraries(slick-edit-tests
+    d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
+
+target_link_libraries(slick-edit-tests cjson)
+
+set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD 23)
+
+file (GLOB_RECURSE TestSources "src/*" "test/*")
+target_sources (slick-edit-tests PRIVATE ${TestSources})
+
 install (TARGETS slick-edit RUNTIME DESTINATION .)
 install (FILES "$<TARGET_PDB_FILE:slick-edit>" DESTINATION .)
