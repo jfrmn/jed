@@ -10,7 +10,10 @@ param(
 	
 	[Alias("go")]
 	[switch] $run = $false,
-	
+
+	[Alias("t")]
+	[switch] $test = $false,
+
 	[switch] $install = $false,
 	[string] $installDir = ""
 )
@@ -67,6 +70,11 @@ if ($install) {
 	}
 
 	& cmake --install ./out/$preset/build --prefix $installDir 
+}
+
+if ($test) {
+	Write-Output "running tests...";
+	& ./out/$preset/slick-edit-tests.exe
 }
 
 if ($run) {

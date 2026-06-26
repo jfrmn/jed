@@ -57,35 +57,37 @@ target_link_libraries(slick-edit cjson)
 target_include_directories (slick-edit PRIVATE "deps")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-target_link_libraries(slick-edit
-    d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
+# main executable
 
+set(WINDOWS_DEPENDENCIES d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
+
+target_link_libraries(slick-edit ${WINDOWS_DEPENDENCIES})
 set_target_properties(slick-edit PROPERTIES CXX_STANDARD 23)
 
 target_include_directories (slick-edit PRIVATE "src")
 
-file (GLOB_RECURSE Sources "src/*")
-target_sources (slick-edit PRIVATE ${Sources})
+file (GLOB_RECURSE SOURCES "src/*")
+target_sources (slick-edit PRIVATE ${SOURCES})
+
+install (TARGETS slick-edit RUNTIME DESTINATION .)
+install (FILES "$<TARGET_PDB_FILE:slick-edit>" DESTINATION .)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Test target for doctest
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# test executable
 
 add_executable (slick-edit-tests)
 
 target_include_directories (slick-edit-tests PRIVATE "deps/doctest")
-target_include_directories (slick-edit-tests PRIVATE "deps")
 target_include_directories (slick-edit-tests PRIVATE "src")
+target_include_directories (slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edit,INCLUDE_DIRECTORIES>)
 
-target_link_libraries(slick-edit-tests
-    d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
-
-target_link_libraries(slick-edit-tests cjson)
-
+target_link_libraries(slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edit,LINK_LIBRARIES>)
+# set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD $<TARGET_PROPERTY:slick-edit,CXX_STANDARD>)
 set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD 23)
 
-file (GLOB_RECURSE TestSources "src/*" "test/*")
-target_sources (slick-edit-tests PRIVATE ${TestSources})
+file (GLOB_RECURSE TEST_SOURCES "src/*" "test/*")
+list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
+target_sources (slick-edit-tests PRIVATE ${TEST_SOURCES})
 
-install (TARGETS slick-edit RUNTIME DESTINATION .)
-install (FILES "$<TARGET_PDB_FILE:slick-edit>" DESTINATION .)
+install (TARGETS slick-edit-tests RUNTIME DESTINATION .)
+install (FILES "$<TARGET_PDB_FILE:slick-edit-tests>" DESTINATION .)

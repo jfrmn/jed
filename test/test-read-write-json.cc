@@ -16,7 +16,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
     // Helper to create a JSON buffer for testing
     std::string WriteToBuffer(auto value) {
         char buffer[4096] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(value, &writeBuffer);
         return std::string(writeBuffer.GetString());
     }
@@ -57,7 +57,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         pos.character = 15;
         
         char buffer[512] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&pos, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -97,7 +97,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         range.end.character = 15;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&range, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -138,7 +138,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         loc.range.end.character = 20;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&loc, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -167,7 +167,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         doc.uri = "file:///my/document.cpp";
         
         char buffer[512] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&doc, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -197,7 +197,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         doc.version = 100;
         
         char buffer[512] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&doc, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -237,7 +237,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::MarkupKind kind = Lsp::MarkupKind_Plaintext;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&kind, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -248,7 +248,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::MarkupKind kind = Lsp::MarkupKind_Markdown;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&kind, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -294,12 +294,12 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         markup.value = "**Bold text**";
         
         char buffer[512] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&markup, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
-        CHECK(result.find("markdown") != std::string::npos || 
-              result.find("Bold") != std::string::npos);
+        CHECK(result.find("markdown") != std::string::npos);
+        CHECK(result.find("**Bold text**") != std::string::npos);
     }
 
     //=========================================================================
@@ -335,39 +335,12 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         edit.newText = "updated";
         
         char buffer[512] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&edit, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
         CHECK(result.find("\"range\"") != std::string::npos);
         CHECK(result.find("\"newText\"") != std::string::npos);
-    }
-
-    //=========================================================================
-    // CompletionItemKind Tests
-    //=========================================================================
-
-    TEST_CASE("CompletionItemKind - ReadJson") {
-        const char* jsonStr = R"(1)";  // Text kind
-        cJSON* json = cJSON_Parse(jsonStr);
-        
-        Lsp::CompletionItemKind kind;
-        ReadJson(json, &kind);
-        
-        CHECK(kind == Lsp::CompletionItemKind_Text);
-        
-        cJSON_Delete(json);
-    }
-
-    TEST_CASE("CompletionItemKind - WriteJson") {
-        Lsp::CompletionItemKind kind = Lsp::CompletionItemKind_Function;
-        
-        char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
-        WriteJson(&kind, &writeBuffer);
-        
-        std::string result(writeBuffer.GetString());
-        CHECK(!result.empty());
     }
 
     //=========================================================================
@@ -414,7 +387,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::PositionEncodingKind kind = Lsp::PositionEncodingKind_Utf8;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&kind, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -465,7 +438,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::TraceValue value = Lsp::TraceValue_Verbose;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&value, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -576,12 +549,12 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         caps.linkSupport = true;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
-        CHECK(result.find("linkSupport") != std::string::npos || 
-              result.find("true") != std::string::npos);
+        CHECK(result.find("linkSupport") != std::string::npos);
+        CHECK(result.find("true") != std::string::npos);
     }
 
     //=========================================================================
@@ -595,12 +568,12 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 5;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
-        CHECK(result.find("textDocument") != std::string::npos ||
-              result.find("position") != std::string::npos);
+        CHECK(result.find("textDocument") != std::string::npos);
+        CHECK(result.find("position") != std::string::npos);
     }
 
     //=========================================================================
@@ -614,7 +587,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 0;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -632,7 +605,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 1;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -650,7 +623,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 2;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -669,7 +642,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.context.includeDecleration = true;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -687,7 +660,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 10;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -705,7 +678,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 12;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -721,7 +694,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.textDocument.uri = "file:///symbols.cpp";
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -739,7 +712,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.position.character = 15;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -758,12 +731,12 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         item.text = "int main() {}";
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&item, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
-        CHECK(result.find("uri") != std::string::npos ||
-              result.find("languageId") != std::string::npos);
+        CHECK(result.find("uri") != std::string::npos);
+        CHECK(result.find("languageId") != std::string::npos);
     }
 
     //=========================================================================
@@ -778,7 +751,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         notif.textDocument.text = "content";
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -794,7 +767,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         notif.textDocument.uri = "file:///close.txt";
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -810,7 +783,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         req.clientInfo.name = "test-client";
         
         char buffer[4096] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -825,7 +798,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::ShutdownRequest req;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&req, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -840,7 +813,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::InitializedNotification notif;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -855,7 +828,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::ExitNotification notif;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -871,7 +844,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         params.value = Lsp::TraceValue_Messages;
         
         char buffer[256] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&params, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1153,7 +1126,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::CompletionClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1168,7 +1141,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::HoverClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1183,7 +1156,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::DocumentSymbolClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1198,7 +1171,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::SignatureHelpClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1213,7 +1186,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::TextDocumentSyncClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1228,7 +1201,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::GotoReferencesClientCapabilities caps;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1243,7 +1216,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::ShowMessageRequestClientCapabilities caps;
         
         char buffer[1024] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1258,7 +1231,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         Lsp::PublishDiagnosticsClientCapabilities caps;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&caps, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1275,7 +1248,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         notif.textDocument.version = 2;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1289,10 +1262,10 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
     TEST_CASE("WillSaveTextDocumentNotification - WriteJson") {
         Lsp::WillSaveTextDocumentNotification notif;
         notif.textDocument.uri = "file:///willsave.txt";
-        notif.reason = Lsp::WillSaveTextDocumentNotification::SaveReason_Manual;
+        notif.saveReason = Lsp::WillSaveTextDocumentNotification::SaveReason_Manual;
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());
@@ -1308,7 +1281,7 @@ TEST_SUITE("ReadJson and WriteJson Functions") {
         notif.textDocument.uri = "file:///save.txt";
         
         char buffer[2048] = {};
-        JsonWriteBuffer writeBuffer(std::span<char>(buffer));
+        JsonWriteBuffer writeBuffer {buffer};
         WriteJson(&notif, &writeBuffer);
         
         std::string result(writeBuffer.GetString());

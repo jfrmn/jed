@@ -13,7 +13,7 @@
 
 [x] repalce basic parser with regex parser
 [x] make settings ini files (DID TOML)
-[ ] move json to language-server stuff
+[x] move json to language-server stuff
 [-] refactor process so that it no longer spawns a thread; language server should spawn its own thread
 [x] refactor glyph run with advanced text shaping
 [x] restructure project -> source -> src; dependencies -> deps
@@ -21,7 +21,6 @@
 [ ] synatx highlighting in scrollbar preview and file preview
 [ ] open explorer at current file (maybe a command?)
 [.] detect file changes -> watch settings and external files
-
 
 # MINOR TASKS
 

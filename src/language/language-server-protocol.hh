@@ -949,8 +949,6 @@ void ReadJson (const cJSON* json, Lsp::MarkupString* value);
 void WriteJson(const Lsp::MarkupString* value, JsonWriteBuffer* writeBuffer);
 void ReadJson (const cJSON* json, Lsp::TextEdit* value);
 void WriteJson(const Lsp::TextEdit* value, JsonWriteBuffer* writeBuffer);
-void ReadJson (const cJSON* json, Lsp::CompletionItemKind* value);
-void WriteJson(const Lsp::CompletionItemKind* value, JsonWriteBuffer* writeBuffer);
 void ReadJson (const cJSON* json, Lsp::TraceValue* value);
 void WriteJson(const Lsp::TraceValue* value, JsonWriteBuffer* writeBuffer);
 
