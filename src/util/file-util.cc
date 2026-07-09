@@ -257,7 +257,9 @@ try_next:
 		return false;
 	
 	} else if (hHandle == NULL) {
-		hHandle = FindFirstFileA(searchPattern.c_str(), &findData);
+		ASSERT(strnlen_s(searchPath, _MAX_PATH) < _MAX_PATH);
+		
+		hHandle = FindFirstFileA(searchPath, &findData);
 		if (hHandle == INVALID_HANDLE_VALUE) {
 			lastError = GetLastError();
 			return false;
@@ -305,15 +307,19 @@ bool DirectoryIterator::IsFile() const {
 }
 
 std::string_view DirectoryIterator::GetSearchPath() const {
-	return std::string_view {searchPattern.begin(), searchPattern.end()-2};
+	const u64 len = strlen(searchPath);
+	return std::string_view {searchPath, len >= 2 ? len-2 : len};
 }
 
-DirectoryIterator::DirectoryIterator(std::string searchPath) noexcept {
-	if (!searchPath.ends_with('\\'))
-		 searchPath.push_back('\\');
+DirectoryIterator::DirectoryIterator() noexcept {}
 
-	searchPath.push_back('*');
-	this->searchPattern = std::move(searchPath);
+DirectoryIterator::DirectoryIterator(std::string_view directoryPath) noexcept {
+	memcpy(searchPath, directoryPath.data(), directoryPath.size());
+	
+	char* tail = searchPath + directoryPath.size();
+	if (!directoryPath.ends_with('\\'))
+		*tail++ = '\\';
+	*tail++ = '*';
 }
 
 DirectoryIterator::~DirectoryIterator() noexcept {

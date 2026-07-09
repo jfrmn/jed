@@ -117,9 +117,7 @@ static bool StartNewSearch(EditorSearch *self, std::string_view searchTerm) {
 		.isCanceled = false,
 		.isComplete = false };
 	
-	DWORD threadId = 0;
-	self->hThread = CreateThread(NULL, 0, WorkerThread, self->threadData, 0, static_cast<LPDWORD>(&threadId));
-
+	self->hThread = CreateThread(NULL, 0, WorkerThread, self->threadData, 0, nullptr);
 	if (self->hThread == NULL) {
 		LogError("CreateThread() failed. Last Error: %", FLastErr(GetLastError()));
 

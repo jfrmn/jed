@@ -11,7 +11,7 @@ struct SearchBar {
 	//-----------------------------------------------------
 	// types
 	
-	struct ItemInfo {
+	struct UpdateItemParams {
 		std::string_view text = {};
 		std::string_view subText = {};
 		ID2D1Bitmap* icon = nullptr;
@@ -26,6 +26,7 @@ struct SearchBar {
 	D2D_RECT_F area = {};
 	
 	f32 itemHighlightAnimationValue = .0f;
+	f32 spawnAnimationValue = .0f;
 	
 	TextBox textBox = {};
 	Scrollarea scrollarea = {};
@@ -40,18 +41,21 @@ struct SearchBar {
 	//-----------------------------------------------------
 	// functions
 	
-	bool Init(std::string_view placeholderText, bool updateItemsImmediately);
-	virtual void OnUpdate();
-	void OnResize();
+	bool Init(std::string_view placeholderText, bool filterItemsImmediately);
+	virtual ~SearchBar() noexcept;
 	
+	void UpdateItem(u64 i, const UpdateItemParams& params);
+	void SetItemCount(u64 newItemCount);
+	
+	void OnUpdate();
+	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) = 0;
+	
+	void OnResize();
 	void OnMouseWheel(f32 distance);
 	void OnKeyDown(KeyEvent event);
 	void OnChar(const char* data, u64 len);
 	
-	virtual u64 FilterItems(std::string_view text) = 0; // should return the new number of items
+	virtual void FilterItems(std::string_view text) = 0;
 	virtual void AcceptItem(u64 item, const KeyEvent* event) = 0;
-	virtual void GetItemInfo(u64 i, /*out*/ ItemInfo* itemInfo) = 0;
 	virtual void OnFinishedParameterConfiguration() {};
-	
-	virtual ~SearchBar() noexcept;
 };

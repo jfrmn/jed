@@ -32,7 +32,6 @@
 [ ] refactor statu-bar to utilize the new glyph run better (e.g. use draw partial at text pos)
 [ ] remove GetProcessDirectory() and move logic to settings directly
 
-
 # BACKLOG
 
 [ ] editorcursorattached: animation for selection just like in prompt

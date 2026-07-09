@@ -413,13 +413,13 @@ TextBuffer& Editor::GetBuffer() {
 void Editor::GetVisibleLines(/*out*/ u64* pfirst, /*out*/ u64* plast) const {
 	
 	if (pfirst) {
-		const auto first = static_cast<u64>((scrollarea.vpY) / settings.fontEditor.lineHeight);
-		*pfirst = std::max<u64>(0, first);
+		const f32 first = (scrollarea.vpY) / settings.fontEditor.lineHeight;
+		*pfirst = static_cast<u64>(std::max(0.0f, first));
 	}
 
 	if (plast) {
-		const auto last = static_cast<u64>((scrollarea.vpY + scrollarea.vpSize.height) / settings.fontEditor.lineHeight);
-		*plast = std::min<u64>(textController.buffer.GetMaxLine(), last);
+		const f32 last = (scrollarea.vpY + scrollarea.vpSize.height) / settings.fontEditor.lineHeight;
+		*plast = static_cast<u64>(std::min<f32>(textController.buffer.GetMaxLine(), last));
 	}
 }
 

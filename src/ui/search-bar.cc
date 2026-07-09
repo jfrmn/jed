@@ -13,27 +13,19 @@
 #include <cmath>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static constexpr float ITEM_HIGHLIGHT_OPACITY_VALUE_MAX = (F32_PI * 2.0f) * 10.0f; // 10 cylces
-static constexpr float ITEM_HIGHLIGHT_OPACITY_SPEED = 0.004f;
+static constexpr f32 ITEM_HIGHLIGHT_OPACITY_VALUE_MAX = (F32_PI * 2.0f) * 10.0f; // 10 cylces
+static constexpr f32 ITEM_HIGHLIGHT_OPACITY_SPEED = 0.004f;
+
+static constexpr f32 SPAWN_ANIMATION_MAX = 1.0f;
+static constexpr f32 SPAWN_ANIMATION_SPEED = 0.008f;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static float GetItemHeight() {
+static float ItemHeight() {
 	return MARGIN_X2 + (settings.fontUi.lineHeight * 2);
 }
 
-static void UpdateItems(SearchBar* self) {
-	const std::string_view searchText = self->textBox.GetText();
-	
-	const u64 itemCountBefore = self->itemCount;
-	self->itemCount = self->FilterItems(searchText);;
-
-	self->scrollarea.totalSize.height = self->itemCount * GetItemHeight();	
-	if (itemCountBefore != self->itemCount)
-		self->OnResize();
-}
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool SearchBar::Init(std::string_view placeholderText, bool updateItemsImmediately) {
+bool SearchBar::Init(std::string_view placeholderText, bool filterItemsImmediately) {
 	
 	if (!textBox.Init(&settings.fontUi, placeholderText))
 		return false;
@@ -45,8 +37,8 @@ bool SearchBar::Init(std::string_view placeholderText, bool updateItemsImmediate
 	shouldClose = false;
 	OnResize();
 	
-	if (updateItemsImmediately)
-		UpdateItems(this);
+	if (filterItemsImmediately)
+		FilterItems(std::string_view {});
 	
 	return true;
 }
@@ -77,20 +69,36 @@ void SearchBar::OnUpdate() {
 		if (itemHighlightAnimationValue > ITEM_HIGHLIGHT_OPACITY_VALUE_MAX)
 			itemHighlightAnimationValue = ITEM_HIGHLIGHT_OPACITY_VALUE_MAX;
 		else needsUpdate = true;
-	}
 		
+		spawnAnimationValue += SPAWN_ANIMATION_SPEED * deltaTime;
+		if (spawnAnimationValue > SPAWN_ANIMATION_MAX)
+			spawnAnimationValue = SPAWN_ANIMATION_MAX;
+		else needsUpdate = true;
+	}
+	
+	//
+	// spawn animation
+	//
+	//LogDevVar(spawnAnimationValue);
+	const f32 halfWidth = RectWidth(area) / 2.0f;
+	const D2D_RECT_F animatedArea {
+		.left = area.left + halfWidth - (halfWidth * spawnAnimationValue),
+		.top = area.top,
+		.right = area.right - halfWidth + (halfWidth * spawnAnimationValue),
+		.bottom = area.bottom};
+	
 	//
 	// draw background
 	//
 	{
-		ID2D1Bitmap* background = CopyFromRenderTarget(deviceContext, area);
+		ID2D1Bitmap* background = CopyFromRenderTarget(deviceContext, animatedArea);
 		if (!background) return;
 		DEFER(background->Release());
 		
-		DrawGlow(deviceContext, background, area);
+		DrawGlow(deviceContext, background, animatedArea);
 		
-		PushLayer(deviceContext, area);
-		BlurArea(deviceContext, area, background);
+		PushLayer(deviceContext, animatedArea);
+		BlurArea(deviceContext, animatedArea, background);
 	}
 		
 	//
@@ -100,84 +108,88 @@ void SearchBar::OnUpdate() {
 		textBox.OnUpdate();
 	}
 	
-	PopLayer(deviceContext);
-	
 	//
 	// draw items
 	//
-	{
-		const f32 itemHeight = GetItemHeight();
-		const f32 itemAreaTop = area.top + MARGIN_X2 + textBox.Height();
+	{	
+		const f32 itemHeight = ItemHeight();
 		
-		deviceContext->PushAxisAlignedClip(
-			D2D_RECT_F {
-				.left = area.left,
-				.top = itemAreaTop,
-				.right = area.right,
-				.bottom = area.bottom},
-			D2D1_ANTIALIAS_MODE_ALIASED);
-		DEFER(deviceContext->PopAxisAlignedClip());
-			
-		for (u64 i = 0u; i < itemCount; i++) {
-			ItemInfo item;
-			GetItemInfo(i, &item);
-			
-			const D2D_RECT_F itemArea {
-				.left   = area.left,
-				.top    = itemAreaTop - scrollarea.vpY + (itemHeight * i),
-				.right  = area.right,
-				.bottom = itemAreaTop - scrollarea.vpY + (itemHeight * (i+1))};
-				
-			if (selectedItem == i) {
-				ID2D1SolidColorBrush* brushGlow = settings.GetBrushDropShadow();
-				const f32 opacityBefore = brushGlow->GetOpacity();
-				DEFER(brushGlow->SetOpacity(opacityBefore));
-				
-				const f32 opacity = std::sin(itemHighlightAnimationValue) * 0.4f + 0.5f;
-				brushGlow->SetOpacity(opacity);
-				
-				deviceContext->FillRectangle(itemArea, brushGlow);
-			}
-			
-			staticGlyphRun.Shape(item.text, settings.fontUi);
-			
-			f32 offsetFrom, offsetTo;
-			staticGlyphRun.MeasureOffsetRange(
-				item.matchedPosition,
-			    item.matchedPosition + item.matchedLength,
-			    &offsetFrom, &offsetTo);
-			
-			deviceContext->FillRectangle(
-				D2D1_RECT_F {
-					.left   = MARGIN + itemArea.left + offsetFrom,
-				    .top    = MARGIN + itemArea.top,
-				    .right  = MARGIN + itemArea.left + offsetTo,
-				    .bottom = MARGIN + itemArea.top + settings.fontUi.lineHeight},
-				settings.GetBrushUiSearchResult());
-
-			staticGlyphRun.Draw(deviceContext,
-				MARGIN + itemArea.left,
-			    MARGIN + itemArea.top,
-				settings.fontUi,
-				settings.GetBrushUiText());
-				
-			staticGlyphRun.ShapeAndDraw(deviceContext, 
-				item.subText,
-				MARGIN + itemArea.left,
-			    MARGIN + itemArea.top + settings.fontUi.lineHeight,
-				settings.fontUi,
-				settings.GetBrushUiText(false));
-			
-			if (mouse.Hittest(itemArea, this, OnClickItem)) {
-				deviceContext->FillRectangle(itemArea, settings.GetBrushHover(mouse.isDown));
-			}
-		}
+		const u64 firstVisible = std::max<u64>(0u, static_cast<u64>(scrollarea.vpY / itemHeight));
+		const u64 lastVisible  = std::min<u64>(itemCount, static_cast<u64>((scrollarea.vpY + scrollarea.vpSize.height) / itemHeight) + 1u);
+		
+		OnUpdateItems(firstVisible, lastVisible);
 	}
+	
+	PopLayer(deviceContext);
 	
 	//
 	// draw scrollbar
 	//
 	scrollarea.OnUpdate();
+}
+
+void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
+	const f32 itemHeight = ItemHeight();
+	const f32 itemAreaTop = area.top + MARGIN_X2 + textBox.Height();
+	
+	const D2D_RECT_F itemArea {
+		.left   = area.left,
+		.top    = itemAreaTop - scrollarea.vpY + (itemHeight * i),
+		.right  = area.right,
+		.bottom = itemAreaTop - scrollarea.vpY + (itemHeight * (i+1))};
+		
+	if (selectedItem == i) {
+		ID2D1SolidColorBrush* brushGlow = settings.GetBrushDropShadow();
+		const f32 opacityBefore = brushGlow->GetOpacity();
+		DEFER(brushGlow->SetOpacity(opacityBefore));
+		
+		const f32 opacity = std::sin(itemHighlightAnimationValue) * 0.4f + 0.5f;
+		brushGlow->SetOpacity(opacity);
+		
+		deviceContext->FillRectangle(itemArea, brushGlow);
+	}
+	
+	staticGlyphRun.Shape(params.text, settings.fontUi);
+	
+	f32 offsetFrom, offsetTo;
+	staticGlyphRun.MeasureOffsetRange(
+		params.matchedPosition,
+	    params.matchedPosition + params.matchedLength,
+	    &offsetFrom, &offsetTo);
+	
+	deviceContext->FillRectangle(
+		D2D1_RECT_F {
+			.left   = MARGIN + itemArea.left + offsetFrom,
+		    .top    = MARGIN + itemArea.top,
+		    .right  = MARGIN + itemArea.left + offsetTo,
+		    .bottom = MARGIN + itemArea.top + settings.fontUi.lineHeight},
+		settings.GetBrushUiSearchResult());
+
+	staticGlyphRun.Draw(deviceContext,
+		MARGIN + itemArea.left,
+	    MARGIN + itemArea.top,
+		settings.fontUi,
+		settings.GetBrushUiText());
+		
+	staticGlyphRun.ShapeAndDraw(deviceContext, 
+		params.subText,
+		MARGIN + itemArea.left,
+	    MARGIN + itemArea.top + settings.fontUi.lineHeight,
+		settings.fontUi,
+		settings.GetBrushUiText(false));
+	
+	if (mouse.Hittest(itemArea, this, OnClickItem))
+		deviceContext->FillRectangle(itemArea, settings.GetBrushHover(mouse.isDown));
+}
+
+void SearchBar::SetItemCount(u64 newItemCount) {
+	if (itemCount != newItemCount) {
+		itemCount = newItemCount;
+		scrollarea.totalSize.height = itemCount * ItemHeight();
+		area.bottom = std::min(
+			area.top + MARGIN_X2 + textBox.Height() + (itemCount * ItemHeight()),
+			mainWindow.height - MARGIN);
+	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -190,12 +202,12 @@ void SearchBar::OnResize() {
 		.top    = offsetFromTop,
 		.right  = mainWindow.width * 0.7f,
 		.bottom = std::min(
-			itemAreaTop + (itemCount * GetItemHeight()),
+			itemAreaTop + (itemCount * ItemHeight()),
 			mainWindow.height - MARGIN)};
 	
 	textBox.position = D2D_POINT_2F {
-		area.left + MARGIN,
-		area.top + MARGIN},
+		.x = area.left + MARGIN,
+		.y = area.top + MARGIN},
 	textBox.width = RectWidth(area) - MARGIN_X2;
 	
 	scrollarea.OnResize(D2D_RECT_F {
@@ -215,8 +227,10 @@ void SearchBar::OnKeyDown(KeyEvent event) {
 	}
 	
 	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP)) {
-
-		if (event.vkeycode == VK_DOWN) {
+		if (itemCount == 0u) {
+			selectedItem = U64_MAX;
+		
+		} else if (event.vkeycode == VK_DOWN) {
 			selectedItem = IncrementWrapAround(selectedItem, itemCount);
 
 		} else if (event.vkeycode == VK_UP) {
@@ -235,7 +249,7 @@ void SearchBar::OnKeyDown(KeyEvent event) {
 	
 	} else {
 		if (textBox.OnKeyDown(event))
-			UpdateItems(this);
+			FilterItems(textBox.GetText());
 	}
 }
 
@@ -244,7 +258,7 @@ void SearchBar::OnChar(const char* data, u64 len) {
 		parameterConfigurator->OnChar(data, len);
 	
 	} else if (textBox.OnChar(data, len)) {
-		UpdateItems(this);
+		FilterItems(textBox.GetText());
 	}
 }
 

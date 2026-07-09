@@ -12,26 +12,25 @@ ToolSearchBar* ToolSearchBar::Make() {
 	return self;
 }
 	
-u64 ToolSearchBar::FilterItems(std::string_view text) {
+void ToolSearchBar::FilterItems(std::string_view text) {
 	
 	filteredTools.clear();
 	
 	if (text.empty()) {
 		for (const auto& t : Tool::tools)
 			filteredTools.emplace_back(&t, FuzzyMatchResult {});
-		
-		return filteredTools.size();
-	}
 	
-	for (const Tool& tool : Tool::tools) {
-		
-		FuzzyMatchResult result {};
-		if (FuzzyMatch(text, tool.name, &result)) {
-			filteredTools.emplace_back(&tool, result);
+	} else {
+	
+		for (const Tool& tool : Tool::tools) {
+			FuzzyMatchResult result {};
+			if (FuzzyMatch(text, tool.name, &result)) {
+				filteredTools.emplace_back(&tool, result);
+			}
 		}
 	}
 	
-	return filteredTools.size();
+	SetItemCount(filteredTools.size());
 }
 
 static bool CheckIfAToolIsAlreadyRunnung(ToolSearchBar* self) {
@@ -68,14 +67,15 @@ void ToolSearchBar::AcceptItem(u64 item, const KeyEvent* event) {
 	shouldClose = true;
 }
 
-void ToolSearchBar::GetItemInfo(u64 i, /*out*/ ItemInfo* itemInfo) {
-	ASSERT(i < filteredTools.size());
-	const Item& item = filteredTools[i];
-	*itemInfo = ItemInfo {
-		.text = item.tool->name,
-		.subText = item.tool->command,
-		.matchedPosition = item.fuzzyMatchResult.position,
-		.matchedLength = item.fuzzyMatchResult.matchedCount};
+void ToolSearchBar::OnUpdateItems(u64 firstVisible, u64 lastVisible) {
+	for (u64 i = firstVisible; i < lastVisible; i++) {
+		const Item& item = filteredTools[i];
+		UpdateItem(i, UpdateItemParams {
+			.text = item.tool->name,
+			.subText = item.tool->command,
+			.matchedPosition = item.fuzzyMatchResult.position,
+			.matchedLength = item.fuzzyMatchResult.matchedCount});
+	}
 }
 
 void ToolSearchBar::OnFinishedParameterConfiguration() {

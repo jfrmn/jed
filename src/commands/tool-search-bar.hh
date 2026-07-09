@@ -26,8 +26,8 @@ struct ToolSearchBar : public SearchBar {
 
 	static ToolSearchBar* Make();
 		
-	virtual u64 FilterItems(std::string_view text) override;
+	virtual void FilterItems(std::string_view text) override;
+	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;	
 	virtual void AcceptItem(u64 item, const KeyEvent* event) override;
-	virtual void GetItemInfo(u64 i, /*out*/ ItemInfo* itemInfo) override;
 	virtual void OnFinishedParameterConfiguration() override;	
 };

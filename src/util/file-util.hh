@@ -47,13 +47,12 @@ std::string_view GetWorkingDirectory();
 // iterate over all files and sub-directories in a dir
 struct DirectoryIterator {
 
-	std::string searchPattern = {};
-
 	void* hHandle = nullptr;
 	u64 fileSize = 0u;
 	u32 fileAttributes = 0u;
 	u32 lastError = 0u;
 	std::string filename = {};
+	char searchPath [260] {0}; // MAX_PATH
 
 	bool Next();
 	bool Failed() const;
@@ -62,7 +61,8 @@ struct DirectoryIterator {
 	bool IsFile() const;
 	std::string_view GetSearchPath() const;
 
-	explicit DirectoryIterator(std::string searchPath) noexcept;
+	DirectoryIterator() noexcept;
+	explicit DirectoryIterator(std::string_view directoryPath) noexcept;
 	~DirectoryIterator() noexcept;
 };
 
