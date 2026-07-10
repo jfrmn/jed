@@ -466,6 +466,70 @@ void MainWindow::OnUpdate() {
 				if (mouse.Hittest(areaTitle, this, OnActivateTab, i)) {
 					deviceContext->FillRectangle(areaTitle, settings.GetBrushHover(mouse.isDown));
 					isTitleHovered = true;
+						
+					// draw preview panel
+					{
+						const TextPosition caret = tab.editor->textController.carets.front().position;
+						const s64 fromLine = std::max(static_cast<s64>(caret.line) - 2, 0ll);
+						const s64 toLine =   std::min(static_cast<s64>(caret.line) + 2,
+													  static_cast<s64>(tab.editor->textController.buffer.GetMaxLine()));
+						
+						staticGlyphRun.Shape(tab.editor->path, settings.fontUi);
+						
+						const u64 lineCount = (toLine - fromLine + 1);
+						const f32 width = std::max(300.0f, staticGlyphRun.width + PADDING_X2);
+						
+						const D2D_RECT_F previewPanelArea {
+							.left = areaTitle.left,
+							.top = areaTitle.bottom,
+							.right = areaTitle.left + width,
+							.bottom = areaTitle.bottom + settings.fontUi.lineHeight + PADDING_X4 + (lineCount * settings.fontEditor.lineHeight)};
+						
+						// blur background
+						BlurArea(deviceContext, previewPanelArea);
+						
+						deviceContext->PushAxisAlignedClip(previewPanelArea, D2D1_ANTIALIAS_MODE_ALIASED);
+						
+						// draw header						
+						deviceContext->FillRoundedRectangle(
+							MakeRoundedRect(previewPanelArea.left, previewPanelArea.top, width, settings.fontUi.lineHeight + PADDING_X2, RADIUS),
+							settings.GetBrushUiBackground());
+						
+						staticGlyphRun.Draw(deviceContext,
+							previewPanelArea.left + PADDING,
+							previewPanelArea.top + PADDING,
+							settings.fontUi,
+							settings.GetBrushUiText(false));
+						
+						auto GetYOffsetForLine = [fromLine] (u64 ln) {
+							return PADDING_X3 + settings.fontUi.lineHeight + (settings.fontEditor.lineHeight * (ln-fromLine));
+						};
+						
+						// draw lines
+						for (s64 i = fromLine; i <= toLine; i++) {
+							tab.editor->glyphRuns[i].Draw(deviceContext,
+								previewPanelArea.left + PADDING,
+								previewPanelArea.top + GetYOffsetForLine(i),
+								settings.fontEditor,
+								settings.GetBrushEditorText());
+						}
+						
+						// draw caret
+						{
+							const f32 offsetX = PADDING + tab.editor->glyphRuns[caret.line].MeasureOffset(caret.column);
+							const f32 offsetY = GetYOffsetForLine(caret.line);
+							
+							deviceContext->DrawRectangle(
+								D2D_RECT_F {
+									.left = previewPanelArea.left + offsetX,
+									.top = previewPanelArea.top + offsetY,
+									.right = previewPanelArea.left + offsetX + settings.fontEditor.GetSpaceAdvance(),
+									.bottom = previewPanelArea.top + offsetY + settings.fontUi.lineHeight},
+								settings.GetBrushEditorText());
+						}
+						
+						deviceContext->PopAxisAlignedClip();
+					}
 				}
 			}
 						
