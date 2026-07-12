@@ -401,7 +401,12 @@ static void OnClickStartPage(void* ud, u64 btn) {
 		self->searchBar = FileSearchBar::Make();
 		needsUpdate = true;
 	
-	} else if (btn == 1) { // open file dialog
+	} else if (btn == 1) { // open explorer
+		if (self->explorer) return;
+		self->explorer = Explorer::Make();
+		needsUpdate = true;
+	
+	} else if (btn == 2) { // open file dialog
 		IFileDialog* fileDialog = nullptr;
 		HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,  IID_PPV_ARGS(&fileDialog));
 		if (hr != S_OK) {
@@ -448,7 +453,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
   		LogInfo("open dialog result: %", filepath);
   		self->OpenEditor(std::move(filepath));
 	
-	} else if (btn == 2) { // open manual
+	} else if (btn == 3) { // open manual
 		// @TODO not implemented
 		// (there is no manual)
 	} else {
@@ -688,8 +693,8 @@ void MainWindow::OnUpdate() {
 	if (tabs.empty()) {
 		ASSERT(panels.empty());
 		
-		constexpr u64 BUTTON_COUNT = 3u;
-		std::string_view buttonTexts[BUTTON_COUNT] {"Search for a file", "Open a file", "Open manual"};
+		constexpr u64 BUTTON_COUNT = 4u;
+		std::string_view buttonTexts[BUTTON_COUNT] {"Search for a file", "Open Explorer", "Open a file", "Open manual"};
 		GlyphRun buttonRuns[BUTTON_COUNT] {};
 		
 		static_assert(STATIC_ARRAY_SIZE(buttonTexts) == BUTTON_COUNT);
@@ -710,6 +715,10 @@ void MainWindow::OnUpdate() {
 				.bottom = (height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
 			
 			deviceContext->DrawRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushUiBackground());
+			
+			if ((i == 0 && searchBar) || i == 1 && explorer)
+				deviceContext->FillRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushUiBackground());
+			
 			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.GetBrushUiText());
 			
 			if (mouse.Hittest(buttonRect, this, OnClickStartPage, i))
@@ -720,7 +729,7 @@ void MainWindow::OnUpdate() {
 	}
 	
 	//
-	// draw status bar
+	// draw status bar 
 	//
 	statusBar.OnUpdate();
 	
