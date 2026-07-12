@@ -84,10 +84,7 @@ int main(int argc, char** argv) {
 		LogError("init main window failed");
 		return -1;
 	}
-	
-	// @DUMMY
-	mainWindow.OpenEditor(".\\src\\main.cc", MainWindow::OpenBehavior_NewPanelLeft);
-	
+		
 	LogInfo("running message loop");
 
 	u64 ticksBefore = 0;

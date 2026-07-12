@@ -20,6 +20,7 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <d2d1_3.h>
+#include <shlobj.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -162,11 +163,11 @@ static void RelinkPanelsAndTabs(MainWindow* self) {
 	}
 }
 
-static float GetTabHeight() {
+static float TabHeight() {
 	return settings.fontUi.lineHeight + PADDING_X2;
 }
 
-static float GetStatusBarHeight() {
+static float StatusBarHeight() {
 	return settings.fontUi.lineHeight + PADDING_X2;
 }
 
@@ -182,15 +183,15 @@ static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
 	
 	panel.editor->OnResize(D2D_RECT_F {
 		.left   = (self->width / self->panels.size()) * self->focusedPanelIndex,
-		.top    = GetTabHeight(),
+		.top    = TabHeight(),
 		.right  = (self->width / self->panels.size()) * (self->focusedPanelIndex + 1),
-		.bottom = self->height - GetStatusBarHeight()});
+		.bottom = self->height - StatusBarHeight()});
 }
 
 static void ResizePanels(MainWindow* self) {
 	
-	const f32 tabHeight = GetTabHeight();
-	const f32 statusBarHeight = GetStatusBarHeight();
+	const f32 tabHeight = TabHeight();
+	const f32 statusBarHeight = StatusBarHeight();
 	const f32 panelWidth = std::floor(mainWindow.width / self->panels.size());
 	f32 panelLeft = 0.0f;
 	
@@ -218,7 +219,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 	
 	//
 	// check if editor already open
-	//	
+	//
 	if (u64 tabIndex = U64_MAX, panelIndex = U64_MAX;
 		FindEditor(this, path, &tabIndex, &panelIndex)) {
 		
@@ -254,6 +255,9 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		   *wasAlreadyOpen = false;
 		
 		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent) {
+			ASSERT(!panels.empty());
+			ASSERT(focusedPanelIndex != U64_MAX);
+			ASSERT(!tabs.empty());
 			
 			MainWindow::Panel& currentPanel = panels[focusedPanelIndex];
 			MainWindow::Tab& currentTab = tabs[currentPanel.tabIndex];
@@ -288,7 +292,14 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			
 			fileWatcher.SubscribeDirectoryOfFile(newTab.editor->path);
 			
-			if (openBehavior == MainWindow::OpenBehavior_Default) {
+			if (panels.empty()) {
+				ASSERT(focusedPanelIndex == U64_MAX);
+				MainWindow::Panel& panel = panels.emplace_back();
+				panel.editor = newTab.editor;
+				panel.tabIndex = newTab.panelIndex = focusedPanelIndex = 0u;
+				ResizePanels(this);
+				
+			} else if (openBehavior == MainWindow::OpenBehavior_Default) {
 				ChangeTabOfFocusedPanel(this, tabs.size() - 1);
 				
 			} else if (openBehavior == MainWindow::OpenBehavior_NewPanelLeft || openBehavior == MainWindow::OpenBehavior_NewPanelRight) {
@@ -383,12 +394,108 @@ static void OnCloseTab(void* ud, u64 i) {
 	
 }
 
+static void OnClickStartPage(void* ud, u64 btn) {
+	auto self = static_cast<MainWindow*>(ud);
+	if (btn == 0) { // search file
+		if (self->searchBar) return;
+		self->searchBar = FileSearchBar::Make();
+		needsUpdate = true;
+	
+	} else if (btn == 1) { // open file dialog
+		IFileDialog* fileDialog = nullptr;
+		HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,  IID_PPV_ARGS(&fileDialog));
+		if (hr != S_OK) {
+			LogError("CoCreateInstance() failed. HRESULT: %", FHr(hr));
+			return;
+		}
+		DEFER(fileDialog->Release());
+		
+		DWORD flags = 0;
+		fileDialog->GetOptions(&flags);
+		fileDialog->SetOptions(flags | FOS_FORCEFILESYSTEM);
+		hr = fileDialog->Show(self->hWnd);
+		if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+			LogInfo("User cancelled open file dialog.");
+			return;
+		} else if (hr != S_OK) {
+			LogError("Show() failed. HRESULT: %", FHr(hr));
+			return;
+		}
+		
+		IShellItem* resultItem = nullptr;
+		hr = fileDialog->GetResult(&resultItem);
+		if (hr != S_OK) {
+			LogError("GetResult() failed. HRESULT: %", FHr(hr));
+			return;
+		}
+		DEFER(resultItem->Release());
+		
+		wchar* wfilepath = nullptr;
+  		hr = resultItem->GetDisplayName(SIGDN_FILESYSPATH, &wfilepath);
+  		if (hr != S_OK) {
+  			LogError("GetDisplayName() failed. HRESULT: %", FHr(hr));
+			return;
+  		}
+  		
+  		std::string filepath {};
+  		u64 filepathLen = 0u;
+  		ToUtf8(wfilepath, {}, &filepathLen);
+  		
+  		filepath.resize(filepathLen);
+  		ToUtf8(wfilepath, {filepath.data(), filepath.size()}, nullptr);
+  		CoTaskMemFree(wfilepath);
+  		
+  		LogInfo("open dialog result: %", filepath);
+  		self->OpenEditor(std::move(filepath));
+	
+	} else if (btn == 2) { // open manual
+		// @TODO not implemented
+		// (there is no manual)
+	} else {
+		ASSERT_UNREACHABLE;
+	}
+}
+
+static void FinishDrawing(MainWindow* self) {
+	const HRESULT hr = deviceContext->EndDraw();
+	if (hr == S_OK) return;
+	
+	const std::string errorString = FormatString("Rendering failed. HRESULT: %", FHr(hr));
+	LogError("%", errorString);
+	
+	HDC hDC = GetDC(self->hWnd);
+	
+	SIZE textExtend {};
+	GetTextExtentPointA(hDC, errorString.data(), static_cast<int>(errorString.size()), &textExtend);
+	SetBkColor(hDC, RGB(0, 0, 0));
+	SetTextColor(hDC, RGB(255, 0, 0));
+	TextOut(hDC,
+		static_cast<int>((self->width / 2.0f) - (textExtend.cx / 2.0f)),
+		static_cast<int>((self->height / 2.0f) - (textExtend.cy / 2.0f)),
+		errorString.data(),
+		static_cast<int>(errorString.size()));
+	ReleaseDC(self->hWnd, hDC);		
+	ValidateRect(self->hWnd, NULL);
+}
+
 void MainWindow::OnUpdate() {
 		
 	deviceContext->BeginDraw();
 	deviceContext->Clear(D2D1::ColorF(D2D1::ColorF::Black));
+	DEFER(FinishDrawing(this));
 	
-	const f32 tabHeight = GetTabHeight();
+	const f32 tabHeight = TabHeight();
+	
+	//
+	// fill background
+	//
+	deviceContext->FillRectangle(
+		D2D_RECT_F {
+			.left = 0.0f,
+			.top = tabHeight,
+			.right = width,
+			.bottom = height - tabHeight},
+		settings.GetBrushEditorBackground());
 	
 	//
 	// draw panels
@@ -412,11 +519,9 @@ void MainWindow::OnUpdate() {
 				.right = panel.editor->area.right - 1.0f,
 				.bottom = panel.editor->area.bottom};
 			
-			
 			if (i == focusedPanelIndex) {
 				deviceContext->DrawRectangle(borderRect, settings.GetBrushDropShadow(), 2.0f);
 			} else if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
-				deviceContext->DrawRectangle(borderRect, settings.GetBrushHover(), 2.0f);
 				if (mouse.event == Mouse::Event_Up) focusedPanelIndex = i;
 			}
 		}
@@ -530,9 +635,21 @@ void MainWindow::OnUpdate() {
 						
 						deviceContext->PopAxisAlignedClip();
 					}
+					
+					// draw grey box around panel
+					if (tab.panelIndex != U64_MAX) {
+						deviceContext->DrawRectangle(
+							D2D1_RECT_F {
+								.left = tab.editor->area.left + 1.0f,
+								.top = tab.editor->area.top,
+								.right = tab.editor->area.right - 1.0f,
+								.bottom = tab.editor->area.bottom},
+							settings.GetBrushHover(),
+							2.0f);
+					}
 				}
 			}
-						
+					
 			// check click on close icon
 			{
 				const D2D1_RECT_F areaIcon {
@@ -566,6 +683,43 @@ void MainWindow::OnUpdate() {
 	}
 	
 	//
+	// draw start page if no panels/tabs are open
+	//
+	if (tabs.empty()) {
+		ASSERT(panels.empty());
+		
+		constexpr u64 BUTTON_COUNT = 3u;
+		std::string_view buttonTexts[BUTTON_COUNT] {"Search for a file", "Open a file", "Open manual"};
+		GlyphRun buttonRuns[BUTTON_COUNT] {};
+		
+		static_assert(STATIC_ARRAY_SIZE(buttonTexts) == BUTTON_COUNT);
+		static_assert(STATIC_ARRAY_SIZE(buttonRuns) == BUTTON_COUNT);
+		
+		GlyphRun::ShapeBatch(buttonTexts, settings.fontUi, buttonRuns);
+		
+		const f32 buttonWidth = std::max_element(buttonRuns, buttonRuns + BUTTON_COUNT, [] (const auto& lhs, const auto& rhs) { return lhs.width < rhs.width; })->width + PADDING_X2;
+		const f32 totalHeight = ((settings.fontUi.lineHeight + PADDING_X2) * BUTTON_COUNT) + (MARGIN_X2 * BUTTON_COUNT-1);
+		
+		f32 offsetY = 0.0f;
+		for (u64 i = 0u; i < BUTTON_COUNT; i++) {
+			
+			const D2D_RECT_F buttonRect {
+				.left   = (width  / 2.0f) - (buttonWidth / 2.0f),
+				.top    = (height / 2.0f) - (totalHeight / 2.0f) + offsetY,
+				.right  = (width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
+				.bottom = (height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
+			
+			deviceContext->DrawRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushUiBackground());
+			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.GetBrushUiText());
+			
+			if (mouse.Hittest(buttonRect, this, OnClickStartPage, i))
+				deviceContext->FillRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushHover(mouse.isDown));
+			
+			offsetY += settings.fontUi.lineHeight + PADDING_X2 + MARGIN_X2;
+		}
+	}
+	
+	//
 	// draw status bar
 	//
 	statusBar.OnUpdate();
@@ -593,22 +747,20 @@ void MainWindow::OnUpdate() {
 			searchBar = nullptr;
 		}
 	}
-	
-	const HRESULT hr = deviceContext->EndDraw();
-	
-	// @TODO needs cleanup
-	{
-		// const double elapsed = GetElapsedMs(ticksBefore);
-		// HDC hdc = GetDC(hWnd);
-		// std::string str = std::format("{:.4}ms", elapsed);
-		// TextOut(hdc, width - 100, 5, str.data(), str.size());
-		// ReleaseDC(hWnd, hdc);
-	}
-	
-	ValidateRect(hWnd, NULL);
+}
 
-	if (hr != S_OK)
-		LogWarning("rendering failed. HRESULT: %", FHr(hr));
+Editor* MainWindow::GetFocusedEditor() {
+	if (focusedPanelIndex != U64_MAX) {
+		ASSERT(focusedPanelIndex < panels.size());
+		return panels[focusedPanelIndex].editor;
+	} else {
+		ASSERT(panels.empty());
+		return nullptr;
+	}
+}
+
+const Editor* MainWindow::GetFocusedEditor() const {
+	return const_cast<MainWindow*>(this)->GetFocusedEditor();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -780,7 +932,7 @@ static void ActionClosePanel(MainWindow* self) {
 }
 
 static void ActionCloseTab(MainWindow* self) {
-	if (self->tabs.size() <= 1u) return;
+	//if (self->tabs.size() <= 1u) return;
 	
 	MainWindow::Panel& panel = self->panels[self->focusedPanelIndex];
 	
@@ -822,7 +974,7 @@ static void ActionCloseTab(MainWindow* self) {
 	
 found_new_tab:
 	RelinkPanelsAndTabs(self);
-	ResizePanels(self);	
+	ResizePanels(self);
 }
 
 static void ActionCloseTabAndPanel(MainWindow* self) {
@@ -931,9 +1083,8 @@ void MainWindow::OnKeyDown(KeyEvent event) {
 			searchBar = nullptr;
 		}
 	
-	} else {
-		ASSERT(focusedPanelIndex < panels.size())
-		panels[focusedPanelIndex].editor->OnKeyDown(event);
+	} else if (Editor* focusedEditor = GetFocusedEditor()) {
+		focusedEditor->OnKeyDown(event);
 	}
 }
 
@@ -945,9 +1096,8 @@ void MainWindow::OnChar(const char* data, u64 len) {
 	} else if (explorer) {
 		explorer->OnChar(data, len);
 		
-	} else {
-		ASSERT(focusedPanelIndex < panels.size())
-		panels[focusedPanelIndex].editor->OnChar(data, len);
+	} else if (Editor* focusedEditor = GetFocusedEditor()) {
+		focusedEditor->OnChar(data, len);
 	}
 }
 

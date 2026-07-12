@@ -57,10 +57,6 @@ static D2D_RECT_F GetArea(const f32 posX, const f32 width, bool l2r) {
 		.bottom = mainWindow.height};
 }
 
-static Editor* GetFocusedEditor() {
-	return mainWindow.panels[mainWindow.focusedPanelIndex].editor;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 // S T A T U S   B A R   E L E M E N T S
@@ -193,7 +189,7 @@ static void OnClickLanguagePopup(void*) {
 
 static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 		
-	const Editor* focusedEditor = GetFocusedEditor();
+	const Editor* focusedEditor = mainWindow.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	GlyphRun currentLanguageName {};
@@ -355,7 +351,7 @@ static void OnClickDiagnostics(void* ud, u64) {
 }
 
 static bool IsVisibleDiagnosticRecords() {
-	Editor* editor = GetFocusedEditor();
+	Editor* editor = mainWindow.GetFocusedEditor();
 	if (!editor) return false;
 	
 	std::scoped_lock lock {editor->editorDiagnostics.mutex};
@@ -364,7 +360,7 @@ static bool IsVisibleDiagnosticRecords() {
 
 static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 	
-	Editor* focusedEditor = GetFocusedEditor();
+	Editor* focusedEditor = mainWindow.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	//
@@ -586,7 +582,7 @@ static void GetCaretInfoTextMultiCarets(StatusBar* self, const TextController& c
 
 static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 	
-	const Editor* focusedEditor = GetFocusedEditor();
+	const Editor* focusedEditor = mainWindow.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	CaretInfoText caretInfoText {};

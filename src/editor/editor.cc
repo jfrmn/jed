@@ -134,8 +134,10 @@ static bool LoadFile(Editor* self) {
 	//
 	// prepare glyph runs
 	//
-	if (!GlyphRun::ShapeBatch(self->textController.buffer, settings.fontEditor, &self->glyphRuns)) {
-		LogError("inital shaping failed!");
+	self->glyphRuns.resize(self->textController.buffer.LineCount());
+	if (!GlyphRun::ShapeBatch(self->textController.buffer, settings.fontEditor, self->glyphRuns)) {
+		LogError("initial shaping failed!");
+		return false;
 	}
 	
 	if (self->language)
@@ -379,7 +381,9 @@ void Editor::ProcessTextChange(const TextChange* change) {
 	}
 	
 	if (needsFullReshape) {
-		GlyphRun::ShapeBatch(GetBuffer(), settings.fontEditor, &glyphRuns);
+		TextBuffer& buffer = GetBuffer();
+		glyphRuns.resize(buffer.LineCount());
+		GlyphRun::ShapeBatch(buffer, settings.fontEditor, glyphRuns);
 	} else {
 		const u64 line = change->operations[0].start.line;	
  		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), settings.fontEditor);
@@ -759,11 +763,6 @@ void Editor::OnUpdate() {
 			}
 		}
 	}
-	
-	//
-	// fill background
-	//
-	deviceContext->FillRectangle(area, settings.GetBrushEditorBackground());
 
 	//
 	// draw scrollbar

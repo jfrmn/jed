@@ -59,7 +59,7 @@ struct MainWindow : public Window {
 	std::vector<Tab>   tabs   = {};
 	std::vector<Panel> panels = {};
 	
-	u64 focusedPanelIndex   = 0u;
+	u64 focusedPanelIndex   = U64_MAX;
 	u64 hoveredTabIndex     = U64_MAX;
 	bool closeButtonHovered = false;
 	
@@ -74,7 +74,9 @@ struct MainWindow : public Window {
 	void Shutdown();
 	
 	Editor* OpenEditor(std::string path, OpenBehavior openBehavior = OpenBehavior_Default, bool* wasAlreadyOpen = nullptr);
-	void RenameEditor(const Editor* editor, std::string_view newName);
+	
+	Editor* GetFocusedEditor();
+	const Editor* GetFocusedEditor() const;
 	
 	void OnUpdate();
 	

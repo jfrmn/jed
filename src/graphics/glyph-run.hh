@@ -31,8 +31,8 @@ struct GlyphRun {
 	// functions
 	//------------------------------------------	
 
-	static bool ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun>* runs);
-	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun>* runs);
+	static bool ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::span<GlyphRun> output);
+	static bool ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::span<GlyphRun> output);
 		
 	bool Shape(std::string_view text, const Font& font);
 		

@@ -221,7 +221,7 @@ bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
 	ASSERT(posDelimiter + 1u <= filepath.length());
 	
 	// need to copy the directory to a buffer because the CreateFile() function takes a null-terminated string
-	char directoryBuffer[_MAX_PATH + 1] {0};
+	char directoryBuffer[_MAX_PATH] {0};
 	memcpy(directoryBuffer, filepath.data(), posDelimiter);
 	directoryBuffer[posDelimiter] = '\0';
 	

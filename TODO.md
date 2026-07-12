@@ -8,6 +8,8 @@
 [?] delete line messes up tree sitter highlighting (and i think pasting text too) (FIXED?)
 [ ] untab at beginning of produces textChange with 0 operations
 [ ] multicursor let's you remove all cursors - leading to a crash
+[ ] Opening both a searchbar and the tool panel blocks keyboard input
+[ ] using the file search bar from start screen and selecting a file with Ctrl+/Shift+Enter crashes
 
 # MAJOR TASKS
 

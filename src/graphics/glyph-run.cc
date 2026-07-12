@@ -631,7 +631,8 @@ static DWORD ShapeBatchThreadProc(LPVOID param) {
 	return (allOk ? TRUE : FALSE);
 }
 
-static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGetLine)(const void*, u64), u64 totalLineCount, const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
+static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGetLine)(const void*, u64), u64 totalLineCount, const Font& font, /*out*/ std::span<GlyphRun> output) {
+	ASSERT(output.size() >= totalLineCount);
 	
 	SYSTEM_INFO systemInfo;
 	GetSystemInfo(&systemInfo);
@@ -640,22 +641,20 @@ static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGe
 	//if (false) {
 		ASSERT(systemInfo.dwNumberOfProcessors > 0);
 		
-		const u32 threadCount = 1;//systemInfo.dwNumberOfProcessors;
+		const u32 threadCount = systemInfo.dwNumberOfProcessors;
 		
 		auto handles = new HANDLE[threadCount];
 		DEFER({
 			for (u64 i = 0; i < threadCount; i++)
 				CloseHandle(handles[i]);
 			delete[] handles; });
-			
-		runs->resize(totalLineCount);
-		
+					
 		ShapeBatchThreadData threadData {
 			.currentLine = 0u,
 			.lineCount = totalLineCount,
 			.lineSource = lineSource,
 			.funcGetLine = funcGetLine,
-			.output = runs->data(),
+			.output = output.data(),
 			.font = &font};
 			
 		for (u64 i = 0; i < threadCount; i++)
@@ -668,32 +667,31 @@ static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGe
 		}
 		
 	} else {
-		runs->resize(totalLineCount);
 		for (u64 i = 0u; i < totalLineCount; i++) {
 			const std::string_view line = funcGetLine(lineSource, i);
-			runs->at(i).Shape(line, font);
+			output[i].Shape(line, font);
 		}
 	}
 	
 	return true;	
 }
 
-bool GlyphRun::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
+bool GlyphRun::ShapeBatch(std::span<const std::string_view> batch, const Font& font, /*out*/ std::span<GlyphRun> output) {
 	return ShapeBatchInternal(
 		batch.data(),
 		[] (const void* ls, u64 ln) { return static_cast<const std::string_view*>(ls)[ln]; },
 		batch.size(),
 		font,
-		runs);
+		output);
 }
 
-bool GlyphRun::ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::vector<GlyphRun>* runs) {
+bool GlyphRun::ShapeBatch(const TextBuffer& textBuffer , const Font& font, /*out*/ std::span<GlyphRun> output) {
 	return ShapeBatchInternal(
 		&textBuffer,
 		[] (const void* ls, u64 ln) { return static_cast<const TextBuffer*>(ls)->GetLineAt(ln).GetText(); },
 		textBuffer.LineCount(),
 		font,
-		runs);
+		output);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
