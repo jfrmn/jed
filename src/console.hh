@@ -3,12 +3,12 @@
 #include "text/text-position.hh"
 #include "graphics/glyph-run.hh"
 #include "commands/parameter.hh"
+#include "commands.hh"
 
 #include "ui/scrollarea.hh"
 #include "ui/file-preview.hh"
 
 #include "util/process.hh"
-#include "util/regex.hh"
 #include "util/color.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -108,10 +108,10 @@ struct Console : public Process::Observer {
 	
 	bool StartProcess();
 	void OnUpdate();
-	
+		
 	void OnResize(f32 newWidth, f32 newHeight);
+	void OnKeyDown(KeyEvent event, Command command);
 	void OnMouseWheel(f32 distance);
-	bool OnKeyDown(KeyEvent event);
 	
 	virtual void OnStderr(std::string_view data) override;
 	virtual void OnStdout(std::string_view data) override;

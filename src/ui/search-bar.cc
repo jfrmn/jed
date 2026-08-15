@@ -218,12 +218,11 @@ void SearchBar::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void SearchBar::OnKeyDown(KeyEvent event) {
+void SearchBar::OnKeyDown(KeyEvent event, Command command) {
 	if (parameterConfigurator) {
-		parameterConfigurator->OnKeyDown(event);
+		parameterConfigurator->OnKeyDown(event, command);
 		if (parameterConfigurator->result != ParameterConfigurator::Result_Unfinished)
 			OnFinishedParameterConfiguration();
-		return;
 	}
 	
 	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP)) {
@@ -244,12 +243,12 @@ void SearchBar::OnKeyDown(KeyEvent event) {
 		if (selectedItem < itemCount)
 			AcceptItem(selectedItem, &event);
 		   
-	} else if (event.vkeycode == VK_ESCAPE && event.NoModifiers()) {
+	} else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
 		shouldClose = true;
 	
 	} else {
-		if (textBox.OnKeyDown(event))
-			FilterItems(textBox.GetText());
+		const bool changed = textBox.OnKeyDown(event, command);
+		if (changed) FilterItems(textBox.GetText());
 	}
 }
 

@@ -185,16 +185,13 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			mouse.x = x;
 			mouse.y = y;
 			
-			const MouseEvent event {x, y};
 			if (nMSG == WM_LBUTTONDOWN) {
 				mouse.isDown = true;
 				mouse.event = Mouse::Event_Down;
-				//window->OnMouseDown(event);
 			
 			} else if (nMSG == WM_LBUTTONUP) {
 				mouse.isDown = false;
 				mouse.event = Mouse::Event_Up;
-				//window->OnMouseUp(event);
 			}
 				
 		} break;
@@ -211,10 +208,12 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		case WM_KEYDOWN: {
 			KeyEvent keyEvent {
 				.vkeycode = static_cast<u32>(wParam),
-				.ctrl  = HIWORD(GetKeyState(VK_CONTROL)) != 0,
-				.shift = HIWORD(GetKeyState(VK_SHIFT))   != 0,
-				.alt   = HIWORD(GetKeyState(VK_MENU))    != 0};
-
+				.modifiers = KM_None};
+				
+				if (HIWORD(GetKeyState(VK_CONTROL)) != 0) keyEvent.modifiers |= KM_Ctrl;
+				if (HIWORD(GetKeyState(VK_SHIFT))   != 0) keyEvent.modifiers |= KM_Shift;
+				if (HIWORD(GetKeyState(VK_MENU))    != 0) keyEvent.modifiers |= KM_Alt;
+			
 			if      (nMSG == WM_KEYDOWN || nMSG == WM_SYSKEYDOWN) window->OnKeyDown(keyEvent);
 			else if (nMSG == WM_KEYUP   || nMSG == WM_SYSKEYUP)   window->OnKeyUp(keyEvent);
 			else ASSERT_UNREACHABLE

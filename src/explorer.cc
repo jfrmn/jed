@@ -190,10 +190,11 @@ Explorer* Explorer::Make() {
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Actions
+// Commands
 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Copy the full filepath of every selected item to the buffer.
 // Each filename is delimited by a \0 and the whole sequence is terminated by a final \0  just like functions
@@ -241,7 +242,7 @@ static u64 CopyFilenamesOfSelectedItems(const Explorer::Panel* panel, std::span<
 	}
 }
 
-static void ActionCopyOrCut(Explorer* self, bool cut) {
+static void CommandCopyOrCut(Explorer* self, bool cut) {
 	// see: https://stackoverflow.com/questions/25708895/how-to-copy-files-by-win32-api-functions-and-paste-by-ctrlv-in-my-desktop
 	
 	const u64 requiredSizeFilenames = CopyFilenamesOfSelectedItems(self->activePanel, {});
@@ -303,7 +304,7 @@ static void ActionCopyOrCut(Explorer* self, bool cut) {
 	}
 }
 
-static void ActionPaste(Explorer* self) {
+static void CommandPaste(Explorer* self) {
 	
 	if (!IsClipboardFormatAvailable(CF_HDROP)) {
 		LogWarning("No clipboard data or clipboard format no compatible");
@@ -449,7 +450,7 @@ static void ActionDelete(Explorer* self) {
 	}
 }
 
-static void ActionShellExecute(Explorer* self) {
+static void CommandShellExecute(Explorer* self) {
 	
 	const std::string itemPath = BuildPanelPath(self->activePanel, self->activePanel->activeItem->filename);
 	const auto result = reinterpret_cast<INT_PTR>(ShellExecuteA(mainWindow.hWnd, NULL, itemPath.c_str(), NULL, NULL, SW_SHOW));
@@ -479,7 +480,7 @@ static void ActionShellExecute(Explorer* self) {
 	}
 }
 
-static void ActionRevealInExplorer(Explorer* self) {
+static void CommandRevealInExplorer(Explorer* self) {
 
 	PIDLIST_ABSOLUTE idlistBase = nullptr;
 	
@@ -614,7 +615,7 @@ static void ActionRevealInExplorer(Explorer* self) {
 	}
 }
 
-static void ActionNewItem(Explorer* self, Explorer::Item::Type type) {
+static void CommandNewItem(Explorer* self, Explorer::Item::Type type) {
 	ASSERT(!self->newItemDialog);
 	ASSERT(type == Explorer::Item::Type_File || type == Explorer::Item::Type_Directory);
 	
@@ -629,7 +630,7 @@ static void ActionNewItem(Explorer* self, Explorer::Item::Type type) {
 	self->newItemDialog->isRename = false;
 }
 
-static void ActionRenameItem(Explorer* self) {
+static void CommandRenameItem(Explorer* self) {
 	ASSERT(!self->newItemDialog);
 	
 	const u64 activeItemIndex = self->activePanel->activeItem - self->activePanel->items.data();
@@ -781,10 +782,11 @@ static void ActionClick(Explorer* self, Explorer::Panel* clickedPanel, Explorer:
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Update
 //
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 	const bool isActivePanel = (self->activePanel == panel);
@@ -992,8 +994,7 @@ void Explorer::OnUpdate() {
 	}
 }
 
-
-void Explorer::OnKeyDown(KeyEvent event) {
+void Explorer::OnKeyDown(KeyEvent event, Command command) {
 	
 	if (newItemDialog) {
 		if (event.vkeycode == VK_ESCAPE || event.vkeycode == VK_RIGHT) {
@@ -1004,89 +1005,85 @@ void Explorer::OnKeyDown(KeyEvent event) {
 			ActionConfirmTextboxPanel(this);
 		
 		} else {
-			newItemDialog->textbox.OnKeyDown(event);
+			newItemDialog->textbox.OnKeyDown(event, command);
 		}
-	
-	} else {
-	
-		if (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) {
+			
+	} else if (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) {
 					
-			Item* oldActiveItem = activePanel->activeItem;
+		Item* oldActiveItem = activePanel->activeItem;
 
-			const u64 oldActiveItemIndex = activePanel->activeItem - activePanel->items.data();
-			const u64 newActiveItemIndex = event.vkeycode == VK_DOWN ?
-				IncrementWrapAround(oldActiveItemIndex, activePanel->items.size()):
-				DecrementWrapAround(oldActiveItemIndex, activePanel->items.size());
-				
-			activePanel->activeItem = &activePanel->items[newActiveItemIndex];
-				
-			if (event.shift) {				
-				if (activePanel->activeItem->isSelected)
-					activePanel->activeItem->isSelected = false;
-				else
-					oldActiveItem->isSelected = true;
+		const u64 oldActiveItemIndex = activePanel->activeItem - activePanel->items.data();
+		const u64 newActiveItemIndex = event.vkeycode == VK_DOWN ?
+			IncrementWrapAround(oldActiveItemIndex, activePanel->items.size()):
+			DecrementWrapAround(oldActiveItemIndex, activePanel->items.size());
 			
-			} else {
-				// reset selection
-				for (Item& item : activePanel->items)
-					item.isSelected = false;
-			}
+		activePanel->activeItem = &activePanel->items[newActiveItemIndex];
 			
-			activeItemAnimationValue = 0.0f;
-				
-		} else if (event.vkeycode == VK_RIGHT) {
-			if (activePanel->activeItem->type == Explorer::Item::Type_Directory)
-				ActionOpenDirectory(this);
-			
-		} else if (event.vkeycode == VK_LEFT) {
-			
-			Panel* closingPanel = activePanel;
-			activePanel = closingPanel->parent;
-			delete closingPanel;
-			
-			if (!activePanel) {
-				shouldClose = true;
-				return;
-			}
-			
-			activeItemAnimationValue = 0.0f;
-			
-		} else if (event == settings.keybinds.copy) {
-			ActionCopyOrCut(this, false);
-	
-		} else if (event == settings.keybinds.cut) {
-			ActionCopyOrCut(this, true);
-			
-		} else if (event == settings.keybinds.paste) {
-			ActionPaste(this);
-			
-		} else if (event == settings.keybinds.deleteNextChar) {
-			ActionDelete(this);
-			
-		} else if (event == settings.keybinds.explorerShellExecute) {
-			ActionShellExecute(this);
-			
-		} else if (event == settings.keybinds.explorerOpenInWindowsExplorer) {
-			ActionRevealInExplorer(this);
+		if ((event.modifiers & KM_Shift) != 0) {				
+			if (activePanel->activeItem->isSelected)
+				activePanel->activeItem->isSelected = false;
+			else
+				oldActiveItem->isSelected = true;
 		
-		} else if (event == settings.keybinds.explorerNewFile) {
-			ActionNewItem(this, Item::Type_File);
-		
-		} else if (event == settings.keybinds.explorerNewFolder) {
-			ActionNewItem(this, Item::Type_Directory);
-		
-		} else if (event == settings.keybinds.explorerRename) {
-			ActionRenameItem(this);
-		
-		} else if (event.vkeycode == VK_RETURN) {
-			ActionOpenItem(this, OpenBehaviorFromModifiers(event));
-			return;
-		
-		} else if (event.vkeycode == VK_ESCAPE) {
-			shouldClose = true;
-			return;
+		} else {
+			// reset selection
+			for (Item& item : activePanel->items)
+				item.isSelected = false;
 		}
+		
+		activeItemAnimationValue = 0.0f;
+			
+	} else if (event.vkeycode == VK_RIGHT) {
+		if (activePanel->activeItem->type == Explorer::Item::Type_Directory) {
+			ActionOpenDirectory(this);
+			}
+		
+	} else if (event.vkeycode == VK_LEFT) {
+		
+		Panel* closingPanel = activePanel;
+		activePanel = closingPanel->parent;
+		delete closingPanel;
+		
+		if (!activePanel) {
+			shouldClose = true;
+		}
+			
+		activeItemAnimationValue = 0.0f;
+		
+	} else if (event.vkeycode == VK_DELETE) {
+		ActionDelete(this);
+				
+	} else if (event.vkeycode == VK_RETURN) {
+		ActionOpenItem(this, OpenBehaviorFromModifiers(event));
+	
+	} else if (event.vkeycode == VK_ESCAPE) {
+		shouldClose = true;
+	
+	} else if (command.id == Command::Id_Clipboard_Copy) {
+		CommandCopyOrCut(this, false);
+	
+	} else if (command.id == Command::Id_Clipboard_Cut) {
+		CommandCopyOrCut(this, true);
+		
+	} else if (command.id == Command::Id_Clipboard_Paste) {
+		CommandPaste(this);
+		
+	} else if (command.id == Command::Id_Explorer_ShellExecute) {
+		CommandShellExecute(this);
+		
+	} else if (command.id == Command::Id_OpenInWindowsExplorer) {
+		CommandRevealInExplorer(this);
+	
+	} else if (command.id == Command::Id_NewFile) {
+		CommandNewItem(this, Item::Type_File);
+	
+	} else if (command.id == Command::Id_Explorer_NewDirectory) {
+		CommandNewItem(this, Item::Type_Directory);
+	
+	} else if (command.id == Command::Id_Explorer_Rename) {
+		CommandRenameItem(this);
 	}
+	
 }
 
 void Explorer::OnChar(const char* utf8, u64 len) {

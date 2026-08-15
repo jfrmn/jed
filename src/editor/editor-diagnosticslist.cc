@@ -39,7 +39,7 @@ static void ActionGotoItem(EditorDiagnosticsList* self, u64 itemIndex, bool clos
 		return;
 		
 	const EditorDiagnostics::Record& record = self->owner->editorDiagnostics.records[itemIndex];
-	self->owner->textController.Select(record.from, record.to);
+	self->owner->textController.SetSelection(record.from, record.to);
 	self->owner->ScrollToLine(record.from.line);
 	
 	// if control is pressed we close ourself
@@ -216,21 +216,16 @@ void EditorDiagnosticsList::OnUpdate() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorDiagnosticsList::OnKeyDown(KeyEvent event) {
-	if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.NoModifiers()) {
+void EditorDiagnosticsList::OnKeyEvent(KeyEvent event, Command command) {
+	if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
 		
 		selectedItem = event.vkeycode == VK_DOWN
 			? IncrementWrapAround(selectedItem, itemCount)
-			: DecrementWrapAround(selectedItem, itemCount);
-		
-		return true;
+			: DecrementWrapAround(selectedItem, itemCount);		
 	
 	} else if (event.vkeycode == VK_RETURN) {
-		ActionGotoItem(this, selectedItem, event.ctrl);			
-		return true;
-	}
-	
-	return false;
+		ActionGotoItem(this, selectedItem, (event.modifiers & KM_Ctrl) != 0);
+	}	
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -29,8 +29,7 @@ std::string_view TextBox::GetText() const {
 void TextBox::SetText(std::string_view text) {
 	textController.SetCaretPosition(TextPosition {0u, text.size()});
 	
-	TextChange* change = nullptr;
-	textController.InitTextChange(&change);
+	TextChange* change = textController.NewTextChange();
 	
 	TextChangeOperation* operation = change->NewOperation();
 	textController.buffer.RemoveInLine(0u, 0u, textController.buffer.GetLineAt(0).length, operation);
@@ -126,13 +125,11 @@ void TextBox::ClearText() {
 	textController.Reset();
 }
 
-bool TextBox::OnKeyDown(KeyEvent event, bool* changed) {
-
-	if (event.vkeycode == VK_RETURN)
-		return false;
+bool TextBox::OnKeyDown(KeyEvent event, Command command) {
+	if (event.vkeycode == VK_RETURN) return false;
 
 	TextChange* change = nullptr;
-	textController.OnKeyDown(event, &change);
+	textController.OnKeyDown(event, command, &change);
 	return (change != nullptr);
 }
 

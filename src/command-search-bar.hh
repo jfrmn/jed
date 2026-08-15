@@ -1,18 +1,16 @@
 #pragma once
 #include "ui/search-bar.hh"
 #include "util/string-util.hh"
+#include "commands.hh"
 
-struct Tool;
-struct ParameterConfigurator;
-
-struct ToolSearchBar : public SearchBar {
+struct CommandSearchBar : public SearchBar {
 
 	//-----------------------------------------------------
 	// types
 	//-----------------------------------------------------
-	
+
 	struct Item {
-		const Tool* tool = nullptr;
+		Command::Id commandId = Command::Id_None;
 		FuzzyMatchResult fuzzyMatchResult = {};	
 	};
 	
@@ -20,16 +18,17 @@ struct ToolSearchBar : public SearchBar {
 	// data
 	//-----------------------------------------------------
 	
-	std::vector<Item> filteredTools = {};
+	std::vector<Item> filteredCommands = {};
 	
 	//-----------------------------------------------------
 	// functions
 	//-----------------------------------------------------
 
-	static ToolSearchBar* Make();
-		
+	static CommandSearchBar* Make();
+
 	virtual void FilterItems(std::string_view text) override;
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;	
 	virtual void AcceptItem(u64 item, const KeyEvent* event) override;
 	virtual void OnFinishedParameterConfiguration() override;	
+
 };

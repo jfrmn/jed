@@ -157,7 +157,7 @@ bool EditorTextLocationList::OnKeyDown(KeyEvent event) {
 				return true;
 			}
 			
-			openedEditor->textController.Select(item.selectionRange.start, item.selectionRange.end);
+			openedEditor->textController.SetSelection(item.selectionRange.start, item.selectionRange.end);
 			
 			if (wasOpen) {
 				openedEditor->ScrollToLine(item.selectionRange.start.line);
@@ -174,7 +174,7 @@ bool EditorTextLocationList::OnKeyDown(KeyEvent event) {
 		
 		return true;
 				
-	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.NoModifiers()) {
+	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
 		selectedItem = (event.vkeycode == VK_UP)
 			? IncrementWrapAround(selectedItem, itemCount)
 			: DecrementWrapAround(selectedItem, itemCount);

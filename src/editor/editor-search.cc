@@ -183,7 +183,7 @@ static void OnClickResultItem(void* ud, u64 i) {
 	
 	const EditorSearch::SearchResult& result = self->threadData->results[i];
 	self->owner->ScrollToLine(result.from.line);
-	self->owner->textController.Select(result.from, result.to);
+	self->owner->textController.SetSelection(result.from, result.to);
 }
 
 void EditorSearch::OnUpdate() {
@@ -424,7 +424,7 @@ static void ActionGotoNextSearchResult(EditorSearch* self, bool prev) {
 	}
 
 	self->owner->ScrollToLine(newResult->from.line);
-	self->owner->textController.Select(newResult->from, newResult->to);	
+	self->owner->textController.SetSelection(newResult->from, newResult->to);	
 }
 
 static void ActionReplaceNext(EditorSearch* self, bool prev) {
@@ -466,8 +466,7 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 		// is currently not supported. If this ever changes, we need to use the
 		// standard remove/insert functions
 		
-		TextChange* change = nullptr;
-		self->owner->textController.InitTextChange(&change);
+		TextChange* change = self->owner->textController.NewTextChange();
 		
 		TextBuffer& textBuffer = self->owner->GetBuffer();
 		
@@ -500,7 +499,7 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 			if (itNextResult == self->threadData->results.end())
 				itNextResult  = self->threadData->results.begin();
 		
-			self->owner->textController.Select(itNextResult->from, itNextResult->to);
+			self->owner->textController.SetSelection(itNextResult->from, itNextResult->to);
 			self->owner->ScrollToLine(itNextResult->from.line);
 		
 		// no more results are left...
@@ -527,8 +526,7 @@ static void ActionReplaceAll(EditorSearch* self) {
 	const std::string_view replacementText = self->textboxReplace.GetText();
 	TextBuffer& textBuffer = self->owner->GetBuffer();
 	
-	TextChange* change = nullptr;
-	self->owner->textController.InitTextChange(&change);
+	TextChange* change = self->owner->textController.NewTextChange();
 	change->ReserveCapacity(self->threadData->results.size());
 
 	self->owner->PrepareInsertAnimation(self->threadData->results.size());
@@ -567,7 +565,7 @@ static void ActionSetCaretToEveryResult(EditorSearch* self, bool select) {
 	
 	if (self->threadData->results.size() == 1) {
 		const EditorSearch::SearchResult& result = self->threadData->results.front();
-		if (select) self->owner->textController.Select(result.from, result.to);
+		if (select) self->owner->textController.SetSelection(result.from, result.to);
 		else        self->owner->textController.SetCaretPosition(result.from);
 		return;
 	}
@@ -582,7 +580,7 @@ static void ActionSetCaretToEveryResult(EditorSearch* self, bool select) {
 	}
 }
 
-bool EditorSearch::OnKeyDown(KeyEvent event) {
+void EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 	
 	if (event.vkeycode == VK_RETURN) {
 	
@@ -596,35 +594,37 @@ bool EditorSearch::OnKeyDown(KeyEvent event) {
 			searchIsDirty = false;
 
 		} else if (IsSearchComplete()) {
-
- 			if (!event.ctrl && !event.alt) {
-	 		
+				const bool ctrl = (event.modifiers & KM_Ctrl) != 0;
+				const bool shift = (event.modifiers & KM_Shift) != 0;
+				const bool alt = (event.modifiers & KM_Alt) != 0;
+ 			
+ 			if (!ctrl && !alt) {
 				if (focusedTextbox == &textboxReplace)
-					ActionReplaceNext(this, event.shift);
+					ActionReplaceNext(this, shift);
 				else if (focusedTextbox == &textboxSearch)
-					ActionGotoNextSearchResult(this, event.shift);
+					ActionGotoNextSearchResult(this, shift);
 				else
 					ASSERT_UNREACHABLE;
 			
-			} else if (event.ctrl && !event.alt) {
-				
+			} else if (ctrl && !alt) {
+			
 				if (focusedTextbox == &textboxReplace)
-					ActionGotoNextSearchResult(this, event.shift);
+					ActionGotoNextSearchResult(this, shift);
 				else if (isReplaceTextboxVisible)
-					ActionReplaceNext(this, event.shift);
+					ActionReplaceNext(this, shift);
 			
-			} else if (!event.ctrl && event.alt) {
-				ActionSetCaretToEveryResult(this, event.shift);	
+			} else if (ctrl && alt) {
+				ActionSetCaretToEveryResult(this, shift);	
 			
-			} else if (event.ctrl && event.alt) {
+			} else if (ctrl && !alt) {
 				ActionReplaceAll(this);	
 			}
 		}
 
-	} else if (event.vkeycode == VK_PAUSE && event.ctrl) {
+	} else if (event.vkeycode == VK_PAUSE && (event.modifiers & KM_Ctrl) != 0) {
 		CancelSearch(this);
 
-	} else if (event.vkeycode == VK_TAB && !event.ctrl) {
+	} else if (event.vkeycode == VK_TAB && (event.modifiers & KM_Ctrl) != 0) {
 
 		if (isReplaceTextboxVisible) {
 			textboxSearch.inactive  = !textboxSearch.inactive;
@@ -633,23 +633,20 @@ bool EditorSearch::OnKeyDown(KeyEvent event) {
 				? &textboxReplace
 				: &textboxSearch;
 
-			ASSERT(XOR(textboxSearch.inactive, textboxReplace.inactive));
+			ASSERT(textboxSearch.inactive ^ textboxReplace.inactive);
 		}
 	
 	} else {
 		ASSERT(focusedTextbox);
-		const bool changed = focusedTextbox->OnKeyDown(event);
+		const bool changed = focusedTextbox->OnKeyDown(event, command);
 		searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
-	}
-	
-	return true;
+	}	
 }
 
-bool EditorSearch::OnChar(const char* data, u64 len) {
+void EditorSearch::OnChar(const char* data, u64 len) {
 	ASSERT(focusedTextbox);
 	const bool changed = focusedTextbox->OnChar(data, len);
 	searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
-	return true;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

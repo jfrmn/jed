@@ -1,6 +1,7 @@
 #pragma once
 #include "basic.hh"
 
+struct Command;
 struct KeyEvent;
 struct EditorSearch;
 struct EditorGotoLine;
@@ -16,6 +17,6 @@ struct EditorToolWindow {
 	virtual bool IsDiagnosticsList() const;
 	
 	virtual void OnUpdate() = 0;
-	virtual bool OnKeyDown(KeyEvent event);
-	virtual bool OnChar(const char* data, u64 len);
+	virtual void OnKeyEvent(KeyEvent event, Command command);
+	virtual void OnChar(const char* data, u64 len);
 };

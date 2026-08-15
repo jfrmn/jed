@@ -74,7 +74,7 @@ struct Tool {
 	std::string environment = {};
 	int flags = 0;
 	
-	std::vector<Parameter> parameters = {};
+	std::vector<ParameterDefinition> parameters = {};
 	
 	ConsoleOpenFlags consoleOpenFlags = ConsoleOpenFlags_Never;
 	Progress progress = {};

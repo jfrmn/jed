@@ -1,17 +1,33 @@
 #pragma once
-#include "util/color.hh"
 #include "events.hh"
+#include "commands.hh"
+#include "util/color.hh"
 #include "graphics/font.hh"
 
+#include <unordered_map>
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct ID2D1Bitmap;
 struct ID2D1DeviceContext;
 struct ID2D1SolidColorBrush;
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+namespace std {
+	template<> struct hash<KeyEvent> {
+		std::size_t operator()(KeyEvent event) const {
+			std::hash<u32> u32Hash;
+			return u32Hash(event.vkeycode) ^ u32Hash(event.modifiers);
+		}
+	};
+};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct Settings {
 
 	//-----------------------------------------------------
 	// icons
-	
+	//-----------------------------------------------------
+		
 	struct Icons {
 		 ID2D1Bitmap* unknown = nullptr;
 		 ID2D1Bitmap* waiting = nullptr;
@@ -70,6 +86,7 @@ struct Settings {
 	
 	//-----------------------------------------------------
 	// colors
+	//-----------------------------------------------------
 	
 	struct Colors {
 		Color unknown              = {1.0f, 0.0f, 0.1f, 1.0f};
@@ -93,120 +110,23 @@ struct Settings {
 	
 	//-----------------------------------------------------
 	// keybinds
-		
-	struct KeyBindings {	
-		//
-		// window
-		//
-		KeyEvent showFileSearch;
-		KeyEvent showExplorer;
-		KeyEvent showToolSearch;
-		KeyEvent showConsole;
-		KeyEvent focusNextTab;
-		KeyEvent focusPrevTab;
-		KeyEvent focusNextPanel;
-		KeyEvent focusPrevPanel;
-		KeyEvent addPanelAfter;
-		KeyEvent addPanelBefore;
-		KeyEvent swapPanels;
-		KeyEvent closePanel;
-		KeyEvent closeTab;
-		KeyEvent closePanelAndTab;
-		
-		//
-		// editor
-		//
-		KeyEvent openSearch;
-		KeyEvent openSearchAndReplace;
-		KeyEvent openGotoLine;
-		KeyEvent showSignatureHelp;
-		KeyEvent showAutocomplete;
-		KeyEvent showGotoLocation;
-		KeyEvent saveFile;
-		KeyEvent scrollUp;
-		KeyEvent scrollDown;
-		KeyEvent gotoPrevDiagnostic;
-		KeyEvent gotoNextDiagnostic;
-		
-		//
-		// text
-		//
-		KeyEvent moveToPrevWord;
-		KeyEvent moveToNextWord;
-		KeyEvent moveToLineStart;
-		KeyEvent moveToLineEnd;
-		KeyEvent moveToBufferStart;
-		KeyEvent moveToBufferEnd;
-		KeyEvent movePageUp;
-		KeyEvent movePageDown;
-		
-		KeyEvent selectBackward;
-		KeyEvent selectForward;
-		KeyEvent selectLineUp;
-		KeyEvent selectLineDown;
-		KeyEvent selectToPrevWord;
-		KeyEvent selectToNextWord;
-		KeyEvent selectToLineStart;
-		KeyEvent selectToLineEnd;
-		KeyEvent selectToBufferStart;
-		KeyEvent selectToBufferEnd;
-		KeyEvent selectPageUp;
-		KeyEvent selectPageDown;
-		KeyEvent selectAll;
-		KeyEvent selectLine;
-		KeyEvent selectInBrackets;
-		KeyEvent selectWord;
-		
-		KeyEvent deletePrevChar;
-		KeyEvent deleteNextChar;
-		KeyEvent deletePrevWord;
-		KeyEvent deleteNextWord;
-		KeyEvent deleteLine;
-		
-		KeyEvent indentLine;
-		KeyEvent unindentLine;
-		KeyEvent insertTab;
-		KeyEvent duplicateLine;
-		KeyEvent undo;
-		KeyEvent redo;
-		KeyEvent cut;
-		KeyEvent copy;
-		KeyEvent paste;
-		KeyEvent cutLines;
-		KeyEvent lineComment;
-		KeyEvent lineUncomment;
-		KeyEvent blockComment;
-		KeyEvent blockUncomment;
-		
-		KeyEvent addCaretAbove;
-		KeyEvent addCaretBelow;
-		KeyEvent editCarets;	
-				
-		//
-		// explorer
-		//
-		KeyEvent explorerShellExecute;
-		KeyEvent explorerOpenInWindowsExplorer;
-		KeyEvent explorerNewFile;
-		KeyEvent explorerNewFolder;
-		KeyEvent explorerRename;
-		
-		//
-		// console
-		//
-		KeyEvent consoleTerminateProcess;
-		KeyEvent consoleCopy;
+	//-----------------------------------------------------
+	
+	struct KeyBind {
+		Command::Id commandId = Command::Id_None;
+		std::vector<ParameterValue> parameters = {};
 	};
 	
 	//-----------------------------------------------------
 	// statics
+	//-----------------------------------------------------
 	
 	static constexpr u64 NUM_ICONS = sizeof(Icons) / sizeof(ID2D1Bitmap*);
 	static constexpr u64 NUM_COLORS  = sizeof(Colors) / sizeof(Color);
-	static constexpr u64 NUM_KEYBINDS = sizeof(KeyBindings) / sizeof(KeyEvent);
 
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 	
 	union {
 		Icons icons = {};
@@ -218,11 +138,8 @@ struct Settings {
 		Color colorArray[NUM_COLORS];
 	};
 	
-	union {
-		KeyBindings keybinds = {};
-		KeyBindings keybindArray[NUM_KEYBINDS];
-	};
-	
+	std::unordered_map<KeyEvent, KeyBind> keyBinds = {};
+		
 	Font fontUi = {};
 	Font fontEditor = {};
 	
@@ -234,9 +151,12 @@ struct Settings {
 	
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 	
 	bool Init(ID2D1DeviceContext* deviceContext);
 	~Settings() noexcept;
+	
+	Command LookupKeyBind(KeyEvent ev);
 	
 	ID2D1SolidColorBrush* GetBrushDropShadow();
 	ID2D1SolidColorBrush* GetBrushSelection(bool active = true);

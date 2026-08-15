@@ -112,7 +112,7 @@ void EditorSignatureHelp::OnUpdate() {
 bool EditorSignatureHelp::OnKeyDown(KeyEvent event) {
 	if (state != State_Completed) return false;
 	
-	if (signatureCount > 1u && (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.alt) {
+	if (signatureCount > 1u && (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_Alt) {
 		activeSignature = event.vkeycode == VK_DOWN
 			? IncrementWrapAround(activeSignature, signatureCount)
 			: DecrementWrapAround(activeSignature, signatureCount);

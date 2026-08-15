@@ -45,7 +45,7 @@ struct TextBox {
 	void OnUpdate();
 	
 	// returns whether the text changed or not
-	bool OnKeyDown(KeyEvent event, bool* changed = nullptr);
+	bool OnKeyDown(KeyEvent event, Command command);
 	
 	// returns whether the text changed or not
 	bool OnChar(const char* data, u64 len);

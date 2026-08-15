@@ -5,26 +5,24 @@
 #define VK_MAX 255
 
 struct D2D_RECT_F;
-
-//-----------------------------------------------------------------------------
-// Mouse event
-//-----------------------------------------------------------------------------
-struct MouseEvent {
-	f32 x = 0.0f;
-	f32 y = 0.0f;
-};
+struct ParameterValue;
 
 //-----------------------------------------------------------------------------
 // Key event
 //-----------------------------------------------------------------------------
+
+enum KeyModifier : u32 {
+	KM_None  = 0,
+	KM_Ctrl  = 1,
+	KM_Shift = 2,
+	KM_Alt   = 4
+};
+
 struct KeyEvent {
-	u32  vkeycode = VK_NONE;
-	bool ctrl  = false;
-	bool shift = false;
-	bool alt   = false;
+	u32 vkeycode = VK_NONE;
+	u32 modifiers = KM_None;
 	
 	bool operator==(KeyEvent other) const;
-	bool NoModifiers() const;
 };
 
 //-----------------------------------------------------------------------------

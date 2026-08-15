@@ -1,11 +1,13 @@
 #pragma once
 #include "basic.hh"
-#include "graphics/glyph-run.hh"
+#include "commands.hh"
+
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
 
 #include "ui/scrollarea.hh"
 #include "util/string-util.hh"
+#include "graphics/glyph-run.hh"
 
 #include "editor/editor-diagnostics.hh"
 
@@ -27,8 +29,9 @@ struct TSTree;
 
 struct Editor {
 	
-	//-------------------------------------------
+	//-----------------------------------------------------
 	// types
+	//-----------------------------------------------------
 
 	struct InsertAnimationData {
 		TextPosition from = {};
@@ -47,8 +50,9 @@ struct Editor {
 		s32 version = 0;
 	};
 
-	//-------------------------------------------
+	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 	
 	D2D_RECT_F area = {};
 	
@@ -84,8 +88,9 @@ struct Editor {
 	TSParser* tsParser = nullptr;
 	TSTree* tsTree = nullptr;
 	
-	//-------------------------------------------
+	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 
 	bool Init();
 	~Editor() noexcept;
@@ -104,12 +109,11 @@ struct Editor {
 	void AddInsertAnimationData(TextPosition from, TextPosition to);
 	void StartInsertAnimation();
 	
-	void OnUpdate();
-	
+	void OnUpdate();	
 	void OnFileChanged(const FileChangeRecord* changeRecord);
 	void OnChar(const char* str, u64 len);
 	void OnMouseWheel(f32 scrollValue);
-	void OnKeyDown(KeyEvent event);
+	void OnKeyEvent(KeyEvent event, Command command);
 	void OnResize(D2D1_RECT_F newArea);
 	bool OnClose();	
 };

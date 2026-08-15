@@ -51,8 +51,6 @@ struct Window {
 	
 	void PostFileChangedEvent(FileChangedEvent* fileChangedEvent);
 	
-	virtual bool OnMouseDown(MouseEvent event)     { return false; }
-	virtual bool OnMouseUp(MouseEvent event)       { return false; }
 	virtual bool OnMouseWheel(float wheel)         { return false; }
 	virtual void OnKeyDown(KeyEvent event)         {}
 	virtual void OnKeyUp(KeyEvent event)           {}

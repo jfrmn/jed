@@ -423,7 +423,8 @@ void Editor::GetVisibleLines(/*out*/ u64* pfirst, /*out*/ u64* plast) const {
 
 	if (plast) {
 		const f32 last = (scrollarea.vpY + scrollarea.vpSize.height) / settings.fontEditor.lineHeight;
-		*plast = static_cast<u64>(std::min<f32>(textController.buffer.GetMaxLine(), last));
+		const f32 max = static_cast<f32>(textController.buffer.GetMaxLine());
+		*plast = static_cast<u64>(std::min(max, last));
 	}
 }
 
@@ -1164,8 +1165,10 @@ void Editor::OnResize(D2D1_RECT_F newArea) {
 
 void Editor::OnChar(const char* data, u64 len) {
 	
-	if (toolWindow && toolWindow->OnChar(data, len))
+	if (toolWindow) {
+		toolWindow->OnChar(data, len);
 		return;
+	}
 	
 	TextChange* change = nullptr;
 	textController.OnChar(data, len, &change);
@@ -1183,9 +1186,9 @@ void Editor::OnMouseWheel(f32 distance) {
 	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5);
 }
 
-void Editor::OnKeyDown(KeyEvent event) {
+void Editor::OnKeyEvent(KeyEvent event, Command command) {
 
-	if (event.vkeycode == VK_ESCAPE && event.NoModifiers()) {
+	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
 
 		if (toolWindow) {
 			delete toolWindow;
@@ -1197,11 +1200,15 @@ void Editor::OnKeyDown(KeyEvent event) {
 		 	return;
 		
 		}
-	}
-			
-	if (event == settings.keybinds.openSearch || event == settings.keybinds.openSearchAndReplace) {
 	
-		const bool showReplace = event == settings.keybinds.openSearchAndReplace;
+	} else if (toolWindow) {
+		toolWindow->OnKeyEvent(event, command);
+	
+	} else if (editorCaretAttached) {
+		editorCaretAttached->OnKeyDown(event);
+		
+	} else if (command.id == Command::Id_Editor_OpenSearch) {		
+		const bool showReplace = command.parameters->boolValue;
 		
 		if (auto search = dynamic_cast<EditorSearch*>(toolWindow)) {
 			search->ToggleReplaceTextbox(showReplace);
@@ -1213,9 +1220,8 @@ void Editor::OnKeyDown(KeyEvent event) {
 			if (!toolWindow)
 				LogError("EditorSearch::Make() failed");
 		}
-		return;
 			
-	} else if (event == settings.keybinds.openGotoLine) {
+	} else if (command.id == Command::Id_Editor_OpenGotoLine) {
 		
 		if (toolWindow && toolWindow->IsGotoLine()) {
 			delete toolWindow;
@@ -1228,10 +1234,9 @@ void Editor::OnKeyDown(KeyEvent event) {
 			if (!toolWindow)
 				LogError("EditorGotoLine::Make() failed");
 		}
-		return;
 	
-	// @TODO keybind
-	} else if (event.vkeycode == VK_OEM_PLUS && event.ctrl && !event.alt) {
+	// @TODO keybind event.vkeycode == VK_OEM_PLUS && event.ctrl && !event.alt
+	} else if (command.id == Command::Id_Editor_OpenDiagnosticsList) {
 		
 		if (toolWindow && toolWindow->IsDiagnosticsList()) {
 			delete toolWindow;
@@ -1244,9 +1249,8 @@ void Editor::OnKeyDown(KeyEvent event) {
 			if (!toolWindow)
 				LogError("EditorDiagnosticsList::Make() failed");
 		}
-		return;
 	
-	} else if (event == settings.keybinds.showGotoLocation) {
+	} else if (command.id == Command::Id_Editor_ShowGotoLocation) {
 		if (!language) return;
 			
 		if (editorCaretAttached) {
@@ -1255,9 +1259,8 @@ void Editor::OnKeyDown(KeyEvent event) {
 		}
 		
     	editorCaretAttached = EditorSelectGotoType::Make(this);
-    	return;
 	
-	} else if (event == settings.keybinds.showSignatureHelp) {
+	} else if (command.id == Command::Id_Editor_ShowSignatureHelp) {
 		if (!language) return;	
 		
 		if (editorCaretAttached) {
@@ -1266,9 +1269,8 @@ void Editor::OnKeyDown(KeyEvent event) {
 		}
 		
     	editorCaretAttached = language->GetSignatureHelp(this);
-    	return;
     	
-	} else if (event == settings.keybinds.showAutocomplete) {
+	} else if (command.id == Command::Id_Editor_ShowAutocomplete) {
 		if (!language) return;
 		
 		EditorSignatureHelp* signatureHelp = dynamic_cast<EditorSignatureHelp*>(editorCaretAttached);
@@ -1289,40 +1291,32 @@ void Editor::OnKeyDown(KeyEvent event) {
 		}
 		
 		editorCaretAttached = autocomplete;
-		return;
 	
-	} else if (event == settings.keybinds.saveFile) {
+	} else if (command.id == Command::Id_Editor_SaveFile) {
 		SaveFile();
-		return;
 	
-	} else if (event == settings.keybinds.scrollUp) {
+	} else if (command.id == Command::Id_Editor_ScrollUp) {
 		scrollarea.vpY -= (settings.fontEditor.lineHeight * 2);
 		if (scrollarea.vpY < 0.0f)
 			scrollarea.vpY = 0.0f;
-		return;
 	
-	} else if (event == settings.keybinds.scrollDown) {
+	} else if (command.id == Command::Id_Editor_ScrollDown) {
 		scrollarea.vpY += (settings.fontEditor.lineHeight * 2);
 		if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
 			scrollarea.vpY  = scrollarea.GetMaxPositionY();
-		return;
-	}
 	
-	if (toolWindow && toolWindow->OnKeyDown(event)) {
-		return;
-	}
+	} else {
+		TextChange* change = nullptr;
+		textController.OnKeyDown(event, command, &change);
+		if (change) {
 	
-	if (editorCaretAttached && editorCaretAttached->OnKeyDown(event))
-		return;
-			
-	if (TextChange* change = nullptr; textController.OnKeyDown(event, &change)) {
-
-		ProcessTextChange(change);
-	
- 		if (editorCaretAttached)
-			editorCaretAttached->OnInput();
+			ProcessTextChange(change);
 		
-		cursorBlinkValue = 0u;
+ 			if (editorCaretAttached)
+				editorCaretAttached->OnInput();
+			
+			cursorBlinkValue = 0u;
+		}
 	}
 }
 

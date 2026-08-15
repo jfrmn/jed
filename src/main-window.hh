@@ -1,6 +1,7 @@
 #pragma once
 #include "events.hh"
 #include "console.hh"
+#include "commands.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
 #include "graphics/glyph-run.hh"
@@ -21,6 +22,7 @@ struct MainWindow : public Window {
 
 	//-----------------------------------------------------
 	// types
+	//-----------------------------------------------------
 
 	struct Tab {
 		GlyphRun title = {};
@@ -50,11 +52,12 @@ struct MainWindow : public Window {
 	
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 
 	SearchBar* searchBar = nullptr;
-	Explorer* explorer = nullptr;
-	Console console = {};
-	StatusBar statusBar = {};
+	Explorer*  explorer = nullptr;
+	Console    console = {};
+	StatusBar  statusBar = {};
 	
 	std::vector<Tab>   tabs   = {};
 	std::vector<Panel> panels = {};
@@ -67,6 +70,7 @@ struct MainWindow : public Window {
 
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 
 	bool Create();
 
@@ -79,6 +83,7 @@ struct MainWindow : public Window {
 	const Editor* GetFocusedEditor() const;
 	
 	void OnUpdate();
+	void OnKeyEvent(KeyEvent event, Command command);
 	
 	virtual void OnFileChanged(FileChangedEvent* fileChangedEvent) override;
 	virtual bool OnMouseWheel(f32 wheel) override;

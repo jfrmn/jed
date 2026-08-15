@@ -1,4 +1,5 @@
 #pragma once
+#include "commands.hh"
 #include "text/text-position.hh"
 #include "text/text-buffer.hh"
 #include "text/text-change.hh"
@@ -74,10 +75,10 @@ struct TextController {
 	// gets called from the editor onClickHandler
 	void ToggleCaret();
 	
-	void Select(TextPosition from, TextPosition to);	
+	void SetSelection(TextPosition from, TextPosition to);	
 	
-	void InitTextChange(TextChange** change);
-
-	bool OnKeyDown(KeyEvent event, /*out*/ TextChange** change);
+	TextChange* NewTextChange();
+	
+	void OnKeyDown(KeyEvent event, Command command, /*out*/ TextChange** change);
 	void OnChar(const char* data, u64 len, /*out*/ TextChange** change);
 };

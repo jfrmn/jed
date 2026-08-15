@@ -108,35 +108,64 @@ void TextController::SetCaretPosition(TextPosition pos) {
 	editCaretsPosition = {};
 }
 
-static void ActionToggleCaret(TextController*);
 void TextController::ToggleCaret() {
 	ASSERT(isEditCaretsMode);
-	ActionToggleCaret(this);
+	
+	for (auto it = carets.begin(); it != carets.end(); ++it) {
+		
+		// remove caret under the edit-caret
+		if (it->position == editCaretsPosition) {
+			carets.erase(it);
+			return;
+		}
+		
+		// check if we are inside a selecetion - adding carets there is not allowed
+		TextPosition itFrom, itTo;
+		if (it->GetSelection(&itFrom, &itTo)) {
+			if (editCaretsPosition > itFrom &&
+				editCaretsPosition < itTo)
+				return;
+		}
+	
+		// @FIXME should be > shoulld it not?
+		// Otherwise we insert a new caret. The carets are sorted by their position.
+		// check if this is the corret index to insert the new caret
+		if (it->position < editCaretsPosition) {
+			carets.insert(it, TextController::Caret {
+				.position = editCaretsPosition,
+				.selection = TextPosition {},
+				.hasSelection = false});
+			return;
+		}
+	}
+	
+	// insert at the end	
+	carets.push_back(TextController::Caret {
+		.position = editCaretsPosition,
+		.selection = TextPosition {},
+		.hasSelection = false});	
 }
 
-void TextController::Select(TextPosition from, TextPosition to) {
+void TextController::SetSelection(TextPosition from, TextPosition to) {
 	carets.resize(1u);
 	carets.front().position = to;
 	carets.front().selection = from;
 	carets.front().hasSelection = true;
 }
 
-void TextController::InitTextChange(TextChange** change) {
+TextChange* TextController::NewTextChange() {
+		
+	historyUndoIndex = USIZE_MAX;
+		
+	TextChange* newChange = 	history.Push();
+	newChange->Clear();
 	
-	if (!(*change)) { // @TODO check if this check is still needed
-		
-		historyUndoIndex = USIZE_MAX;
-		
-		TextChange* newChange = 	history.Push();
-		newChange->Clear();
-		
-		*change = newChange;
-	}
+	return newChange;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// H E L P E R
+// Helper
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -225,11 +254,11 @@ static void AdjustFollowingCarets(TextController* self, u64 currentCaretIndex, c
 	}	
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// M O V E M E N T S
+// Movements
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void MoveBackward(TextController* self, TextPosition* position) {
 
@@ -446,22 +475,20 @@ static void MovePageDown(TextController* self, TextPosition* position) {
 	}
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// A C T I O N S
+// Basic operations
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Common
-
-static void ActionInsertText(TextController* self, std::string_view text, TextChange** change) {
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());
+static void InsertText(TextController* self, std::string_view text, /*out*/ TextChange** outChange) {
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	change->ReserveCapacity(self->carets.size());
 	
 	for (u64 i = 0u; i < self->carets.size(); i++) {	
 		TextController::Caret& caret = self->carets[i];
-		TextChangeOperation* operation = (*change)->NewOperation();
+		TextChangeOperation* operation = change->NewOperation();
 		
 		TextPosition insertion;
 		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
@@ -479,17 +506,14 @@ static void ActionInsertText(TextController* self, std::string_view text, TextCh
 	}
 }
 
-static void ActionMoveCaret(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
+static void MoveCaret(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
 	for (TextController::Caret& caret : self->carets) {
 		caret.ResetSelection();
 		funcMovement(self, &caret.position);
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Selection
-
-static void ActionSelect(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
+static void Select(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
 	for (TextController::Caret& caret : self->carets) {
 		if (!caret.hasSelection)	{
 		 	 caret.selection = caret.position;
@@ -499,14 +523,187 @@ static void ActionSelect(TextController* self, void (*funcMovement)(TextControll
 	}
 }
 
-static void ActionSelectAll(TextController* self) {
+static void Delete(TextController* self, TextChange** outChange, void (*funcMovement)(TextController*, TextPosition*)) {
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	change->ReserveCapacity(self->carets.size());
+	
+	for (TextController::Caret& caret : self->carets) {
+		
+		TextPosition from, to;
+		if (!caret.GetSelection(&from, &to)) {
+			TextPosition other = caret.position;
+			funcMovement(self, &other);
+			if (other < caret.position) {
+				from = other;
+				to = caret.position;
+			} else {
+				from = caret.position;
+				to = other;
+			}
+		}
+		
+		self->buffer.Remove(from, to, change->NewOperation());
+		caret.ResetSelection();
+		caret.position = from;
+	}
+}
+
+//static void ActionDeleteRight(TextController* self, TextChange** change, void (*funcMovement)(TextController*, TextPosition*)) {
+//
+//	self->InitTextChange(change);
+//	(*change)->ReserveCapacity(self->carets.size());
+//	
+//	for (TextController::Caret& caret : self->carets) {
+//		TextPosition from, to;
+//		if (!caret.GetSelection(&from, &to)) {
+//			from = caret.position;
+//			funcMovement(self, &caret.position);
+//			to = caret.position;
+//		}
+//	
+//		self->buffer.Remove(from, to, (*change)->NewOperation());
+//		caret.ResetSelection();
+//		caret.position = from;
+//	}
+//}
+
+static void InsertNewLine(TextController* self, TextChange** outChange) {
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	change->ReserveCapacity(self->carets.size());
+	
+	for (TextController::Caret& caret : self->carets) {
+		
+		TextChangeOperation* operation = change->NewOperation();
+		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
+			self->buffer.Remove(from, to, operation);
+			caret.ResetSelection();
+			caret.position = from;
+		}
+	
+		// @TODO(settings) use line-ending mode
+		std::string toInsert {"\r\n"};
+	
+		// adjust to current indentation
+		{
+			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
+			
+			const u64 maxColumn = std::min(line.length, caret.position.column);
+			for (u64 i = 0u; i < maxColumn; i++) {
+				
+				const char ch = line.data[i];
+				if (ch == '\t' || ch == ' ')
+					toInsert.push_back(ch);
+				else
+					break;
+			}
+		}
+		
+		self->buffer.Insert(caret.position, toInsert, operation);
+		caret.position = operation->insertionEnd;
+	}
+}
+
+static void ClearMultiCarets(TextController* self, bool keepLast) {
+	if (keepLast) std::swap(self->carets.front(), self->carets.back());
+	self->carets.resize(1u);
+}
+
+static void EnterEditMultiCaretMode(TextController* self, bool spawnAtLast) {
+	ASSERT(!self->isEditCaretsMode);
+	
+	self->isEditCaretsMode = true;
+	self->editCaretsPosition = spawnAtLast
+		? self->carets.back().position
+		: self->carets.front().position;
+}
+
+static void LeaveEditMultiCaretMode(TextController* self) {
+	ASSERT(self->isEditCaretsMode);
+	self->isEditCaretsMode = false;	
+	self->editCaretsPosition = {};
+}
+
+static void ShiftCaret(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
+	TextPosition* positionToModifiy = nullptr;
+	for (TextController::Caret& caret : self->carets) {
+		if (caret.position == self->editCaretsPosition) {
+			positionToModifiy = &caret.position;
+			goto found_position;
+		}
+		
+		if (caret.hasSelection && caret.selection == self->editCaretsPosition) {
+			positionToModifiy = &caret.selection;
+			goto found_position;
+		}
+	}	
+	return;
+	
+found_position:
+	funcMovement(self, positionToModifiy);
+	self->editCaretsPosition = *positionToModifiy;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// 
+// Commands
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Basic
+
+static void CommandMoveCaret(TextController* self, ParameterValue* parameters) {
+	const TextPosition target {
+		.line = static_cast<u64>(parameters[0].numberValue),
+		.column = static_cast<u64>(parameters[1].numberValue)};
+	
+	if (self->isEditCaretsMode) {
+		self->editCaretsPosition = target;
+	} else {
+		self->carets.resize(1u);
+		self->carets.front().ResetSelection();
+		self->carets.front().position = target;
+	}
+}
+
+static void CommandInsertText(TextController* self, ParameterValue* parameters, TextChange** outChange) {
+	InsertText(self, parameters->stringValue, outChange);
+	// @FIXME works only with text that does not contain any linebreaks
+}
+
+static void CommandDeleteRange(TextController* self, ParameterValue* parameters, TextChange** outChange) {
+	const TextPosition from {
+		.line = static_cast<u64>(parameters[0].numberValue),
+		.column = static_cast<u64>(parameters[1].numberValue)};
+	const TextPosition to {
+		.line = static_cast<u64>(parameters[2].numberValue),
+		.column = static_cast<u64>(parameters[3].numberValue)};
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	self->buffer.Remove(from, to, change->NewOperation());
+	
+	// @TODO finish
+	ASSERT_NOT_IMPLEMENTED;
+	
+	for (TextController::Caret& caret : self->carets) {
+		
+	}
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Selection
+
+static void CommandSelectAll(TextController* self) {
 	self->carets.resize(1u);	
 	self->carets.front().hasSelection = true;	
 	self->carets.front().selection = TextPosition {0u, 0u};
 	MoveToBufferEnd(self, &self->carets.front().position);
 }
 
-static void ActionSelectLine(TextController* self) {
+static void CommandSelectLine(TextController* self) {
 	for (TextController::Caret& caret : self->carets) {
 		caret.hasSelection = true;
 		caret.selection = TextPosition {
@@ -516,7 +713,7 @@ static void ActionSelectLine(TextController* self) {
 	}
 }
 
-static void ActionSelectInBrackets(TextController* self) {
+static void CommandSelectInBrackets(TextController* self) {
 	for (TextController::Caret& caret : self->carets) {
 		
 		const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
@@ -549,7 +746,7 @@ static void ActionSelectInBrackets(TextController* self) {
 	}
 }
 
-static void ActionSelectWord(TextController* self) {
+static void CommandSelectWord(TextController* self) {
 	for (TextController::Caret& caret : self->carets) {
 		caret.hasSelection = true;
 		MoveToNextWord(self, &caret.position);
@@ -560,51 +757,82 @@ static void ActionSelectWord(TextController* self) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Deleteion
+// Modification
 
-static void ActionDeleteLeft(TextController* self, TextChange** change, void (*funcMovement)(TextController*, TextPosition*)) {
+static void CommandRepeatText(TextController* self, ParameterValue* parameters, TextChange** change) {
+	const std::string_view textToRepeat = parameters[0].stringValue;
+	const u64 repeatCount = static_cast<u64>(parameters[1].numberValue);
 	
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());
-	
-	for (TextController::Caret& caret : self->carets) {
+	std::string textToInsert {};
+	textToInsert.reserve(repeatCount * textToRepeat.size());
+	for (u64 i = 0u; i < repeatCount; i++)
+		textToInsert.append(textToRepeat);
 		
-		TextPosition from, to;	
-		if (!caret.GetSelection(&from, &to)) {
-			to = caret.position;
-			funcMovement(self, &caret.position);
-			from = caret.position;
-		}
-		
-		self->buffer.Remove(from, to, (*change)->NewOperation());
-		caret.ResetSelection();
-		caret.position = from;
-	}
+	InsertText(self, textToInsert, change);		
 }
 
-static void ActionDeleteRight(TextController* self, TextChange** change, void (*funcMovement)(TextController*, TextPosition*)) {
-
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());
+static void CommandTransformCase(TextController* self, ParameterValue* parameters, TextChange** change) {
+	
+	const int targetCase = parameters[0].numberValue;
+	const bool capitalizeFirstLetter = parameters[1].numberValue;
 	
 	for (TextController::Caret& caret : self->carets) {
 		TextPosition from, to;
 		if (!caret.GetSelection(&from, &to)) {
-			from = caret.position;
-			funcMovement(self, &caret.position);
-			to = caret.position;
+			from = to = caret.position;
+			MoveToNextWord(self, &to);
+			MoveToPrevWord(self, &from);
 		}
-	
-		self->buffer.Remove(from, to, (*change)->NewOperation());
-		caret.ResetSelection();
-		caret.position = from;
+		
+		const std::string originalText = self->buffer.GetText(from, to);
+		ASSERT(originalText.empty());
+		
+		std::vector<std::string_view> tokens {};
+		
+		bool prevIsUpperCase = (originalText.front() >= 'A' && originalText.front() <= 'Z');
+		u64 tokenStart = 0u;
+		for (u64 i = 0u; i < originalText.size(); i++) {
+			const bool isUpperCase = (originalText.front() >= 'A' && originalText.front() <= 'Z');
+			if (prevIsUpperCase != isUpperCase) {
+				tokens.push_back(std::string_view {originalText.begin() + tokenStart, originalText.begin() + i});
+				prevIsUpperCase = isUpperCase;
+				continue;
+				}
+		}
+		
+		// @TODO finish
 	}
 }
 
-static void ActionDeleteLine(TextController* self, TextChange** change) {
+static void CommandToUpperOrLowerCase(TextController* self, TextChange** outChange, int (*funcTransform)(int)) {
+	
+	TextChange* change = *outChange = self->NewTextChange();
+		
+	for (TextController::Caret& caret : self->carets) {
+		
+		TextPosition from, to;
+		
+		if (!caret.GetSelection(&from, &to)) {
+			from = to = caret.position;
+			MoveForward(self, &to);
+		}
+		
+		TextChangeOperation* operation = change->NewOperation();
+		self->buffer.Remove(from, to, operation);
+		
+		std::string textToInsert {};
+		textToInsert.reserve(operation->removedText.size());
+		for (char ch : operation->removedText)
+			textToInsert.push_back(static_cast<char>(funcTransform(ch)));
+		
+		self->buffer.Insert(from, textToInsert, operation);
+	}
+}
 
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());	
+static void CommandDeleteLine(TextController* self, TextChange** outChange) {
+
+	TextChange* change = *outChange = self->NewTextChange();
+	change->ReserveCapacity(self->carets.size());	
 	
 	for (TextController::Caret& caret : self->carets) {	
 		u64 lineFrom = 0u, lineTo = 0u;
@@ -616,75 +844,16 @@ static void ActionDeleteLine(TextController* self, TextChange** change) {
 		}		
 	
 		
-		self->buffer.RemoveChunk(lineFrom, lineTo, (*change)->NewOperation());
+		self->buffer.RemoveChunk(lineFrom, lineTo, change->NewOperation());
 	
 		caret.position.column = GetIndentationEnd(self, lineFrom);
 		caret.ResetSelection();
 	}
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Insertion
+static void CommandIndentLine(TextController* self, TextChange** outChange) {
 
-static void ActionInsertNewLine(TextController* self, TextChange** change) {
-	
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());
-	
-	for (TextController::Caret& caret : self->carets) {
-		
-		TextChangeOperation* operation = (*change)->NewOperation();
-		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
-			self->buffer.Remove(from, to, operation);
-			caret.ResetSelection();
-			caret.position = from;
-		}
-	
-		// @TODO(settings) use line-ending mode
-		std::string toInsert {"\r\n"};
-	
-		// adjust to current indentation
-		{
-			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
-			
-			const u64 maxColumn = std::min(line.length, caret.position.column);
-			for (u64 i = 0u; i < maxColumn; i++) {
-				
-				const char ch = line.data[i];
-				if (ch == '\t' || ch == ' ')
-					toInsert.push_back(ch);
-				else
-					break;
-			}
-		}
-		
-		self->buffer.Insert(caret.position, toInsert, operation);
-		caret.position = operation->insertionEnd;
-	}
-}
-
-static void ActionInsertTab(TextController* self, TextChange** change) {
-	
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size());
-	
-	for (TextController::Caret& caret : self->carets) {
-
-		TextChangeOperation* operation = (*change)->NewOperation();	
-		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
-			self->buffer.Remove(from, to, operation);
-			caret.ResetSelection();
-			caret.position = from;
-		}
-	
-		self->buffer.InsertInLine(caret.position, "\t", operation);
-		caret.position = operation->insertionEnd;
-	}
-}
-
-static void ActionIndentLine(TextController* self, TextChange** change) {
-
-	self->InitTextChange(change);
+	TextChange* change = *outChange = self->NewTextChange();
 	
 	for (TextController::Caret& caret : self->carets) {	
 		
@@ -693,7 +862,7 @@ static void ActionIndentLine(TextController* self, TextChange** change) {
 		
 			const u64 lineFrom = std::min(caret.position.line, caret.selection.line);
 			const u64 lineTo   = std::max(caret.position.line, caret.selection.line);
-			(*change)->ReserveMore((lineTo - lineFrom) + 1);	
+			change->ReserveMore((lineTo - lineFrom) + 1);	
 		
 			for (u64 ln = lineFrom; ln <= lineTo; ln++) {
 							
@@ -703,7 +872,7 @@ static void ActionIndentLine(TextController* self, TextChange** change) {
 						.line = ln,
 						.column = GetIndentationEnd(self, ln) },
 					"\t",
-					(*change)->NewOperation());
+					change->NewOperation());
 			}
 					
 			caret.position.column++;
@@ -717,14 +886,14 @@ static void ActionIndentLine(TextController* self, TextChange** change) {
 					.line = caret.position.line,
 					.column = GetIndentationEnd(self, caret.position.line) },
 				"\t",
-				(*change)->NewOperation());
+				change->NewOperation());
 				
 			caret.position.column++;
 		}
 	}
 }
 
-static void UnindentLine(TextController* self, TextController::Caret& caret, TextChange** change, u64 ln) {
+static void UnindentLine(TextController* self, TextController::Caret& caret, TextChange* change, u64 ln) {
 	const std::string_view line = self->buffer.GetLineAt(ln).GetText();
 		
 	u64 charsToRemove = 0;
@@ -746,10 +915,8 @@ static void UnindentLine(TextController* self, TextController::Caret& caret, Tex
 		return;
 	}
 	
-	self->InitTextChange(change);
-		 
-	self->buffer.RemoveInLine(ln, 0, charsToRemove, (*change)->NewOperation());
-			
+	self->buffer.RemoveInLine(ln, 0, charsToRemove, change->NewOperation());
+	
 	// adjust cursor
 	if (caret.position.line == ln)
 		caret.position.column = caret.position.column - std::min(charsToRemove, caret.position.column);
@@ -759,15 +926,15 @@ static void UnindentLine(TextController* self, TextController::Caret& caret, Tex
 		caret.selection.column = caret.selection.column - std::min(charsToRemove, caret.selection.column);
 }
 
-static void ActionUnindentLine(TextController* self, TextChange** change) {
+static void CommandUnindentLine(TextController* self, TextChange** outChange) {
 
-	self->InitTextChange(change);
+	TextChange* change = *outChange = self->NewTextChange();
 	
 	for (TextController::Caret& caret : self->carets) {
 
 		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
 		
-			(*change)->ReserveMore((to.line - from.line) + 1u);
+			change->ReserveMore((to.line - from.line) + 1u);
 			for (u64 ln = from.line; ln <= to.line; ln++)
 				UnindentLine(self, caret, change, ln);
 		
@@ -777,17 +944,17 @@ static void ActionUnindentLine(TextController* self, TextChange** change) {
 	}
 }	
 
-static void ActionDuplicateLine(TextController* self, TextChange** change) {
+static void CommandDuplicateLine(TextController* self, TextChange** outChange) {
 	// @FIXME this doesn't work with the last line yet
 
-	self->InitTextChange(change);
+	TextChange* change = *outChange = self->NewTextChange();
 	
 	if (self->ownerEditor)
 		self->ownerEditor->PrepareInsertAnimation(self->carets.size());
 	
 	for (TextController::Caret& caret : self->carets) {
 	
-		TextChangeOperation* operation = (*change)->NewOperation();	
+		TextChangeOperation* operation = change->NewOperation();	
 	
 		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
 			std::string toInsert {};
@@ -818,10 +985,18 @@ static void ActionDuplicateLine(TextController* self, TextChange** change) {
 		self->ownerEditor->StartInsertAnimation();
 }
 
+static void CommandSwapLines(TextController* self, TextChange** change) {
+	ASSERT_NOT_IMPLEMENTED;
+}
+
+static void CommandTrimTrailingWhitespace(TextController* self, TextChange** change) {
+	ASSERT_NOT_IMPLEMENTED;
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Undo Redo
 
-static void ActionUndo(TextController* self, TextChange** change) {
+static void CommandUndo(TextController* self, TextChange** change) {
 	
 	// no actions done yet - no undo
 	if (self->history.written == 0u)
@@ -887,7 +1062,7 @@ static void ActionUndo(TextController* self, TextChange** change) {
 		self->ownerEditor->StartInsertAnimation();
 }
 
-static void ActionRedo(TextController* self, TextChange** change) {
+static void CommandRedo(TextController* self, TextChange** change) {
 
 	// did no undos yet
 	if (self->historyUndoIndex == USIZE_MAX)
@@ -936,6 +1111,245 @@ static void ActionRedo(TextController* self, TextChange** change) {
 	
 	if (self->ownerEditor)
 		self->ownerEditor->StartInsertAnimation();
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Comments
+
+static void CommandLineComment(TextController* self, TextChange** outChange) {	
+	if (!self->ownerEditor) return;
+	if (!self->ownerEditor->language) return;
+	if ( self->ownerEditor->language->lineComment.empty()) return;
+	
+	const Language* language = self->ownerEditor->language;
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	
+	for (TextController::Caret& caret : self->carets) {
+		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
+			change->ReserveMore((from.line - to.line) + 1);
+			
+			// find smallest indentation	 of all lines
+			// we should look for the visual column in case tabs and spaces are mixed
+			// but it's fine for now
+			u64 indentation = U64_MAX;	
+			for (u64 ln = from.line; ln <= to.line; ln++) {
+				const u64 currentIndent = GetIndentationEnd(self, ln);
+				if (currentIndent < indentation)
+					indentation = currentIndent; 
+			}
+			
+			// now insert the comment prefix
+			for (u64 ln = from.line; ln <= to.line; ln++) {			
+				self->buffer.InsertInLine(
+					TextPosition {
+						.line = ln,
+						.column = indentation},
+					language->lineComment,
+					change->NewOperation());
+			}
+			
+			caret.position.column += language->lineComment.size();
+			caret.selection.column += language->lineComment.size();
+			
+		} else {
+			self->buffer.InsertInLine(
+				TextPosition {
+					.line = caret.position.line,
+					.column = GetIndentationEnd(self, caret.position.line)},
+				language->lineComment,
+			change->NewOperation());
+			
+			caret.position.column += language->lineComment.size();
+		}
+	}
+}
+
+static void CommandUnLineComment(TextController* self, TextChange** change) {
+	if (!self->ownerEditor) return;
+	if (!self->ownerEditor->language) return;
+	if ( self->ownerEditor->language->lineComment.empty()) return;
+	
+	const Language* language = self->ownerEditor->language;
+
+	for (TextController::Caret& caret : self->carets) {	
+		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
+			
+			for (u64 ln = from.line; ln <= to.line; ln++) {
+				const TextBuffer::Line& line = self->buffer.GetLineAt(ln);
+				
+				const usize pos = line.GetText().find(language->lineComment);
+				if (pos == std::string_view::npos) continue;
+				
+				if (!(*change))
+ 			 	(*change) = self->NewTextChange();
+				
+				self->buffer.RemoveInLine(ln, pos, pos + language->lineComment.size(), (*change)->NewOperation());
+				
+				if (caret.position.line == ln)
+					caret.position.column -= language->lineComment.size();
+				if (caret.selection.line == ln)
+					caret.selection.column -= language->lineComment.size();
+			}	
+		} else {
+			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
+					
+			const usize pos =  line.GetText().find(language->lineComment);
+			if (pos == std::string_view::npos) continue;
+			if (!(*change))
+			 	(*change) = self->NewTextChange();
+			self->buffer.RemoveInLine(caret.position.line, pos, pos + language->lineComment.size(), (*change)->NewOperation());
+			caret.position.column -= language->lineComment.size();	
+		}
+	}
+}
+
+static void CommandBlockComment(TextController* self, TextChange** outChange) {
+	if (!self->ownerEditor) return;
+	if (!self->ownerEditor->language) return;
+	if  (self->ownerEditor->language->blockComment[0].empty() ||
+	     self->ownerEditor->language->blockComment[1].empty()) return;
+	
+	const Language* language = self->ownerEditor->language;
+	
+	TextChange* change = *outChange = self->NewTextChange();
+	change->ReserveCapacity(self->carets.size() * 2u);
+	
+	for (TextController::Caret& caret : self->carets) {	
+		if (caret.hasSelection) {
+			// NOTE: can't use GetSelection() here because we need pointers not copies
+	
+			TextPosition* start,* end;
+			if (caret.position < caret.position) {
+				start = &caret.position;
+				end   = &caret.selection;
+			} else {
+				start = &caret.selection;
+				end   = &caret.position;
+			}		
+							
+			self->buffer.InsertInLine(*start, language->blockComment[0], change->NewOperation());
+			self->buffer.InsertInLine(*end,   language->blockComment[1], change->NewOperation());
+			
+			if (end->line == start->line)
+				end->column += language->blockComment[0].size();
+			end->column += language->blockComment[1].size();
+		
+		} else {
+				
+			self->buffer.InsertInLine(
+				TextPosition {
+					.line   = caret.position.line,
+					.column = GetIndentationEnd(self, caret.position.line)},
+				language->blockComment[0],
+			change->NewOperation());
+				
+			self->buffer.InsertInLine(
+				TextPosition {
+					.line   = caret.position.line,
+					.column = self->buffer.GetLineAt(caret.position.line).length},
+				language->blockComment[1],
+			change->NewOperation());
+			
+			caret.position.column += language->blockComment[0].size();
+		}
+	}
+}
+
+static void CommandUnBlockComment(TextController* self, TextChange** change) {
+	if (!self->ownerEditor) return;
+	if (!self->ownerEditor->language) return;
+	if  (self->ownerEditor->language->blockComment[0].empty() ||
+	     self->ownerEditor->language->blockComment[1].empty()) return;
+	    
+	const Language* language = self->ownerEditor->language; 
+	
+	for (TextController::Caret& caret : self->carets) {	
+		if (caret.hasSelection) {
+			// NOTE: can't use GetSelection() here because we need pointers not copies
+		
+			TextPosition* start,* end;
+			if (caret.position < caret.position) {
+				start = &caret.position;
+				end   = &caret.selection;
+			} else {
+				start = &caret.selection;
+				end   = &caret.position;
+			}
+			
+			const TextBuffer::Line& startLine = self->buffer.GetLineAt(start->line);
+			const usize posStart = startLine.GetText().find(language->blockComment[0], start->column);
+			if (posStart == std::string_view::npos) return;
+			
+			const TextBuffer::Line& endLine = self->buffer.GetLineAt(end->line);
+			const usize posEnd = endLine.GetText().rfind(language->blockComment[1], end->column);
+			if (posEnd == std::string_view::npos) return;
+			
+			if (!(*change)) {
+				(*change) = self->NewTextChange();
+				(*change)->ReserveMore(2u);
+			}
+			
+			self->buffer.RemoveInLine(end->line,   posEnd,   posEnd   + language->blockComment[1].size(), (*change)->NewOperation());
+			self->buffer.RemoveInLine(start->line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
+			
+			if (end->line == start->line)
+				end->column += language->blockComment[0].size();
+			end->column -= language->blockComment[1].size();
+			
+		} else {
+			
+			const std::string_view line = self->buffer.GetLineAt(caret.position.line).GetText();
+			
+			const usize posStart = line.rfind(language->blockComment[0], caret.position.column);
+			if (posStart == std::string_view::npos) return;
+			
+			const usize posEnd = line.find(language->blockComment[1], caret.position.column);
+			if (posEnd == std::string_view::npos) return;
+			
+			if (!(*change)) {
+					(*change) = self->NewTextChange();
+				(*change)->ReserveMore(2u);
+			}
+			
+			self->buffer.RemoveInLine(caret.position.line, posEnd,   posEnd   + language->blockComment[1].size(), (*change)->NewOperation());
+			self->buffer.RemoveInLine(caret.position.line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
+			
+			caret.position.column -= language->blockComment[0].size();
+		}
+	}
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// multi caret
+
+static void CommandAddCaretAbove(TextController* self) {
+
+	TextController::Caret newCaret = self->carets.front();
+	if (newCaret.position.line == 0u) return;
+				
+	MoveLineUp(self, &newCaret.position);
+	if (newCaret.hasSelection)
+		MoveLineUp(self, &newCaret.selection);
+				
+	self->carets.insert(self->carets.begin(), newCaret);	
+}
+
+static void CommandAddCaretBelow(TextController* self) {
+	TextController::Caret newCaret = self->carets.back();
+	if (newCaret.position.line == self->buffer.GetMaxLine()) return;
+				
+	MoveLineDown(self, &newCaret.position);
+	if (newCaret.hasSelection)
+		MoveLineDown(self, &newCaret.selection);
+				
+	self->carets.push_back(newCaret);
+}
+
+static void CommandClearMultiCarets(TextController* self, bool keepLast) {
+	if (keepLast) std::swap(self->carets.front(), self->carets.back());
+	self->carets.resize(1u);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1030,7 +1444,7 @@ static void CopyTextToClipboard(std::span<std::string_view> textsToCopy) {
 	}
 }
 
-static void ActionCut(TextController* self, TextChange** change) {
+static void CommandCut(TextController* self, TextChange** outChange) {
 	
 	std::string_view* textsToCopy = new std::string_view[self->carets.size()];
 	DEFER(delete[] textsToCopy);
@@ -1050,8 +1464,8 @@ static void ActionCut(TextController* self, TextChange** change) {
 				.column = self->buffer.GetLineAt(caret.position.line).length };
 		}
 		
-		self->InitTextChange(change);
-		TextChangeOperation* operation = (*change)->NewOperation();
+		TextChange* change = *outChange = self->NewTextChange();
+		TextChangeOperation* operation = change->NewOperation();
 		
 		self->buffer.Remove(from, to, operation);
 		
@@ -1064,7 +1478,7 @@ static void ActionCut(TextController* self, TextChange** change) {
 	CopyTextToClipboard({textsToCopy, self->carets.size()});
 }
 
-static void ActionCopy(TextController* self, TextChange** pchange) {
+static void CommandCopy(TextController* self, TextChange** pchange) {
 
 	std::string_view* textsToCopy = new std::string_view[self->carets.size()];	
 	std::string* texts = new std::string[self->carets.size()];
@@ -1093,7 +1507,7 @@ static void ActionCopy(TextController* self, TextChange** pchange) {
 	CopyTextToClipboard({textsToCopy, self->carets.size()});
 }
 
-static void ActionCutLines(TextController* self, TextChange** change) {
+static void CommandCutLines(TextController* self, TextChange** outChange) {
 
 	std::string_view* textsToCopy = new std::string_view[self->carets.size()];
 	DEFER(delete[] textsToCopy);
@@ -1110,8 +1524,8 @@ static void ActionCutLines(TextController* self, TextChange** change) {
 			lineFrom = lineTo = caret.position.line;
 		}
 		
-		self->InitTextChange(change);
-		TextChangeOperation* operation = (*change)->NewOperation();
+		TextChange* change = *outChange = self->NewTextChange();
+		TextChangeOperation* operation = change->NewOperation();
 		
 		self->buffer.RemoveChunk(lineFrom, lineTo, operation);
 		caret.position = TextPosition {lineFrom, GetIndentationEnd(self, lineFrom)};
@@ -1123,10 +1537,10 @@ static void ActionCutLines(TextController* self, TextChange** change) {
 	CopyTextToClipboard({textsToCopy, self->carets.size()});
 }
 
-static void PasteText(TextController* self, u64 caretIndex, std::string_view text, TextChange** change) {
+static void PasteText(TextController* self, u64 caretIndex, std::string_view text, TextChange* change) {
 	
 	TextController::Caret& caret = self->carets[caretIndex];
-	TextChangeOperation* operation = (*change)->NewOperation();
+	TextChangeOperation* operation = change->NewOperation();
 	
 	TextPosition insertionPoint {};
 	if (TextPosition selectionStart, selectionEnd; caret.GetSelection(&selectionStart, &selectionEnd)) {
@@ -1149,7 +1563,7 @@ static void PasteText(TextController* self, u64 caretIndex, std::string_view tex
 		self->ownerEditor->AddInsertAnimationData(operation->start, operation->insertionEnd);
 }
 
-static void ActionPaste(TextController* self, TextChange** change) {
+static void CommandPaste(TextController* self, TextChange** outChange) {
 	
 	const UINT cfMultiCaretText = RegisterClipboardFormatA(CLIPBOARD_FORMAT_MULTICARET_TEXT);
 	
@@ -1164,7 +1578,7 @@ static void ActionPaste(TextController* self, TextChange** change) {
 	}
 	DEFER(CloseClipboard());
 	
-	self->InitTextChange(change);
+	TextChange* change = *outChange = self->NewTextChange();
 	
 	if (IsClipboardFormatAvailable(cfMultiCaretText) && self->carets.size() > 1u) {
 		
@@ -1251,318 +1665,8 @@ static void ActionPaste(TextController* self, TextChange** change) {
 		self->ownerEditor->StartInsertAnimation();
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Comments
 
-static void ActionLineComment(TextController* self, TextChange** change) {	
-	if (!self->ownerEditor) return;
-	if (!self->ownerEditor->language) return;
-	if ( self->ownerEditor->language->lineComment.empty()) return;
-	
-	const Language* language = self->ownerEditor->language;
-	
-	self->InitTextChange(change);
-	
-	for (TextController::Caret& caret : self->carets) {
-		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
-			(*change)->ReserveMore((from.line - to.line) + 1);
-			
-			// find smallest indentation	 of all lines
-			// we should look for the visual column in case tabs and spaces are mixed
-			// but it's fine for now
-			u64 indentation = U64_MAX;	
-			for (u64 ln = from.line; ln <= to.line; ln++) {
-				const u64 currentIndent = GetIndentationEnd(self, ln);
-				if (currentIndent < indentation)
-					indentation = currentIndent; 
-			}
-			
-			// now insert the comment prefix
-			for (u64 ln = from.line; ln <= to.line; ln++) {			
-				self->buffer.InsertInLine(
-					TextPosition {
-						.line = ln,
-						.column = indentation},
-					language->lineComment,
-					(*change)->NewOperation());
-			}
-			
-			caret.position.column += language->lineComment.size();
-			caret.selection.column += language->lineComment.size();
-			
-		} else {
-			self->buffer.InsertInLine(
-				TextPosition {
-					.line = caret.position.line,
-					.column = GetIndentationEnd(self, caret.position.line)},
-				language->lineComment,
-				(*change)->NewOperation());
-			
-			caret.position.column += language->lineComment.size();
-		}
-	}
-}
-
-static void ActionUnLineComment(TextController* self, TextChange** change) {
-	if (!self->ownerEditor) return;
-	if (!self->ownerEditor->language) return;
-	if ( self->ownerEditor->language->lineComment.empty()) return;
-	
-	const Language* language = self->ownerEditor->language;
-
-	for (TextController::Caret& caret : self->carets) {	
-		if (TextPosition from, to; caret.GetSelection(&from, &to)) {
-			
-			for (u64 ln = from.line; ln <= to.line; ln++) {
-				const TextBuffer::Line& line = self->buffer.GetLineAt(ln);
-				
-				const usize pos = line.GetText().find(language->lineComment);
-				if (pos == std::string_view::npos) continue;
-				
-				if (!(*change))
- 			 		self->InitTextChange(change);
-				
-				self->buffer.RemoveInLine(ln, pos, pos + language->lineComment.size(), (*change)->NewOperation());
-				
-				if (caret.position.line == ln)
-					caret.position.column -= language->lineComment.size();
-				if (caret.selection.line == ln)
-					caret.selection.column -= language->lineComment.size();
-			}	
-		} else {
-			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
-					
-			const usize pos =  line.GetText().find(language->lineComment);
-			if (pos == std::string_view::npos) continue;
-			if (!(*change))
-			 	self->InitTextChange(change);
-			self->buffer.RemoveInLine(caret.position.line, pos, pos + language->lineComment.size(), (*change)->NewOperation());
-			caret.position.column -= language->lineComment.size();	
-		}
-	}
-}
-
-static void ActionBlockComment(TextController* self, TextChange** change) {
-	if (!self->ownerEditor) return;
-	if (!self->ownerEditor->language) return;
-	if  (self->ownerEditor->language->blockComment[0].empty() ||
-	     self->ownerEditor->language->blockComment[1].empty()) return;
-	
-	const Language* language = self->ownerEditor->language;
-	
-	self->InitTextChange(change);
-	(*change)->ReserveCapacity(self->carets.size() * 2u);
-	
-	for (TextController::Caret& caret : self->carets) {	
-		if (caret.hasSelection) {
-			// NOTE: can't use GetSelection() here because we need pointers not copies
-	
-			TextPosition* start,* end;
-			if (caret.position < caret.position) {
-				start = &caret.position;
-				end   = &caret.selection;
-			} else {
-				start = &caret.selection;
-				end   = &caret.position;
-			}		
-							
-			self->buffer.InsertInLine(*start, language->blockComment[0], (*change)->NewOperation());
-			self->buffer.InsertInLine(*end,   language->blockComment[1], (*change)->NewOperation());
-			
-			if (end->line == start->line)
-				end->column += language->blockComment[0].size();
-			end->column += language->blockComment[1].size();
-		
-		} else {
-				
-			self->buffer.InsertInLine(
-				TextPosition {
-					.line   = caret.position.line,
-					.column = GetIndentationEnd(self, caret.position.line)},
-				language->blockComment[0],
-				(*change)->NewOperation());
-				
-			self->buffer.InsertInLine(
-				TextPosition {
-					.line   = caret.position.line,
-					.column = self->buffer.GetLineAt(caret.position.line).length},
-				language->blockComment[1],
-				(*change)->NewOperation());
-			
-			caret.position.column += language->blockComment[0].size();
-		}
-	}
-}
-
-static void ActionUnBlockComment(TextController* self, TextChange** change) {
-	if (!self->ownerEditor) return;
-	if (!self->ownerEditor->language) return;
-	if  (self->ownerEditor->language->blockComment[0].empty() ||
-	     self->ownerEditor->language->blockComment[1].empty()) return;
-	    
-	const Language* language = self->ownerEditor->language; 
-	
-	for (TextController::Caret& caret : self->carets) {	
-		if (caret.hasSelection) {
-			// NOTE: can't use GetSelection() here because we need pointers not copies
-		
-			TextPosition* start,* end;
-			if (caret.position < caret.position) {
-				start = &caret.position;
-				end   = &caret.selection;
-			} else {
-				start = &caret.selection;
-				end   = &caret.position;
-			}
-			
-			const TextBuffer::Line& startLine = self->buffer.GetLineAt(start->line);
-			const usize posStart = startLine.GetText().find(language->blockComment[0], start->column);
-			if (posStart == std::string_view::npos) return;
-			
-			const TextBuffer::Line& endLine = self->buffer.GetLineAt(end->line);
-			const usize posEnd = endLine.GetText().rfind(language->blockComment[1], end->column);
-			if (posEnd == std::string_view::npos) return;
-			
-			if (!(*change)) {
-				self->InitTextChange(change);
-				(*change)->ReserveMore(2u);
-			}
-			
-			self->buffer.RemoveInLine(end->line,   posEnd,   posEnd   + language->blockComment[1].size(), (*change)->NewOperation());
-			self->buffer.RemoveInLine(start->line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
-			
-			if (end->line == start->line)
-				end->column += language->blockComment[0].size();
-			end->column -= language->blockComment[1].size();
-			
-		} else {
-			
-			const std::string_view line = self->buffer.GetLineAt(caret.position.line).GetText();
-			
-			const usize posStart = line.rfind(language->blockComment[0], caret.position.column);
-			if (posStart == std::string_view::npos) return;
-			
-			const usize posEnd = line.find(language->blockComment[1], caret.position.column);
-			if (posEnd == std::string_view::npos) return;
-			
-			if (!(*change)) {
-				self->InitTextChange(change);
-				(*change)->ReserveMore(2u);
-			}
-			
-			self->buffer.RemoveInLine(caret.position.line, posEnd,   posEnd   + language->blockComment[1].size(), (*change)->NewOperation());
-			self->buffer.RemoveInLine(caret.position.line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
-			
-			caret.position.column -= language->blockComment[0].size();
-		}
-	}
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// multi caret
-
-static void ActionAddCaretAbove(TextController* self) {
-
-	TextController::Caret newCaret = self->carets.front();
-	if (newCaret.position.line == 0u) return;
-				
-	MoveLineUp(self, &newCaret.position);
-	if (newCaret.hasSelection)
-		MoveLineUp(self, &newCaret.selection);
-				
-	self->carets.insert(self->carets.begin(), newCaret);	
-}
-
-static void ActionAddCaretBelow(TextController* self) {
-	TextController::Caret newCaret = self->carets.back();
-	if (newCaret.position.line == self->buffer.GetMaxLine()) return;
-				
-	MoveLineDown(self, &newCaret.position);
-	if (newCaret.hasSelection)
-		MoveLineDown(self, &newCaret.selection);
-				
-	self->carets.push_back(newCaret);
-}
-
-static void ActionClearMultiCarets(TextController* self, bool keepLast) {
-	if (keepLast) std::swap(self->carets.front(), self->carets.back());
-	self->carets.resize(1u);
-}
-
-static void ActionToggleCaret(TextController* self) {
-	ASSERT(self->isEditCaretsMode);	
-	
-	for (auto it = self->carets.begin(); it != self->carets.end(); ++it) {
-		
-		// remove caret under the edit-caret
-		if (it->position == self->editCaretsPosition) {
-			self->carets.erase(it);
-			return;
-		}
-		
-		// check if we are inside a selecetion - adding carets there is not allowed
-		TextPosition itFrom, itTo;
-		if (it->GetSelection(&itFrom, &itTo)) {
-			if (self->editCaretsPosition > itFrom &&
-				self->editCaretsPosition < itTo)
-				return;
-		}
-	
-		// @FIXME should be > shoulld it not?
-		// Otherwise we insert a new caret. The carets are sorted by their position.
-		// check if this is the corret index to insert the new caret
-		if (it->position < self->editCaretsPosition) {
-			self->carets.insert(it, TextController::Caret {
-				.position = self->editCaretsPosition,
-				.selection = TextPosition {},
-				.hasSelection = false});
-			return;
-		}
-	}
-	
-	// insert at the end	
-	self->carets.push_back(TextController::Caret {
-		.position = self->editCaretsPosition,
-		.selection = TextPosition {},
-		.hasSelection = false});	
-}
-
-static void ActionEnterEditMultiCaretMode(TextController* self, bool spawnAtLast) {
-	ASSERT(!self->isEditCaretsMode);
-	
-	self->isEditCaretsMode = true;
-	self->editCaretsPosition = spawnAtLast
-		? self->carets.back().position
-		: self->carets.front().position;
-}
-
-static void ActionLeaveEditMultiCaretMode(TextController* self) {
-	ASSERT(self->isEditCaretsMode);
-	self->isEditCaretsMode = false;	
-	self->editCaretsPosition = {};
-}
-
-static void ActionShiftCaret(TextController* self, void (*funcMovement)(TextController*, TextPosition*)) {
-	TextPosition* positionToModifiy = nullptr;
-	for (TextController::Caret& caret : self->carets) {
-		if (caret.position == self->editCaretsPosition) {
-			positionToModifiy = &caret.position;
-			goto found_position;
-		}
-		
-		if (caret.hasSelection && caret.selection == self->editCaretsPosition) {
-			positionToModifiy = &caret.selection;
-			goto found_position;
-		}
-	}	
-	return;
-	
-found_position:
-	funcMovement(self, positionToModifiy);
-	self->editCaretsPosition = *positionToModifiy;
-}
-
-static void ActionGotoPrevCaret(TextController* self) {
+static void CommandGotoPrevCaret(TextController* self) {
 	for (auto it = self->carets.rbegin(); it != self->carets.rend(); ++it) {
 		if (self->editCaretsPosition > it->position) {
 			self->editCaretsPosition = it->position;
@@ -1571,7 +1675,7 @@ static void ActionGotoPrevCaret(TextController* self) {
 	}
 }
 
-static void ActionGotoNextCaret(TextController* self) {
+static void CommandGotoNextCaret(TextController* self) {
 	for (const TextController::Caret& caret : self->carets) {
 		if (self->editCaretsPosition < caret.position) {
 			self->editCaretsPosition = caret.position;
@@ -1580,110 +1684,117 @@ static void ActionGotoNextCaret(TextController* self) {
 	}
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// M A P P I N G
+// Input
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool OnKeyDownEditMutiCursor(TextController* self, KeyEvent event) {
-	if      (event.vkeycode == VK_UP && event.NoModifiers()) MoveLineUp(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_RIGHT && event.NoModifiers())MoveForward(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_DOWN && event.NoModifiers()) MoveLineDown(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_LEFT && event.NoModifiers()) MoveBackward(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_LEFT && event.NoModifiers()) MoveBackward(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_ESCAPE) ActionLeaveEditMultiCaretMode(self);
-	else if (event.vkeycode == VK_RETURN && event.NoModifiers()) ActionToggleCaret(self);
-	else if (event == settings.keybinds.moveToPrevWord) MoveToPrevWord(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.moveToNextWord) MoveToNextWord(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.moveToLineStart) MoveToLineStart(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.moveToLineEnd) MoveToLineEnd(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.moveToBufferStart) MoveToBufferStart(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.moveToBufferEnd) MoveToBufferEnd(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.movePageUp) MovePageUp(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.movePageDown) MovePageDown(self, &self->editCaretsPosition);
-	else if (event == settings.keybinds.selectBackward) ActionShiftCaret(self, MoveBackward);
-	else if (event == settings.keybinds.selectForward) ActionShiftCaret(self, MoveForward);
-	else if (event == settings.keybinds.selectLineUp) ActionShiftCaret(self, MoveLineUp);
-	else if (event == settings.keybinds.selectLineDown) ActionShiftCaret(self, MoveLineDown);
-	else if (event == settings.keybinds.selectToNextWord) ActionShiftCaret(self, MoveToNextWord);
-	else if (event == settings.keybinds.selectToPrevWord) ActionShiftCaret(self, MoveToPrevWord);
-	else if (event == settings.keybinds.selectToLineStart) ActionShiftCaret(self, MoveToLineStart);
-	else if (event == settings.keybinds.selectToLineEnd) ActionShiftCaret(self, MoveToLineEnd);
-	else if (event == settings.keybinds.selectToBufferStart) ActionShiftCaret(self, MoveToBufferStart);
-	else if (event == settings.keybinds.selectToBufferEnd) ActionShiftCaret(self, MoveToBufferEnd);
-	else if (event == settings.keybinds.selectPageUp) ActionShiftCaret(self, MovePageUp);
-	else if (event == settings.keybinds.selectPageDown) ActionShiftCaret(self, MovePageDown);
-	else if (event == settings.keybinds.addCaretAbove) ActionGotoPrevCaret(self);
-	else if (event == settings.keybinds.addCaretBelow) ActionGotoNextCaret(self);
-	else if (event == settings.keybinds.editCarets) ActionLeaveEditMultiCaretMode(self);
-	else return false;
-	
-	return true;
+static void OnKeyDownEditMutiCursor(TextController* self, KeyEvent event, Command command) {
+	if      (event.vkeycode == VK_UP     && event.modifiers == KM_None) MoveLineUp(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None) MoveForward(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_None) MoveLineDown(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None) MoveBackward(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) LeaveEditMultiCaretMode(self);
+	else if (event.vkeycode == VK_RETURN && event.modifiers == KM_None) self->ToggleCaret();
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Ctrl) MoveToPrevWord(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Ctrl) MoveToNextWord(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_None) MoveToLineStart(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_None) MoveToLineEnd(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_Ctrl) MoveToBufferStart(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Ctrl) MoveToBufferEnd(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_None) MovePageUp(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_None) MovePageDown(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) ShiftCaret(self, MoveBackward);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) ShiftCaret(self, MoveForward);
+	else if (event.vkeycode == VK_UP     && event.modifiers == KM_Shift) ShiftCaret(self, MoveLineUp);
+	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_Shift) ShiftCaret(self, MoveLineDown);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToNextWord);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToPrevWord);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_Shift) ShiftCaret(self, MoveToLineStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Shift) ShiftCaret(self, MoveToLineEnd);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == (KM_Shift | KM_Ctrl)) ShiftCaret(self, MoveToBufferStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Shift) ShiftCaret(self, MoveToBufferEnd);
+	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_Shift) ShiftCaret(self, MovePageUp);
+	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_Shift) ShiftCaret(self, MovePageDown);
+	else if (command.id == Command::Id_Text_MoveCaret)            CommandMoveCaret(self, command.parameters);
+	else if (command.id == Command::Id_MultiCaret_AddCaretAbove)  CommandGotoPrevCaret(self);
+	else if (command.id == Command::Id_MultiCaret_AddCaretBelow)  CommandGotoNextCaret(self);
+	else if (command.id == Command::Id_MultiCaret_ToggleEditMode) LeaveEditMultiCaretMode(self);
 }
 
-bool TextController::OnKeyDown(KeyEvent event, /*out*/ TextChange** change) {
+void TextController::OnKeyDown(KeyEvent event, Command command, /*out*/ TextChange** change) {
 	ASSERT(!carets.empty());
 	
-	if (isEditCaretsMode)
-		return OnKeyDownEditMutiCursor(this, event);
+	if (isEditCaretsMode) {
+		OnKeyDownEditMutiCursor(this, event, command);
+		return;
+	}
 			
-	if      (event.vkeycode == VK_UP && event.NoModifiers()) ActionMoveCaret(this, MoveLineUp);
-	else if (event.vkeycode == VK_RIGHT && event.NoModifiers()) ActionMoveCaret(this, MoveForward);
-	else if (event.vkeycode == VK_DOWN && event.NoModifiers()) ActionMoveCaret(this, MoveLineDown);
-	else if (event.vkeycode == VK_LEFT && event.NoModifiers()) ActionMoveCaret(this, MoveBackward);
-	else if (event.vkeycode == VK_RETURN && event.NoModifiers()) ActionInsertNewLine(this, change);
-	else if (event.vkeycode == VK_ESCAPE && event.NoModifiers()) ActionClearMultiCarets(this, true);
-	else if (event.vkeycode == VK_ESCAPE && event.ctrl) ActionClearMultiCarets(this, false);
-	else if (event == settings.keybinds.moveToPrevWord) ActionMoveCaret(this, MoveToPrevWord);
-	else if (event == settings.keybinds.moveToNextWord) ActionMoveCaret(this, MoveToNextWord);
-	else if (event == settings.keybinds.moveToLineStart) ActionMoveCaret(this, MoveToLineStart);
-	else if (event == settings.keybinds.moveToLineEnd) ActionMoveCaret(this, MoveToLineEnd);
-	else if (event == settings.keybinds.moveToBufferStart) ActionMoveCaret(this, MoveToBufferStart);
-	else if (event == settings.keybinds.moveToBufferEnd) ActionMoveCaret(this, MoveToBufferEnd);
-	else if (event == settings.keybinds.movePageUp) ActionMoveCaret(this, MovePageUp);
-	else if (event == settings.keybinds.movePageDown) ActionMoveCaret(this, MovePageDown);
-	else if (event == settings.keybinds.selectBackward) ActionSelect(this, MoveBackward);
-	else if (event == settings.keybinds.selectForward) ActionSelect(this, MoveForward);
-	else if (event == settings.keybinds.selectLineUp) ActionSelect(this, MoveLineUp);
-	else if (event == settings.keybinds.selectLineDown) ActionSelect(this, MoveLineDown);
-	else if (event == settings.keybinds.selectToPrevWord) ActionSelect(this, MoveToPrevWord);
-	else if (event == settings.keybinds.selectToNextWord) ActionSelect(this, MoveToNextWord);
-	else if (event == settings.keybinds.selectToLineStart) ActionSelect(this, MoveToLineStart);
-	else if (event == settings.keybinds.selectToLineEnd) ActionSelect(this, MoveToLineEnd);
-	else if (event == settings.keybinds.selectToBufferStart) ActionSelect(this, MoveToBufferStart);
-	else if (event == settings.keybinds.selectToBufferEnd) ActionSelect(this, MoveToBufferEnd);
-	else if (event == settings.keybinds.selectPageUp) ActionSelect(this, MovePageUp);
-	else if (event == settings.keybinds.selectPageDown) ActionSelect(this, MovePageDown);
-	else if (event == settings.keybinds.selectAll) ActionSelectAll(this);
-	else if (event == settings.keybinds.selectLine) ActionSelectLine(this);
-	else if (event == settings.keybinds.selectInBrackets) ActionSelectInBrackets(this);
-	else if (event == settings.keybinds.selectWord) ActionSelectWord(this);
-	else if (event == settings.keybinds.deletePrevChar) ActionDeleteLeft(this, change, MoveBackward);
-	else if (event == settings.keybinds.deleteNextChar) ActionDeleteRight(this, change, MoveForward);
-	else if (event == settings.keybinds.deletePrevWord) ActionDeleteLeft(this, change, MoveToPrevWord);
-	else if (event == settings.keybinds.deleteNextWord) ActionDeleteRight(this, change, MoveToNextWord);
-	else if (event == settings.keybinds.deleteLine) ActionDeleteLine(this, change);
-	else if (event == settings.keybinds.indentLine) ActionIndentLine(this, change);
-	else if (event == settings.keybinds.unindentLine) ActionUnindentLine(this, change);
-	else if (event == settings.keybinds.insertTab) ActionInsertTab(this, change);
-	else if (event == settings.keybinds.duplicateLine) ActionDuplicateLine(this, change);
-	else if (event == settings.keybinds.undo) ActionUndo(this, change);
-	else if (event == settings.keybinds.redo) ActionRedo(this, change);
-	else if (event == settings.keybinds.cut) ActionCut(this, change);
-	else if (event == settings.keybinds.copy) ActionCopy(this, change);
-	else if (event == settings.keybinds.paste) ActionPaste(this, change);
-	else if (event == settings.keybinds.cutLines) ActionCutLines(this, change);
-	else if (event == settings.keybinds.lineComment) ActionLineComment(this, change);
-	else if (event == settings.keybinds.lineUncomment) ActionUnLineComment(this, change);
-	else if (event == settings.keybinds.blockComment) ActionBlockComment(this, change);
-	else if (event == settings.keybinds.blockUncomment) ActionUnBlockComment(this, change);
-	else if (event == settings.keybinds.addCaretAbove) ActionAddCaretAbove(this);
-	else if (event == settings.keybinds.addCaretBelow) ActionAddCaretBelow(this);
-	else if (event == settings.keybinds.editCarets) ActionEnterEditMultiCaretMode(this, true);
-	else return false;
+	if      (event.vkeycode == VK_UP     && event.modifiers == KM_None)  MoveCaret(this, MoveLineUp);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None)  MoveCaret(this, MoveForward);
+	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_None)  MoveCaret(this, MoveLineDown);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None)  MoveCaret(this, MoveBackward);
+	else if (event.vkeycode == VK_RETURN && event.modifiers == KM_None)  InsertNewLine(this, change);
+	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None)  ClearMultiCarets(this, true);
+	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_Ctrl)  ClearMultiCarets(this, false);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Ctrl)  MoveCaret(this, MoveToPrevWord);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Ctrl)  MoveCaret(this, MoveToNextWord);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_None)  MoveCaret(this, MoveToLineStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_None)  MoveCaret(this, MoveToLineEnd);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_Ctrl)  MoveCaret(this, MoveToBufferStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Ctrl)  MoveCaret(this, MoveToBufferEnd);
+	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_None)  MoveCaret(this, MovePageUp);
+	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_None)  MoveCaret(this, MovePageDown);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) Select(this, MoveBackward);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) Select(this, MoveForward);
+	else if (event.vkeycode == VK_UP     && event.modifiers == KM_Shift) Select(this, MoveLineUp);
+	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_Shift) Select(this, MoveLineDown);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == (KM_Ctrl | KM_Shift)) Select(this, MoveToNextWord);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == (KM_Ctrl | KM_Shift)) Select(this, MoveToPrevWord);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == KM_Shift) Select(this, MoveToLineStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Shift) Select(this, MoveToLineEnd);
+	else if (event.vkeycode == VK_HOME   && event.modifiers == (KM_Shift | KM_Ctrl)) Select(this, MoveToBufferStart);
+	else if (event.vkeycode == VK_END    && event.modifiers == KM_Shift) Select(this, MoveToBufferEnd);
+	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_Shift) Select(this, MovePageUp);
+	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_Shift) Select(this, MovePageDown);
+	else if (event.vkeycode == VK_BACK   && event.modifiers == KM_None)  Delete(this, change, MoveBackward);
+	else if (event.vkeycode == VK_DELETE && event.modifiers == KM_None)  Delete(this, change, MoveForward);
+	else if (event.vkeycode == VK_BACK   && event.modifiers == KM_Ctrl)  Delete(this, change, MoveToPrevWord);
+	else if (event.vkeycode == VK_DELETE && event.modifiers == KM_Ctrl)  Delete(this, change, MoveToNextWord);
+	else if (command.id == Command::Id_Text_MoveCaret)        CommandMoveCaret(this, command.parameters);
+	else if (command.id == Command::Id_Text_InsertText)       CommandInsertText(this, command.parameters, change);
+	else if (command.id == Command::Id_Text_DeleteRange)      CommandDeleteRange(this, command.parameters, change);
 	
-	return true;
+	else if (command.id == Command::Id_Text_SelectAll)        CommandSelectAll(this);
+	else if (command.id == Command::Id_Text_SelectLine)       CommandSelectLine(this);
+	else if (command.id == Command::Id_Text_SelectInBrackets) CommandSelectInBrackets(this);
+	else if (command.id == Command::Id_Text_SelectWord)       CommandSelectWord(this);
+	
+	else if (command.id == Command::Id_Text_RepeatText)       CommandRepeatText(this, command.parameters, change);
+	else if (command.id == Command::Id_Text_TransformCase)    CommandTransformCase(this, command.parameters, change);
+	else if (command.id == Command::Id_Text_ToUpperCase)      CommandToUpperOrLowerCase(this, change, std::toupper);
+	else if (command.id == Command::Id_Text_ToLowerCase)      CommandToUpperOrLowerCase(this, change, std::tolower);
+	
+	else if (command.id == Command::Id_Text_DeleteLine)       CommandDeleteLine(this, change);
+	else if (command.id == Command::Id_Text_IndentLine)       CommandIndentLine(this, change);
+	else if (command.id == Command::Id_Text_UnIndentLine)     CommandUnindentLine(this, change);
+	else if (command.id == Command::Id_Text_CommentLine)      return; // @TODO
+	else if (command.id == Command::Id_Text_SwapLines)        CommandSwapLines(this, change);
+	else if (command.id == Command::Id_Text_DuplicateLine)    CommandDuplicateLine(this, change);
+	else if (command.id == Command::Id_Text_TrimTrailingWhitespace) CommandTrimTrailingWhitespace(this, change);
+	
+	else if (command.id == Command::Id_Text_Undo)             CommandUndo(this, change);
+	else if (command.id == Command::Id_Text_Redo)             CommandRedo(this, change);
+	
+	else if (command.id == Command::Id_Clipboard_Cut)         CommandCut(this, change);
+	else if (command.id == Command::Id_Clipboard_Copy)        CommandCopy(this, change);
+	else if (command.id == Command::Id_Clipboard_Paste)       CommandPaste(this, change);
+	else if (command.id == Command::Id_Clipboard_CutLines)    CommandCutLines(this, change);
+	
+	else if (command.id == Command::Id_MultiCaret_AddCaretAbove)  CommandAddCaretAbove(this);
+	else if (command.id == Command::Id_MultiCaret_AddCaretBelow)  CommandAddCaretBelow(this);
+	else if (command.id == Command::Id_MultiCaret_ToggleEditMode) EnterEditMultiCaretMode(this, true);	
 }
 
 void TextController::OnChar(const char* data, u64 len, /*out*/ TextChange** change) {
@@ -1693,12 +1804,12 @@ void TextController::OnChar(const char* data, u64 len, /*out*/ TextChange** chan
 	
 	if (isEditCaretsMode) {
 		if (text.size() == 1u && text.front() == ' ') {
-			ActionToggleCaret(this);
+			ToggleCaret();
 			return;
 		} else {
-			ActionLeaveEditMultiCaretMode(this);
+			LeaveEditMultiCaretMode(this);
 		}
 	}
 	
-	ActionInsertText(this, text, change);	
+	InsertText(this, text, change);	
 }

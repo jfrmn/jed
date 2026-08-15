@@ -145,8 +145,7 @@ static void InsertItem(EditorAutocomplete* self) {
 	
 	const EditorAutocomplete::Item& item = self->items[self->selectedItem];
 
-	TextChange* textChange = nullptr;
-	self->owner->textController.InitTextChange(&textChange);
+	TextChange* textChange = self->owner->textController.NewTextChange();
 	TextChangeOperation* operation = textChange->NewOperation();	
 
 	if (item.insertPosition.column != self->owner->textController.carets.front().position.column) {
@@ -205,7 +204,7 @@ void EditorAutocomplete::SortItems() {
 bool EditorAutocomplete::OnKeyDown(KeyEvent event) {
 	if (!items || itemCount == 0u) return false;
 
-	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.NoModifiers()) {
+	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
 		
 		selectedItem = event.vkeycode == VK_DOWN ?
 			IncrementWrapAround(selectedItem, itemCount):
@@ -213,7 +212,7 @@ bool EditorAutocomplete::OnKeyDown(KeyEvent event) {
 
 		return true;
 	
-	} else if ((event.vkeycode == VK_RETURN || event.vkeycode == VK_TAB) && event.NoModifiers()) {
+	} else if ((event.vkeycode == VK_RETURN || event.vkeycode == VK_TAB) && event.modifiers == KM_None) {
 		InsertItem(this);
 		RemoveReference();
 		return true;

@@ -25,8 +25,8 @@ struct EditorGotoLine : public EditorToolWindow {
 	static EditorGotoLine* Make(Editor *editor);
 
 	virtual void OnUpdate() override;
-	virtual bool OnKeyDown(KeyEvent event) override;
-	virtual bool OnChar(const char* data, u64 len) override;
+	virtual void OnKeyEvent(KeyEvent event, Command command) override;
+	virtual void OnChar(const char* data, u64 len) override;
 	
 	virtual bool IsGotoLine() const override;
 };

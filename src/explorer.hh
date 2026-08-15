@@ -1,6 +1,7 @@
 #pragma once
 #include "basic.hh"
 #include "events.hh"
+#include "commands.hh"
 #include "ui/text-box.hh"
 
 #include <vector>
@@ -82,8 +83,8 @@ struct Explorer {
 	~Explorer() noexcept;
 	
 	void OnUpdate();
-	void OnResize();
 	
-	void OnKeyDown(KeyEvent event);
+	void OnResize();
+	void OnKeyDown(KeyEvent event, Command commaand);
 	void OnChar(const char * utf8, u64 len);
 };

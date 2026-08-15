@@ -47,6 +47,6 @@ struct ParameterConfigurator {
 	void OnUpdate();
 	void OnResize();
 	
-	void OnKeyDown(KeyEvent event);
+	void OnKeyDown(KeyEvent event, Command command);
 	void OnChar(const char* data, u64 len);
 };

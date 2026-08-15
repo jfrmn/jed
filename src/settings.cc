@@ -293,95 +293,6 @@ static constexpr std::pair<std::string_view, u32> stringToVirtualKeyCode[] = {
 	{"OEM_CLEAR", VK_OEM_CLEAR}
 };
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static constexpr std::string_view actionNames[] = {
-	"show-file-search",
-	"show-explorer",
-	"show-tool-search",
-	"show-console",
-	
-	"focus-next-tab",
-	"focus-prev-tab",
-	"focus-next-panel",
-	"focus-prev-panel",
-	"add-panel-after",
-	"add-panel-before",
-	"swap-panels",
-	"close-panel",
-	"close-panel-and-tab",
-	"close-tab",
-	
-	"open-search",
-	"open-search-and-replace",
-	"open-goto-line",
-	"show-signature-help",
-	"show-autocomplete",
-	"show-goto-location",
-	"save-file",
-	"scroll-up",
-	"scroll-down",
-	"goto-prev-diagnostic",
-	"goto-next-diagnostic",
-	
-	"move-to-next-word",
-	"move-to-prev-word",
-	"move-to-line-start",
-	"move-to-line-end",
-	"move-to-buffer-start",
-	"move-to-buffer-end",
-	"move-page-up",
-	"move-page-down",
-	"select-backward",
-	"select-forward",
-	"select-line-up",
-	"select-line-down",
-	"select-to-next-word",
-	"select-to-prev-word",
-	"select-to-line-start",
-	"select-to-line-end",
-	"select-to-buffer-start",
-	"select-to-buffer-end",
-	"select-page-up",
-	"select-page-down",
-	"select-all",
-	"select-line",
-	"select-in-brackets",
-	"select-word",
-	"delete-prev-char",
-	"delete-prev-word",
-	"delete-next-char",
-	"delete-next-word",
-	"delete-line",
-	"indent-line",
-	"unindent-line",
-	"insert-tab",
-	"duplicate-line",
-	"undo",
-	"redo",
-	"cut",
-	"copy",
-	"paste",
-	"cut-lines",
-	"line-comment",
-	"line-uncomment",
-	"block-comment",
-	"block-uncomment",
-	"add-caret-above",
-	"add-caret-below",	
-	"edit-carets",
-		
-	"explorer-shell-execute",
-	"explorer-open-in-windows-explorer",
-	"explorer-new-file",
-	"explorer-new-folder",
-	"explorer-rename",
-	
-	"console-terminate-process",
-	"console-copy"
-};
-
-static_assert(STATIC_ARRAY_SIZE(actionNames) == Settings::NUM_KEYBINDS);
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
 // Defaults
@@ -410,94 +321,63 @@ Settings settings {
 		.uiBackgroundInactive = {0.2f, 0.2f, 0.2f, 1.0f},
 		.uiBackgroundInvalid  = {0.4f, 0.0f, 0.0f, 1.0f}},
 	
-	.keybinds  = {
-		// window
-		.showFileSearch       = {.vkeycode = VK_OEM_COMMA, .ctrl = true},
-		.showExplorer         = {.vkeycode = 'E',          .ctrl = true},
-		.showToolSearch       = {.vkeycode = 'T',          .ctrl = true},
-		.showConsole          = {.vkeycode = VK_OEM_2,     .ctrl = true},
-		.focusNextTab         = {.vkeycode = VK_TAB,       .ctrl = true},
-		.focusPrevTab         = {.vkeycode = VK_TAB,       .ctrl = true, .shift = true},
-		.focusNextPanel       = {.vkeycode = VK_RIGHT,                   .alt = true},
-		.focusPrevPanel       = {.vkeycode = VK_LEFT,                    .alt = true},
-		.addPanelAfter        = {.vkeycode = VK_LEFT,      .ctrl = true, .alt = true},
-		.addPanelBefore       = {.vkeycode = VK_RIGHT,     .ctrl = true, .alt = true},
-		.swapPanels           = {.vkeycode = VK_F10},
-		.closePanel           = {.vkeycode = VK_F11},
-		.closeTab             = {.vkeycode = VK_F12},
-		.closePanelAndTab     = {.vkeycode = VK_F12,        .ctrl = true},
-
-		// editor
-		.openSearch           = {.vkeycode = 'F',          .ctrl = true},
-		.openSearchAndReplace = {.vkeycode = 'H',          .ctrl = true},
-		.openGotoLine         = {.vkeycode = 'G',          .ctrl = true},
-		.showSignatureHelp    = {.vkeycode = 'I',          .ctrl = true},
-		.showAutocomplete     = {.vkeycode = VK_SPACE,     .ctrl = true},
-		.showGotoLocation     = {.vkeycode = VK_F8},
-		.saveFile             = {.vkeycode = 'S',          .ctrl = true},
-		.scrollUp             = {.vkeycode = VK_UP,        .ctrl = true},
-		.scrollDown           = {.vkeycode = VK_DOWN,      .ctrl = true},
-		.gotoPrevDiagnostic   = {.vkeycode = VK_PRIOR,     .ctrl = true},
-		.gotoNextDiagnostic   = {.vkeycode = VK_NEXT,      .ctrl = true},
-
-		// text controller
-		.moveToPrevWord       = {.vkeycode = VK_LEFT,      .ctrl = true},
-		.moveToNextWord       = {.vkeycode = VK_RIGHT,     .ctrl = true},
-		.moveToLineStart      = {.vkeycode = VK_HOME},
-		.moveToLineEnd        = {.vkeycode = VK_END},
-		.moveToBufferStart    = {.vkeycode = VK_HOME,      .ctrl = true},
-		.moveToBufferEnd      = {.vkeycode = VK_END,       .ctrl = true},
-		.movePageUp           = {.vkeycode = VK_PRIOR},
-		.movePageDown         = {.vkeycode = VK_NEXT},
-
-		.selectBackward       = {.vkeycode = VK_LEFT,                    .shift = true},
-		.selectForward        = {.vkeycode = VK_RIGHT,                   .shift = true},
-		.selectLineUp         = {.vkeycode = VK_UP,                      .shift = true},
-		.selectLineDown       = {.vkeycode = VK_DOWN,                    .shift = true},
-		.selectToPrevWord     = {.vkeycode = VK_LEFT,      .ctrl = true, .shift = true},
-		.selectToNextWord     = {.vkeycode = VK_RIGHT,     .ctrl = true, .shift = true},
-		.selectToLineStart    = {.vkeycode = VK_HOME,                    .shift = true},
-		.selectToLineEnd      = {.vkeycode = VK_END,                     .shift = true},
-		.selectToBufferStart  = {.vkeycode = VK_HOME,      .ctrl = true, .shift = true},
-		.selectToBufferEnd    = {.vkeycode = VK_END,       .ctrl = true, .shift = true},
-		.selectPageUp         = {.vkeycode = VK_PRIOR,                   .shift = true},
-		.selectPageDown       = {.vkeycode = VK_NEXT,                    .shift = true},
-		.selectAll            = {.vkeycode = 'A',          .ctrl = true},
-		.selectLine           = {.vkeycode = 'L',          .ctrl = true, .shift = true},
-		.selectInBrackets     = {.vkeycode = 'B',          .ctrl = true, .shift = true},
-		.selectWord           = {.vkeycode = 'W',          .ctrl = true},
-
-		.deletePrevChar       = {.vkeycode = VK_BACK},
-		.deleteNextChar       = {.vkeycode = VK_DELETE},
-		.deletePrevWord       = {.vkeycode = VK_BACK,      .ctrl = true},
-		.deleteNextWord       = {.vkeycode = VK_DELETE,    .ctrl = true},
-		.deleteLine           = {.vkeycode = 'L',          .ctrl = true},
-
-		.indentLine           = {.vkeycode = VK_TAB},
-		.unindentLine         = {.vkeycode = VK_TAB,                    .shift = true},
-		.insertTab            = {.vkeycode = VK_TAB,       .ctrl = true},
-		.duplicateLine        = {.vkeycode = 'D',          .ctrl = true},
-
-		.undo                 = {.vkeycode = 'Z',          .ctrl = true},
-		.redo                 = {.vkeycode = 'Y',          .ctrl = true},
-		.cut                  = {.vkeycode = 'X',          .ctrl = true},
-		.copy                 = {.vkeycode = 'C',          .ctrl = true},
-		.paste                = {.vkeycode = 'V',          .ctrl = true},
-		.cutLines             = {.vkeycode = 'L',          .ctrl = true, .alt = true},
-		.lineComment          = {.vkeycode = 'K',          .ctrl = true},
-		.lineUncomment        = {.vkeycode = 'U',          .ctrl = true},
-		.blockComment         = {.vkeycode = 'K',          .ctrl = true, .alt = true},
-		.blockUncomment       = {.vkeycode = 'U',          .ctrl = true, .alt = true},
+	.keyBinds = {
+		{KeyEvent {.vkeycode = VK_OEM_COMMA, .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenFileSearch}},
+		{KeyEvent {.vkeycode = 'T',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenToolSearch}},
+		{KeyEvent {.vkeycode = 'P',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenCommandSearch}},
+		{KeyEvent {.vkeycode = VK_OEM_1,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
+		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleExplorer}},
+		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusNextPanel}},
+		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusPrevPanel}},
+		{KeyEvent {.vkeycode = VK_F10,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_SwapPanels}},
+		{KeyEvent {.vkeycode = VK_F11,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_ClosePanel}},
+		{KeyEvent {.vkeycode = VK_F12,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_CloseFile}},
+		{KeyEvent {.vkeycode = VK_F12,       .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ClosePanelAndFile}},
 		
-		.addCaretAbove        = {.vkeycode = VK_UP,        .ctrl = true, .alt = true},
-		.addCaretBelow        = {.vkeycode = VK_DOWN,      .ctrl = true, .alt = true},
-		.editCarets           = {.vkeycode = 'M',          .ctrl = true},
+		{KeyEvent {.vkeycode = VK_NEXT,      .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_GotoNextDiagnosticRecord}},
+		{KeyEvent {.vkeycode = VK_PRIOR,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_GotoPrevDiagnosticRecord}},
+		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_OpenInWindowsExplorer}},
 		
-		.explorerShellExecute          = {.vkeycode = 'Q', .ctrl = true},
-		.explorerOpenInWindowsExplorer = {.vkeycode = 'R', .ctrl = true, .shift = true},
-		.explorerNewFile               = {.vkeycode = 'N', .ctrl = true},
-		.explorerNewFolder             = {.vkeycode = 'N', .ctrl = true, .shift = true},
-		.explorerRename                = {.vkeycode = VK_F2},
+		{KeyEvent {.vkeycode = 'F',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = false}}}},
+		{KeyEvent {.vkeycode = 'H',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = true}}}},
+		{KeyEvent {.vkeycode = 'G',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenGotoLine}},
+		{KeyEvent {.vkeycode = VK_OEM_PLUS,  .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenDiagnosticsList}},
+		{KeyEvent {.vkeycode = 'I',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowSignatureHelp}},
+		{KeyEvent {.vkeycode = VK_SPACE,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowAutocomplete}},
+		{KeyEvent {.vkeycode = VK_F8,        .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowGotoLocation}},
+		{KeyEvent {.vkeycode = 'S',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_SaveFile}},
+		{KeyEvent {.vkeycode = VK_UP,        .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ScrollUp}},
+		{KeyEvent {.vkeycode = VK_DOWN,      .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ScrollDown}},
+		
+		{KeyEvent {.vkeycode = 'A',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectAll}},
+		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_SelectLine}},
+		{KeyEvent {.vkeycode = 'B',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectInBrackets}},
+		{KeyEvent {.vkeycode = 'W',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectWord}},
+		
+		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_DeleteLine}},
+		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_Text_IndentLine}},
+		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_UnIndentLine}},
+		//{KeyEvent {.vkeycode = 'K',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_CommentLine}},
+		{KeyEvent {.vkeycode = 'D',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_DuplicateLine}},
+		{KeyEvent {.vkeycode = 'D',          .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_SwapLines}},
+		
+		{KeyEvent {.vkeycode = 'Z',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_Undo}},
+		{KeyEvent {.vkeycode = 'Y',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_Redo}},
+		
+		{KeyEvent {.vkeycode = 'X',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Cut}},
+		{KeyEvent {.vkeycode = 'C',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Copy}},
+		{KeyEvent {.vkeycode = 'V',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Paste}},
+		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_Clipboard_CutLines}},
+		
+		{KeyEvent {.vkeycode = 'M',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_MultiCaret_ToggleEditMode}},
+		{KeyEvent {.vkeycode = VK_UP,        .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretAbove}},
+		{KeyEvent {.vkeycode = VK_DOWN,      .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretBelow}},
+		
+		{KeyEvent {.vkeycode = 'Q',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Explorer_ShellExecute}},
+		{KeyEvent {.vkeycode = 'N',          .modifiers = KM_Ctrl | KM_Shift},  Settings::KeyBind {.commandId = Command::Id_Explorer_NewDirectory}},
+		{KeyEvent {.vkeycode = VK_F2,        .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_Explorer_Rename}},
+		
+		{KeyEvent {.vkeycode = 'C',          .modifiers = KM_Ctrl | KM_Shift},  Settings::KeyBind {.commandId = Command::Id_ToolOutput_TerminateProcess}},
 	}
 };
 
@@ -506,6 +386,15 @@ Settings settings {
 // Brush Function
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+Command Settings::LookupKeyBind(KeyEvent ev) {
+	auto it = keyBinds.find(ev);
+	if (it == keyBinds.end()) return Command {Command::Id_None, nullptr};
+	
+	return Command {
+		.id = it->second.commandId,
+		.parameters = it->second.parameters.data()};
+}
 
 ID2D1SolidColorBrush* Settings::GetBrushDropShadow() {
 	brush->SetColor(colors.dropShadow.ToD2D());

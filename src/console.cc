@@ -812,6 +812,19 @@ void Console::OnUpdate() {
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Commands
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Input
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Console::OnResize(f32 newWidth, f32 newHeight) {
 	area = D2D_RECT_F {
 		.left = std::floor(mainWindow.width * 0.6f),
@@ -833,27 +846,21 @@ void Console::OnMouseWheel(f32 distance) {
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
-static void ActionGotoDiagnostic(Console* self, u64 newSelectedRecord) {
-
-}
-
-bool Console::OnKeyDown(KeyEvent event) {
-	if (event == settings.keybinds.gotoNextDiagnostic) {
+void Console::OnKeyDown(KeyEvent event, Command command) {
+	
+	if (command.id == Command::Id_GotoNextDiagnosticRecord) {
 		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
-		return true;
 		
-	} else if (event == settings.keybinds.gotoPrevDiagnostic) {
+	} else if (command.id == Command::Id_GotoPrevDiagnosticRecord) {
 		selectedDiagnosticsRecord = DecrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
-		return true;
 	
-	} else if (event == settings.keybinds.consoleTerminateProcess) {
+	} else if (command.id == Command::Id_ToolOutput_TerminateProcess) {
 		if (process) process->Terminate();
-		return true;
 	
-	} else if (event == settings.keybinds.consoleCopy) {
-		if (selectionStart == selectionEnd) return true;
+	} else if (command.id == Command::Id_Clipboard_Copy) {
+		if (selectionStart == selectionEnd) return;
 		
 		const std::string& startLine = lines[selectionStart.line];
 		const std::string& endLine   = lines[selectionEnd.line];
@@ -886,9 +893,7 @@ bool Console::OnKeyDown(KeyEvent event) {
 		
 		GlobalUnlock(hGlobal);
 		SetClipboardData(CF_TEXT, hGlobal);
-	}
-	
-	return false;
+	}	
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

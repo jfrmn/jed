@@ -90,7 +90,7 @@ void EditorSelectGotoType::OnUpdate() {
 
 bool EditorSelectGotoType::OnKeyDown(KeyEvent event) {
 
-	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.NoModifiers()) {
+	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
 		
 		selectedItem = event.vkeycode == VK_DOWN ?
 			IncrementWrapAround(selectedItem, static_cast<u64>(ITEM_COUNT)):
@@ -98,7 +98,7 @@ bool EditorSelectGotoType::OnKeyDown(KeyEvent event) {
 		
 		return true;
 	
-	} else if ((event.vkeycode == VK_RETURN) && event.NoModifiers()) {
+	} else if ((event.vkeycode == VK_RETURN) && event.modifiers == KM_None) {
 		if (!owner->language) return true;
 		
 		ASSERT(selectedItem >= 0u && selectedItem < ITEM_COUNT);

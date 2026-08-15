@@ -48,11 +48,12 @@ struct SearchBar {
 	void SetItemCount(u64 newItemCount);
 	
 	void OnUpdate();
+	
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) = 0;
 	
 	void OnResize();
 	void OnMouseWheel(f32 distance);
-	void OnKeyDown(KeyEvent event);
+	void OnKeyDown(KeyEvent event, Command command);
 	void OnChar(const char* data, u64 len);
 	
 	virtual void FilterItems(std::string_view text) = 0;

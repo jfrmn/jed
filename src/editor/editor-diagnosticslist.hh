@@ -22,7 +22,7 @@ struct EditorDiagnosticsList : public EditorToolWindow {
 	static EditorDiagnosticsList* Make(Editor* editor);
 	
 	virtual void OnUpdate() override;
-	virtual bool OnKeyDown(KeyEvent event) override;
+	virtual void OnKeyEvent(KeyEvent event, Command command) override;
 	
 	virtual bool IsDiagnosticsList() const override;
 };

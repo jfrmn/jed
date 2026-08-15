@@ -348,19 +348,18 @@ void ParameterConfigurator::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void ParameterConfigurator::OnKeyDown(KeyEvent event) {
+void ParameterConfigurator::OnKeyDown(KeyEvent event, Command command) {
 	
 	ASSERT(selectedItem <= itemCount);
 	Item* item = selectedItem == itemCount ? nullptr : &items[selectedItem];	
 	
-	if (event.vkeycode == VK_TAB && !event.ctrl && !event.alt) {
-		selectedItem = event.shift
+	if (event.vkeycode == VK_TAB && (event.modifiers & KM_Ctrl) != 0 && (event.modifiers & KM_Alt) != 0) {
+		selectedItem = (event.modifiers & KM_Shift) != 0
 			? DecrementWrapAround(selectedItem, itemCount+1)
 			: IncrementWrapAround(selectedItem, itemCount+1);
 		isDropDownOpen = true;
-		return;
 	
-	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.NoModifiers()) {
+	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
 		
 		// step through enum values
 		if (item && item->parameter->type == Parameter::Type_Enum && isDropDownOpen) {
@@ -377,9 +376,8 @@ void ParameterConfigurator::OnKeyDown(KeyEvent event) {
 				: IncrementWrapAround(selectedItem, itemCount+1);
 			isDropDownOpen = false;	
 		}
-		return;
 	
-	} else if ((event.vkeycode == VK_LEFT || event.vkeycode == VK_RIGHT) && event.NoModifiers()) {
+	} else if ((event.vkeycode == VK_LEFT || event.vkeycode == VK_RIGHT) && event.modifiers == KM_None) {
 		
 		// increment or decrement numbers
 		if (item && item->parameter->type == Parameter::Type_Number && !item->textBox.invalid) {
@@ -395,7 +393,6 @@ void ParameterConfigurator::OnKeyDown(KeyEvent event) {
 			    : std::min(number + 1, item->parameter->maxValue);
 			
 			item->textBox.SetText(std::to_string(number));
-			return;
 		
 		// switch between run and cancel
 		} else if (!item) {
@@ -406,31 +403,28 @@ void ParameterConfigurator::OnKeyDown(KeyEvent event) {
 		if (isCancelButtonSelected)     result = Result_Cancel;
 		else if (CheckParameters(this)) result = Result_Run;
 		else                            result = Result_Unfinished;
-		return;
-	}
 	
 	// pass through to textbox
-	if (item && item->HasTextBox()) {
-		const bool changed = item->textBox.OnKeyDown(event);
-		if (!changed) return;
-		const std::string_view text = item->textBox.GetText();		
-		
-		if (item->parameter->type == Parameter::Type_Number) {
+ 	} else if (item && item->HasTextBox()) {
+		bool changed = item->textBox.OnKeyDown(event, command);
+		if (changed) {
+			const std::string_view text = item->textBox.GetText();		
 			
-			s64 number = 0;
-			const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
+			if (item->parameter->type == Parameter::Type_Number) {
+				
+				s64 number = 0;
+				const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
+				
+				item->textBox.invalid = text.empty() ||
+					(result.ec != std::errc()) ||
+					number < item->parameter->minValue ||
+					number > item->parameter->maxValue;
 			
-			item->textBox.invalid = text.empty() ||
-				(result.ec != std::errc()) ||
-				number < item->parameter->minValue ||
-				number > item->parameter->maxValue;
-		
-		} else if (item->parameter->type == Parameter::Type_String) {
-			item->textBox.invalid = item->parameter->allowEmpty || !text.empty();
+			} else if (item->parameter->type == Parameter::Type_String) {
+				item->textBox.invalid = item->parameter->allowEmpty || !text.empty();
+			}
 		}
 	}
-	
-	return;
 }
 
 void ParameterConfigurator::OnChar(const char* data, u64 len) {

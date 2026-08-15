@@ -553,8 +553,8 @@ static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& fon
 					for (u32 iadv = 0; iadv < icharInChunk; iadv++)
 						currentAdvance += self->glyphAdvances[self->glyphCount + iadv];
 					
-					const u32 currentStopIndex = static_cast<u32>(currentAdvance / tabStopWidth);
-					const f32 nextStopPosition = (currentStopIndex + 1) * tabStopWidth;
+					const f32 currentStopIndex = currentAdvance / tabStopWidth;
+					const f32 nextStopPosition = (currentStopIndex + 1.0f) * tabStopWidth;
 					
 					const f32 advance = nextStopPosition - currentAdvance;
 					self->glyphAdvances[iglyphInRun] = advance;

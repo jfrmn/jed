@@ -190,3 +190,9 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 		
 	return true;
 }
+
+void ParameterDefinition::GetDefaultValues(std::span<ParameterDefinition> parameters, std::vector<ParameterValue>* values) {
+	values->reserve(parameters.size());
+	for (const ParameterDefinition& p : parameters)
+		values->push_back(p.defaultValue);
+}

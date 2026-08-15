@@ -104,8 +104,6 @@ struct Deferer {
 
 #define STATIC_ARRAY_SIZE(staticArray) sizeof(staticArray) / sizeof(staticArray[0])
 
-extern constexpr bool XOR(bool a, bool b);
-
 #define function_cast(signature, func) reinterpret_cast<signature>(reinterpret_cast<intptr_t>(func))
 
 #define DISALLOW_COPY_AND_ASSING(clazz)\

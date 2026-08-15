@@ -118,11 +118,11 @@ static void ValidateLineNumber(EditorGotoLine *self) {
 	self->textbox.invalid = (lineNumber < 1 || lineNumber > self->owner->GetBuffer().LineCount());
 }
 
-bool EditorGotoLine::OnKeyDown(KeyEvent event) {
+void EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
 	
 	if (event.vkeycode == VK_RETURN) {
 
-		if (textbox.invalid) return true;
+		if (textbox.invalid) return;
 
 		const u64 lineNumber = GetCurrentLineNumber(this) - 1; // adjust to 0-based
 		ASSERT(lineNumber > 0 && lineNumber < owner->GetBuffer().LineCount());
@@ -132,7 +132,7 @@ bool EditorGotoLine::OnKeyDown(KeyEvent event) {
 			ASSERT(owner->toolWindow == this);
 			owner->toolWindow = nullptr;
 			delete this;
-			return true;
+			return;
 		}
 
 		const TextBuffer::Line& line = owner->GetBuffer().GetLineAt(lineNumber);
@@ -143,27 +143,21 @@ bool EditorGotoLine::OnKeyDown(KeyEvent event) {
 
 		owner->textController.SetCaretPosition(TextPosition {lineNumber, lineStart});
 		owner->ScrollToLine(lineNumber);
-		return true;
+		return;
 	
 	}
 	
-	if (textbox.OnKeyDown(event)) {
-		ValidateLineNumber(this);
-		return false;
-	}
-	
-	return false;
+	const bool changed = textbox.OnKeyDown(event, command);
+	if (changed) ValidateLineNumber(this);
 }
 
-bool EditorGotoLine::OnChar(const char* data, u64 len) {
+void EditorGotoLine::OnChar(const char* data, u64 len) {
 		
-	if (len == 1 && (data[0] < '0' || data[0] > '9')) return true;
-	if (textbox.GetText().size() >= MAX_DIGITS) return true;
- 
-	if (textbox.OnChar(data, len))
-		ValidateLineNumber(this);
+	if (len == 1 && (data[0] < '0' || data[0] > '9')) return;
+	if (textbox.GetText().size() >= MAX_DIGITS) return;
 	
-	return true;
+	const bool changed = textbox.OnChar(data, len);
+	if (changed) ValidateLineNumber(this);	
 }
 
 bool EditorGotoLine::IsGotoLine() const {

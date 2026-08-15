@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <span>
 
 namespace toml { class node; }
 
@@ -15,7 +16,7 @@ struct ParameterValue {
 	};
 };
 	
-struct Parameter {
+struct ParameterDefinition {
 
 	//-----------------------------------------------------
 	// types
@@ -40,7 +41,7 @@ struct Parameter {
 	// data
 	//-----------------------------------------------------
 
-	Parameter::Type type = Parameter::Type_None;
+	ParameterDefinition::Type type = ParameterDefinition::Type_None;
 	
 	std::string name = {};
 	
@@ -59,5 +60,8 @@ struct Parameter {
 	// functions
 	//-----------------------------------------------------
 	
-	static bool FromToml(toml::node& node, /*out*/ Parameter* parameter);
+	static bool FromToml(toml::node& node, /*out*/ ParameterDefinition* parameter);
+	static void GetDefaultValues(std::span<ParameterDefinition> parameter, std::vector<ParameterValue>* values);
 };
+
+using Parameter = ParameterDefinition;

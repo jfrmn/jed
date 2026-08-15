@@ -50,7 +50,7 @@ void ToolSearchBar::AcceptItem(u64 item, const KeyEvent* event) {
 	ASSERT(item < filteredTools.size());
 	
 	const Tool& tool = Tool::tools[item];
-	if (tool.forceConfiguration || (event && event->ctrl)) {
+	if (tool.forceConfiguration || (event && (event->modifiers & KM_Ctrl) != 0)) {
 		ASSERT(!parameterConfigurator);
 		parameterConfigurator = ParameterConfigurator::Make(tool.parameters);
 		return;
