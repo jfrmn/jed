@@ -1188,7 +1188,7 @@ void Editor::OnMouseWheel(f32 distance) {
 
 void Editor::OnKeyEvent(KeyEvent event, Command command) {
 
-	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
+	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None && (toolWindow || editorCaretAttached)) {
 
 		if (toolWindow) {
 			delete toolWindow;
@@ -1197,8 +1197,9 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
 		} else if (editorCaretAttached) {
 		 	editorCaretAttached->RemoveReference();
 		 	editorCaretAttached = nullptr;
-		 	return;
 		
+		} else {
+			ASSERT_UNREACHABLE;
 		}
 	
 	} else if (toolWindow) {
