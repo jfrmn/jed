@@ -391,7 +391,7 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 			
 			const std::to_chars_result result = std::to_chars(buffer, buffer + bufferSize, recordCount);
 			if (result.ec != std::errc()) {
-				LogWarning("failed to convert diagnostics count: %. Error: %", recordCount, F(result));
+				LogWarning("failed to convert diagnostics count: %zu. Error: %s", recordCount, Str(result));
 				continue;
 			}
 			
@@ -479,7 +479,7 @@ static void AppendNumber(char* numberBuffer, CaretInfoText* info, u64 numberToFo
 	
 	const std::to_chars_result result = std::to_chars(numberBuffer, numberBuffer + NUMBER_BUFFER_SIZE, numberToFormat);
 	if (result.ec != std::errc {}) {
-		LogError("std::to_chars() failed. Error: %", F(result));
+		LogError("std::to_chars() failed. Error: %", Str(result));
 		return;
 	}
 	
@@ -632,7 +632,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		run.Draw(renderTarget, PADDING, PADDING, settings.fontUi, alphaMaskBrush);
 		
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
-			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
+			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", StrHr(hr));
 		
 		renderTarget->GetBitmap(&bitmapText);
 	}
@@ -660,7 +660,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		}
 			
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
-			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
+			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", StrHr(hr));
 		
 		renderTarget->GetBitmap(&bitmapColor);
 	}

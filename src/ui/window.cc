@@ -2,7 +2,7 @@
 #include "globals.hh"
 
 #include "graphics/factories.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/string-util.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -36,7 +36,7 @@ bool Window::Create(const CreateParams& createParams) {
 	
 	// @TODO see comment at WM_CHAR
 	if (!RegisterClassA(&wndc)) {
-		LogError("RegisterClass() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("RegisterClass() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 
@@ -52,7 +52,7 @@ bool Window::Create(const CreateParams& createParams) {
 		NULL);                                   // lparam for init-message
 
 	if (!hWnd) {
-		LogError("CreateWindow() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateWindow() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 
@@ -71,7 +71,7 @@ bool Window::Create(const CreateParams& createParams) {
 			D2D1::HwndRenderTargetProperties(hWnd, D2D1::SizeU(w, h)),
 			&hwndRenderTarget);
 			hr != S_OK) {
-		LogError("CreateHwndRenderTarget() failed. HRESULT: %", FHr(hr));
+		LogError("CreateHwndRenderTarget() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
@@ -79,7 +79,7 @@ bool Window::Create(const CreateParams& createParams) {
 	hwndRenderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
 	
 	if (HRESULT hr = hwndRenderTarget->QueryInterface(&deviceContext); hr != S_OK) {
-		LogError("QueryInterface() for ID2D1DeviceContext failed. HRESULT: %", FHr(hr));
+		LogError("QueryInterface() for ID2D1DeviceContext failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
@@ -89,7 +89,7 @@ bool Window::Create(const CreateParams& createParams) {
 			&useDarkMode,
 			sizeof(useDarkMode));
 			hr != S_OK) {
-		LogError("DwmSetWindowAttribute() failed. HRESULT: %", FHr(hr));
+		LogError("DwmSetWindowAttribute() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 	

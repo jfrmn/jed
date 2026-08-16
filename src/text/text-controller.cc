@@ -2,7 +2,7 @@
 #include "settings.hh"
 
 #include "editor/editor.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/string-util.hh"
 
 // need hWnd for Clipboard operations
@@ -1359,7 +1359,7 @@ static void CopyTextToClipboard(std::span<std::string_view> textsToCopy) {
 	ASSERT(!textsToCopy.empty());
 	
 	if (!OpenClipboard(mainWindow.hWnd)) {
-		LogError("OpenClipboard() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("OpenClipboard() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return;
 	}	
 	DEFER(CloseClipboard());
@@ -1382,7 +1382,7 @@ static void CopyTextToClipboard(std::span<std::string_view> textsToCopy) {
 		
 		HGLOBAL hMemory = GlobalAlloc(GMEM_MOVEABLE, dataMemorySize + headerMemorySize);
 		if (!hMemory) {
-			LogError("GlobalAlloc() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GlobalAlloc() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 	
@@ -1418,7 +1418,7 @@ static void CopyTextToClipboard(std::span<std::string_view> textsToCopy) {
 	
 		HGLOBAL hMemory = GlobalAlloc(GMEM_MOVEABLE, totalMemoryRequired);
 		if (!hMemory) {
-			LogError("GlobalAlloc() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GlobalAlloc() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 		
@@ -1573,7 +1573,7 @@ static void CommandPaste(TextController* self, TextChange** outChange) {
 	}
 		
 	if (!OpenClipboard(mainWindow.hWnd)) {
-		LogError("OpenClipboard() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("OpenClipboard() failed. Last Error: %", StrLastErr(GetLastError()));
 		return;
 	}
 	DEFER(CloseClipboard());
@@ -1584,13 +1584,13 @@ static void CommandPaste(TextController* self, TextChange** outChange) {
 		
 		HGLOBAL hMemory = GetClipboardData(cfMultiCaretText);
 		if (!hMemory) {
-			LogError("GetClipboardData() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GetClipboardData() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 		
 		const auto clipboardData = static_cast<const MultiCaretClipboardData*>(GlobalLock(hMemory));
 		if (!clipboardData) {
-			LogError("GLobalLock() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GLobalLock() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}		
 			
@@ -1610,13 +1610,13 @@ static void CommandPaste(TextController* self, TextChange** outChange) {
 		
 		HGLOBAL hMemory = GetClipboardData(CF_TEXT);
 		if (!hMemory) {
-			LogError("GetClipboardData() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GetClipboardData() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 			
 		const char* mem = static_cast<const char*>(GlobalLock(hMemory));
 		if (!mem) {
-			LogError("GLobalLock() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GLobalLock() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 	
@@ -1631,26 +1631,26 @@ static void CommandPaste(TextController* self, TextChange** outChange) {
 	} else {
 		HGLOBAL hMemory = GetClipboardData(CF_UNICODETEXT);
 		if (!hMemory) {
-			LogError("GetClipboardData() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GetClipboardData() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 			
 		const wchar* mem = static_cast<const wchar*>(GlobalLock(hMemory));
 		if (!mem) {
-			LogError("GLobalLock() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("GLobalLock() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 		DEFER(GlobalUnlock(hMemory));
 		
 		usize requiredSize = 0u;
 		if (!ToUtf8(mem, {}, &requiredSize)) {
-			LogError("failed to determine required size for utf-8 conversion. Last Error: %", FLastErr(GetLastError()));
+			LogError("failed to determine required size for utf-8 conversion. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 		
 		std::string utf8 (requiredSize, '\0');
 		if (!ToUtf8(mem, utf8, nullptr)) {
-			LogError("failed to convert to utf-8. Last Error: %", FLastErr(GetLastError()));
+			LogError("failed to convert to utf-8. Last Error: %s", StrLastErr(GetLastError()));
 			return;
 		}
 		

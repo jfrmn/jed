@@ -12,7 +12,6 @@
 #include "graphics/effects.hh"
 
 #include "util/rect-util.hh"
-#include "util/format.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -162,8 +161,10 @@ void EditorDiagnosticsList::OnUpdate() {
 		const f32 offset = PADDING + staticGlyphRun.width;
 		
 		char buffer[32] {'\0'};
-		const u64 size = FormatToBuffer(buffer, "% records", itemCount);
-		staticGlyphRun.Shape({buffer, size}, settings.fontUi);
+		const int size = sprintf_s(buffer, "%zu records", itemCount);
+		if (size < 0) return;
+		
+		staticGlyphRun.Shape({buffer, static_cast<u64>(size)}, settings.fontUi);
 		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText(false));
 	}
 	

@@ -6,7 +6,7 @@
 
 #include "ui/constants.h"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/rect-util.hh"
 
 bool TextBox::Init(Font* fontToUse, std::string_view placeholderText /*= {}*/, std::string initalText /*= {}*/) {

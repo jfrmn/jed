@@ -1,7 +1,7 @@
 #include "glyph-run.hh"
 #include "font.hh"
 #include "factories.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "text/text-buffer.hh"
 
 #include <atomic>
@@ -76,7 +76,7 @@ struct ShapingBuffer {
 		shapingGlyphDataCapacity = initialSize;
 		
 		if (HRESULT hr = dwFactory->CreateTextAnalyzer(&textAnalyzer); hr != S_OK) {
-			LogError("CreateTextAnalyzer() failed. HRESULT: %", FHr(hr));
+			LogError("CreateTextAnalyzer() failed. HRESULT: %", StrHr(hr));
 			return false;
 		}
 		
@@ -446,7 +446,7 @@ static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& fon
 	TextAnalysisSink textAnalysisSink {shapingBuffer};
 	
 	if (HRESULT hr = shapingBuffer->textAnalyzer->AnalyzeScript(&textAnalysisSource, 0, utf16Length, &textAnalysisSink); hr != S_OK) {
-		LogError("AnalyzeScript() failed. HRESULT: %", FHr(hr));
+		LogError("AnalyzeScript() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
@@ -491,13 +491,13 @@ static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& fon
 					return false;
 				}
 				
-				LogDetail("Shaping buffer too small. Retrying with %", newCapacity);
+				LogTrace("Shaping buffer too small. Retrying with %lu", newCapacity);
 				ReallocateGlyphs(self, static_cast<u32>(newCapacity));
 				shapingBuffer->ReallocateShapingGlyphData(static_cast<u32>(newCapacity));
 				continue; // try again
 	  		
 	  		} else {
-		  		LogError("GetGlpyhs() failed. HRESULT: %", FHr(hr));
+		  		LogError("GetGlpyhs() failed. HRESULT: %s", StrHr(hr));
 		  		return false;
 	  		}
   		}
@@ -523,7 +523,7 @@ static bool ShapeInternal(GlyphRun* self, std::string_view text, const Font& fon
 			/* glyphOffset */         shapingBuffer->glyphOffsets.get());
 			
 		if (hr != S_OK) {
-			LogError("GetGlyphPlacements() failed. HRESULT: %", FHr(hr));
+			LogError("GetGlyphPlacements() failed. HRESULT: %", StrHr(hr));
 	  		return false;
 		}
 		
@@ -662,7 +662,7 @@ static bool ShapeBatchInternal(const void* lineSource, std::string_view (*funcGe
 		
 		DWORD result = WaitForMultipleObjects(threadCount, handles, TRUE, INFINITE);
 		if (result != WAIT_OBJECT_0) {
-			LogError("ShapeBatch() failed. WaitForMultipleObjects() failed: %", FWaitRes(result));
+			LogError("ShapeBatch() failed. WaitForMultipleObjects() failed: %", StrWaitRes(result));
 			return false;
 		}
 		

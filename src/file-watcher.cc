@@ -1,5 +1,5 @@
 #include "file-watcher.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/string-util.hh"
 #include "main-window.hh"
 
@@ -42,7 +42,7 @@ struct WatchedDirectory {
 			/* lpCompletionRoutine */ CompletionRoutine);
 			
 		if (!res) {
-			LogWarning("ReadDirectoryChangesW() failed. Last Error: %", FLastErr(GetLastError()));
+			LogWarning("ReadDirectoryChangesW() failed. Last Error: %s", StrLastErr(GetLastError()));
 			return false;
 		}
 		
@@ -69,7 +69,7 @@ static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OV
 	
 	if (errorCode == ERROR_OPERATION_ABORTED) return;
 	if (errorCode != 0u) {
-		LogError("ReadDirectoryChangesW() completed with error-code: %", errorCode);
+		LogError("ReadDirectoryChangesW() completed with error-code: %u", errorCode);
 		return;
 	}
 	
@@ -162,7 +162,7 @@ static DWORD WINAPI ThreadProc(LPVOID userdata) {
 		if      (result == WAIT_IO_COMPLETION) continue;
 		else if (result == WAIT_OBJECT_0) break;
 		else {
-			LogError("WaitForSingleObject() in ThreadProc returned: %", FWaitRes(result));
+			LogError("WaitForSingleObject() in ThreadProc returned: %s", StrWaitRes(result));
 			return 1l;
 		}
 	}
@@ -185,7 +185,7 @@ bool FileWatcher::Init() {
 		/* lpName */            nullptr);
 		
 	if (!hEventExitThread) {
-		LogError("CreateEventA() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateEventA() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 		
@@ -193,7 +193,7 @@ bool FileWatcher::Init() {
 	
 	hThread = CreateThread(nullptr, 0, ThreadProc, this, 0, nullptr);
 	if (hThread == NULL) {
-		LogError("failed to create file-watcher thread. Last Error: %", FLastErr(GetLastError()));
+		LogError("failed to create file-watcher thread. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 	
@@ -206,7 +206,7 @@ void FileWatcher::Shutdown() {
 	
 	const u32 waitRes = WaitForSingleObject(hThread, 5000);
 	if (waitRes != WAIT_OBJECT_0)
-		LogWarning("file-watcher thread did not return in time. Result: %", FWaitRes(waitRes));
+		LogWarning("file-watcher thread did not return in time. Result: %s", StrWaitRes(waitRes));
 	
 	CloseHandle(hEventExitThread);
 	CloseHandle(hThread);
@@ -245,7 +245,7 @@ bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
 		/*hTemplateFile*/         NULL);
 	
 	if (hDir == INVALID_HANDLE_VALUE) {
-		LogError("CreateFile() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateFile() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 	
@@ -261,7 +261,7 @@ bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
 	
 	const DWORD ok = QueueUserAPC(StartReadingDirectoryChanges, hThread, reinterpret_cast<ULONG_PTR>(newWatchedDirectory));
 	if (ok == 0u) {
-		LogError("QueueUserAPC() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("QueueUserAPC() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 	
@@ -291,7 +291,7 @@ bool FileWatcher::UnsubscribeDirectoryOfFile(std::string_view filepath) {
 			
 			const DWORD ok = QueueUserAPC(CloseDirectory, hThread, reinterpret_cast<ULONG_PTR>(watchedDirectory));
 			if (ok == 0u) {
-				LogError("QueueUserAPC() failed. Last Error: %", FLastErr(GetLastError()));
+				LogError("QueueUserAPC() failed. Last Error: %s", StrLastErr(GetLastError()));
 				return false;
 			}
 			
@@ -299,7 +299,7 @@ bool FileWatcher::UnsubscribeDirectoryOfFile(std::string_view filepath) {
 		}
 	}
 	
-	LogError("directory '%' is not watched", filepath);
+	LogError("directory '%.*s' is not watched", SIZE_AND_DATA(filepath));
 	return false;
 }
 

@@ -3,7 +3,7 @@
 #include "parameter-configurator.hh"
 #include "main-window.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 
 ToolSearchBar* ToolSearchBar::Make() {
 	auto self = new ToolSearchBar();

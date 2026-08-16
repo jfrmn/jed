@@ -10,7 +10,7 @@
 #include "graphics/glyph-run.hh"
 #include "graphics/effects.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 
@@ -38,7 +38,7 @@ void EditorTextLocationList::OnUpdate() {
 	char currentPathBuffer[MAX_PATH + 1];
 	const u64 currentPathLength = GetCurrentDirectory(MAX_PATH, currentPathBuffer);
 	if (currentPathLength == 0u) {
-		LogError("GetCurrentDirectory() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("GetCurrentDirectory() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return;
 	}
 	
@@ -54,8 +54,8 @@ void EditorTextLocationList::OnUpdate() {
 		Item& item = items[i];
 		
 		const std::string label = item.selectionRange.start.line == item.selectionRange.end.line
-			? FormatString("%:%", item.filename, item.selectionRange.start.line)
-			: FormatString("%:%-%", item.filename, item.selectionRange.start.line, item.selectionRange.end.line);
+			? FormatString("%.*s:%zu",      SIZE_AND_DATA(item.filename), item.selectionRange.start.line)
+			: FormatString("%.*s:%zu-%zu", SIZE_AND_DATA(item.filename), item.selectionRange.start.line, item.selectionRange.end.line);
 		
 		const std::string_view directory = GetDirectoryFromPath(item.targetPath);
 		

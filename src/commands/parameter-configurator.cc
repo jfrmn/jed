@@ -4,7 +4,7 @@
 #include "main-window.hh"
 #include "settings.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/rect-util.hh"
 #include "ui/constants.h"
 #include "graphics/effects.hh"
@@ -39,7 +39,7 @@ ParameterConfigurator* ParameterConfigurator::Make(std::span<const Parameter> pa
 				initalValue = std::to_string(defaultValue.numberValue);
 				
 			if (!item.textBox.Init(&settings.fontUi, {}, std::move(initalValue))) {
-				LogError("failed to init textbox for parameter #%", i);
+				LogError("failed to init textbox for parameter #%u", i);
 				delete self;
 				return nullptr;
 			}

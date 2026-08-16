@@ -10,7 +10,7 @@
 #include "console.hh"
 #include "commands/tool-search-bar.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 
@@ -86,14 +86,14 @@ static bool LoadFileInformation(std::string_view path, /*out*/ BY_HANDLE_FILE_IN
 	
 	HANDLE hFile = CreateFileA(path.data(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("failed to open file '%'. LastError: %", path, FLastErr(GetLastError()));
+		LogError("failed to open file '%.*s'. LastError: %s", SIZE_AND_DATA(path), StrLastErr(GetLastError()));
 		return false;
 	}
 	
 	DEFER(CloseHandle(hFile));
 
 	if (!GetFileInformationByHandle(hFile, fileInfo)) {
-		LogError("GetFileInformationByHandle() failed. LastError: %", FLastErr(GetLastError()));
+		LogError("GetFileInformationByHandle() failed. LastError: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 		
@@ -224,7 +224,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 	if (u64 tabIndex = U64_MAX, panelIndex = U64_MAX;
 		FindEditor(this, path, &tabIndex, &panelIndex)) {
 		
-		LogInfo("file already open: '%'", path);
+		LogInfo("file already open: '%.*s'", SIZE_AND_DATA(path));
 		
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = true;
@@ -250,7 +250,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 	// file not already open...
 	//
 	} else {
-		LogInfo("opening file: '%'", path);
+		LogInfo("opening file: '%.*s'", SIZE_AND_DATA(path));
 		
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = false;
@@ -411,7 +411,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
 		IFileDialog* fileDialog = nullptr;
 		HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,  IID_PPV_ARGS(&fileDialog));
 		if (hr != S_OK) {
-			LogError("CoCreateInstance() failed. HRESULT: %", FHr(hr));
+			LogError("CoCreateInstance() failed. HRESULT: %", StrHr(hr));
 			return;
 		}
 		DEFER(fileDialog->Release());
@@ -424,14 +424,14 @@ static void OnClickStartPage(void* ud, u64 btn) {
 			LogInfo("User cancelled open file dialog.");
 			return;
 		} else if (hr != S_OK) {
-			LogError("Show() failed. HRESULT: %", FHr(hr));
+			LogError("Show() failed. HRESULT: %", StrHr(hr));
 			return;
 		}
 		
 		IShellItem* resultItem = nullptr;
 		hr = fileDialog->GetResult(&resultItem);
 		if (hr != S_OK) {
-			LogError("GetResult() failed. HRESULT: %", FHr(hr));
+			LogError("GetResult() failed. HRESULT: %", StrHr(hr));
 			return;
 		}
 		DEFER(resultItem->Release());
@@ -439,7 +439,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
 		wchar* wfilepath = nullptr;
   		hr = resultItem->GetDisplayName(SIGDN_FILESYSPATH, &wfilepath);
   		if (hr != S_OK) {
-  			LogError("GetDisplayName() failed. HRESULT: %", FHr(hr));
+  			LogError("GetDisplayName() failed. HRESULT: %", StrHr(hr));
 			return;
   		}
   		
@@ -451,7 +451,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
   		ToUtf8(wfilepath, {filepath.data(), filepath.size()}, nullptr);
   		CoTaskMemFree(wfilepath);
   		
-  		LogInfo("open dialog result: %", filepath);
+  		LogInfo("open dialog result: %.*s", SIZE_AND_DATA(filepath));
   		self->OpenEditor(std::move(filepath));
 	
 	} else if (btn == 3) { // open manual
@@ -466,8 +466,8 @@ static void FinishDrawing(MainWindow* self) {
 	const HRESULT hr = deviceContext->EndDraw();
 	if (hr == S_OK) return;
 	
-	const std::string errorString = FormatString("Rendering failed. HRESULT: %", FHr(hr));
-	LogError("%", errorString);
+	const std::string errorString = FormatString("Rendering failed. HRESULT: %s", StrHr(hr));
+	LogError("%s", errorString.c_str());
 	
 	HDC hDC = GetDC(self->hWnd);
 	
@@ -1031,7 +1031,7 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 		const FileChangeRecord& record = fileChangedEvent->records[i];
 		
 		const std::string_view fn {record.filename, record.filenameLength};
-		LogInfo("Action % -> %", static_cast<int>(record.action), fn);
+		LogInfo("Action %d -> %.*s", static_cast<int>(record.action), SIZE_AND_DATA(fn));
 				
 		memcpy(buffer + fileChangedEvent->directoryLength + 1u, record.filename, record.filenameLength);
 		const std::string_view recordFilepath {buffer, fileChangedEvent->directoryLength + 1u + record.filenameLength};

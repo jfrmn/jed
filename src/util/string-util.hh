@@ -1,6 +1,7 @@
 #pragma once
 #include "basic.hh"
 
+#include <string>
 #include <string_view>
 #include <span>
 #include <cctype>
@@ -96,6 +97,13 @@ struct FuzzyMatchResult {
 bool FuzzyMatch(std::string_view pattern, std::string_view fullText, /*out*/ FuzzyMatchResult* result);
 
 int CompareFuzzyMatchResults(const FuzzyMatchResult& lhs, const FuzzyMatchResult& rhs);
+
+//---------------------------------------------------------
+// String formatting
+//---------------------------------------------------------
+
+std::string FormatString(const char* fmt, ...);
+void FormatString(/*out*/ std::string* str, const char* fmt, ...);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 template <bool caseInsenstive>

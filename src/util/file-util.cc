@@ -1,6 +1,6 @@
 #include "file-util.hh"
 #include "basic.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -13,14 +13,14 @@ bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer) {
 
 	HANDLE hFile = CreateFileA(path.data(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("failed to open file '%'. LastError: %", path, FLastErr(GetLastError()));
+		LogError("failed to open file '%.*s'. LastError: %s", (int)path.size(), path.data(), StrLastErr(GetLastError()));
 		return false;
 	}
 
 	DWORD hiSize = 0;
 	const DWORD loSize = GetFileSize(hFile, &hiSize);
 	if (loSize == INVALID_FILE_SIZE) {
-		LogError("failed to obtain file size of '%'. LastError: %", path, FLastErr(GetLastError()));
+		LogError("failed to obtain file size of '%.*s'. LastError: %s", (int)path.size(), path.data(), StrLastErr(GetLastError()));
 		CloseHandle(hFile);
 		return false;
 	}
@@ -32,7 +32,7 @@ bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer) {
 
 	DWORD bytesRead = 0;
 	if (!ReadFile(hFile, buffer->data(), static_cast<u32>(size), &bytesRead, NULL)) {
-		LogError("ReadFile() failed. LastError: %", FLastErr(GetLastError()));
+		LogError("ReadFile() failed. LastError: %", StrLastErr(GetLastError()));
 		CloseHandle(hFile);
 		return false;
 	}
@@ -95,8 +95,8 @@ std::string MakeUriFromPath(std::string_view path) {
 				uri.append(buffer, buffer + 2u);
 			} else {
 				uri.push_back(charaterToEncode);
-				LogError("error converting path to uri: %\nfailed to encode characetrer '%' (%), Error: %",
-					orgPath, charaterToEncode, static_cast<int>(charaterToEncode), F(toCharsResult));
+				LogError("error converting path to uri: %.*s\nfailed to encode characetrer '%c' (%d), Error: %s",
+					(int)orgPath.size(), orgPath.data(), charaterToEncode, static_cast<int>(charaterToEncode), Str(toCharsResult));
 			}
 		}
 		
@@ -129,7 +129,7 @@ std::string MakePathFromUri(std::string_view uri) {
 		if (uri[pos] == '%') {
 			
 			if (pos > uri.size() - 3u) {
-				LogWarning("unexpected '%' in uri %. % chars before the end", '%', orgUri, pos);
+				LogWarning("unexpected '%' in uri %.*s. %zu chars before the end", SIZE_AND_DATA(orgUri), pos);
 				continue;
 			}
 			
@@ -140,10 +140,10 @@ std::string MakePathFromUri(std::string_view uri) {
 				path.push_back(characterToInsert);
 				
 			} else {
-				LogError("error converting uri to path: %\nfailed to decode special char '%'. Error: %", 
-					orgUri,
-					uri.substr(pos, 3u),
-					F(fromCharsRes));
+				LogError("error converting uri to path: %.*s\nfailed to decode special char '%.*s'. Error: %s", 
+					SIZE_AND_DATA(orgUri),
+					3, uri.data() + pos,
+					Str(fromCharsRes));
 				path.append(uri.substr(pos, 3u));
 			}
 			

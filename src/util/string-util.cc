@@ -290,3 +290,40 @@ int CompareFuzzyMatchResults(const FuzzyMatchResult& lhs, const FuzzyMatchResult
 			
 	return 0;
 }
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+static void FormatString(std::string* str, const char* fmt, va_list args) {
+	char buffer[64] {0};
+	const int len = vsprintf_s(buffer, fmt, args);
+	if (len < 0) {
+		const int required = vsnprintf(nullptr, 0, fmt, args);
+		if (required < 0) return;
+		
+		str->resize(static_cast<u64>(required));
+		vsprintf_s(str->data(), str->size(), fmt, args);
+	
+	} else {
+		str->resize(static_cast<u64>(len));
+		memcpy(str->data(), buffer, len);
+	}
+}
+
+
+std::string FormatString(const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	
+	std::string result;
+	FormatString(&result, fmt, args);
+	
+	va_end(args);
+	return result;
+}
+
+void FormatString(std::string* str, const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	FormatString(str, fmt, args);
+	va_end(args);
+}

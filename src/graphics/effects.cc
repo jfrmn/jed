@@ -3,7 +3,7 @@
 #include "ui/constants.h"
 #include "graphics/factories.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/rect-util.hh"
 #include "util/color.hh"
 
@@ -38,7 +38,7 @@ ID2D1SolidColorBrush* brush = nullptr;
 bool InitEffects(ID2D1DeviceContext* deviceContext) {
 	
 	if (HRESULT hr = deviceContext->CreateEffect(guidGaussianBlurEffect, &blurEffect); hr != S_OK) {
-		LogError("CreateEffect() failed for blur-effect, HRESULT: %", FHr(hr));
+		LogError("CreateEffect() failed for blur-effect, HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
@@ -47,7 +47,7 @@ bool InitEffects(ID2D1DeviceContext* deviceContext) {
 	blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
 		
 	if (HRESULT hr = deviceContext->CreateEffect(guidShadowEffect, &shadowEffect); hr != S_OK) {
-		LogError("CreateEffect() failed for shadow-effect, HRESULT: %", FHr(hr));
+		LogError("CreateEffect() failed for shadow-effect, HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
@@ -55,19 +55,19 @@ bool InitEffects(ID2D1DeviceContext* deviceContext) {
 	shadowEffect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, STANDARD_DEVIATION);
 	
 	if (HRESULT hr = deviceContext->CreateEffect(guidBlendEffect, &blendEffect); hr != S_OK) {
-		LogError("CreateEffect() failed for blend-effect, HRESULT: %", FHr(hr));
+		LogError("CreateEffect() failed for blend-effect, HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
 	blendEffect->SetValue(D2D1_BLEND_PROP_MODE, D2D1_BLEND_MODE_MULTIPLY);
 	
 	if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {0.0f, 0.0f, 0.0f, 1.0f}, &brush); hr != S_OK) {
-		LogError("CreateSolidColorBrush() failed for global brush. HRESULT: %", FHr(hr));
+		LogError("CreateSolidColorBrush() failed for global brush. HRESULT: %", StrHr(hr));
 		return false;
 	}
 
 	if (HRESULT hr = deviceContext->CreateSolidColorBrush(D2D_COLOR_F {1.0f, 1.0f, 1.0f, 1.0f}, &alphaMaskBrush); hr != S_OK) {
-		LogError("CreateSolidColorBrush() failed for alpha-mask-brush. HRESULT: %", FHr(hr));
+		LogError("CreateSolidColorBrush() failed for alpha-mask-brush. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
@@ -118,7 +118,7 @@ ID2D1Bitmap* CopyFromRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_R
 				.dpiX = dpiX,
 				.dpiY = dpiY},
 			&bitmap); hr != S_OK) {
-		LogError("CreateBitmap() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmap() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -130,7 +130,7 @@ ID2D1Bitmap* CopyFromRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_R
 		.bottom = static_cast<UINT32>(area.bottom) };
 	
 	if (HRESULT hr = bitmap->CopyFromRenderTarget(&copyDestination, deviceContext, &copySourceRect); hr != S_OK) {
-		LogError("CopyFromRenderTarget failed. HRESULT: %", FHr(hr));
+		LogError("CopyFromRenderTarget failed. HRESULT: %", StrHr(hr));
 		bitmap->Release();
 		return nullptr;
 	}
@@ -163,7 +163,7 @@ void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const 
 ID2D1BitmapRenderTarget* CreateCompatibleRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_SIZE_F& size) {
 	ID2D1BitmapRenderTarget* renderTarget = nullptr;
 	if (HRESULT hr = deviceContext->CreateCompatibleRenderTarget(size, &renderTarget); hr != S_OK) {
-		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", FHr(hr));
+		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -187,7 +187,7 @@ void PushLayer(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& boundingBox)
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D1_ROUNDED_RECT& boundingBox) {
 	ID2D1RoundedRectangleGeometry* geometry = nullptr;
 	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(boundingBox, &geometry); hr != S_OK) {
-		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", FHr(hr));
+		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", StrHr(hr));
 		return;
 	}
 			

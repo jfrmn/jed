@@ -1,16 +1,17 @@
 #include "regex.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 
-static constexpr u64 ERROR_BUFFER_SIZE = 128;
-static char errorBuffer[ERROR_BUFFER_SIZE] {0};
 
-static std::string_view GetErrorMessage(int errorNumber) {
-	memset(errorBuffer, 0, sizeof(char) * ERROR_BUFFER_SIZE);
-	const u64 len = pcre2_get_error_message(errorNumber, reinterpret_cast<unsigned char*>(errorBuffer), ERROR_BUFFER_SIZE);	
-	return std::string_view {errorBuffer, len};
+
+
+static const char* GetErrorMessage(int errorNumber) {
+	static char errorBuffer[128] {0};
+	memset(errorBuffer, 0, sizeof(errorBuffer));
+	pcre2_get_error_message(errorNumber, reinterpret_cast<unsigned char*>(errorBuffer), sizeof(errorBuffer));
+	return errorBuffer;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -102,7 +103,7 @@ bool Regex::Compile(std::string_view expression, /*out*/ RegexError* error) {
 	
 	errorNum = pcre2_pattern_info(code, PCRE2_INFO_CAPTURECOUNT, &captureGroupCount);
 	if (errorNum < 0) {
-		LogError("pcre2_pattern_info() failed. % %", errorNum, GetErrorMessage(errorNum));
+		LogError("pcre2_pattern_info() failed. %d %s", errorNum, GetErrorMessage(errorNum));
 		return false;
 	}
 	isOk = true;
@@ -110,7 +111,7 @@ bool Regex::Compile(std::string_view expression, /*out*/ RegexError* error) {
 	errorNum = pcre2_jit_compile(code, PCRE2_JIT_COMPLETE);
 	if (errorNum < 0) {
 		ASSERT(errorNum != PCRE2_ERROR_BADOPTION);
-		LogWarning("pcre2_jit_compile() failed. % %", errorNum, GetErrorMessage(errorNum));
+		LogWarning("pcre2_jit_compile() failed. %d %s", errorNum, GetErrorMessage(errorNum));
 	}
 	isJitCompiled = true;
 	
@@ -200,13 +201,10 @@ Regex::~Regex() noexcept {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-FormatArgument F(const RegexError& error) {
-	return FormatArgument {
-		.userdata = &error,
-		.Write = [] (const void* userdata, std::ostream* sink) {
-			auto error = static_cast<const RegexError*>(userdata);
-			*sink << error->code << ": " << error->message << " at pos " << error->position;
-		}
-	};
+const char* Str(const RegexError& error) {
+	static char buffer[128];
+	memset(buffer, 0, sizeof(buffer));
+	sprintf_s(buffer, "%d: %s at pos %zu", error.code, error.message.c_str(), error.position);
+	return buffer;
 }
 

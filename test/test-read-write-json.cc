@@ -3,7 +3,7 @@
 #include "language/json-helper.hh"
 #include <cJSON/cJSON.h>
 #include <string>
-#include <cstring>
+#include <ostream> // won't compile without this - idk why
 
 namespace Lsp = LanguageServerProtocol;
 

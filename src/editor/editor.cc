@@ -7,7 +7,7 @@
 #include "language/language.hh"
 #include "ui/constants.h"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 
@@ -84,19 +84,19 @@ static void UnloadFile(Editor* self) {
 	//
 	self->lastWriteTime = {};
 	
-	LogInfo("closed file: '%'", (!self->path.empty() ? self->path.c_str() : "(empty)"));
+	LogInfo("closed file: '%s'", (!self->path.empty() ? self->path.c_str() : "(empty)"));
 }
 
 static bool LoadFile(Editor* self) {
 	
-	LogInfo("opening file '%'", self->path);
+	LogInfo("opening file '%s'", self->path.c_str());
 	
 	//
 	// open file
 	//
 	HANDLE hFile = CreateFileA(self->path.data(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("failed to open file '%'. LastError: %", self->path, FLastErr(GetLastError()));
+		LogError("failed to open file '%s'. LastError: %s", self->path.c_str(), StrLastErr(GetLastError()));
 		return false;
 	}
 	DEFER(CloseHandle(hFile));
@@ -106,7 +106,7 @@ static bool LoadFile(Editor* self) {
 	//
 	s64 fileSize = 0u;
 	if (!GetFileSizeEx(hFile, reinterpret_cast<LARGE_INTEGER*>(&fileSize))) {
-		LogError("GetFileSizeEx() failed. LastError: %", FLastErr(GetLastError()));
+		LogError("GetFileSizeEx() failed. LastError: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 	
@@ -122,7 +122,7 @@ static bool LoadFile(Editor* self) {
 	const bool ok = ReadFile(hFile, buffer->data(), static_cast<u32>(fileSize), &numOfBytesRead, nullptr);
 	
 	ASSERT(numOfBytesRead == fileSize);
-	if (!ok) LogError("ReadFile() failed. Last Error: %", FLastErr(GetLastError()));
+	if (!ok) LogError("ReadFile() failed. Last Error: %s", StrLastErr(GetLastError()));
 	
 	self->textController.buffer.RecreateLines();
 	
@@ -209,7 +209,7 @@ bool Editor::SaveFile() {
 	if (!isDirty && !fileRemoved)
 		return true;
 
-	LogInfo("saving file '%'", path);
+	LogInfo("saving file '%s'", path.c_str());
 	
 	if (settings.backupFileBeforeSaving) {
 		// @TODO
@@ -217,7 +217,7 @@ bool Editor::SaveFile() {
 	
 	HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("CreateFile() failed '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+		LogError("CreateFile() failed '%s'. Last Error: %s", path.c_str(), StrLastErr(GetLastError()));
 		return false;
 	}
 	
@@ -236,7 +236,7 @@ bool Editor::SaveFile() {
 	
 	hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LogError("Failed to reopen file. CreateFile() failed '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+		LogError("Failed to reopen file. CreateFile() failed '%s'. Last Error: %s", path.c_str(), StrLastErr(GetLastError()));
 		return false;
 	}	
 	GetFileTime(hFile, nullptr, nullptr, &lastWriteTime);
@@ -263,7 +263,7 @@ void Editor::OnFileChanged(const FileChangeRecord* fileChangeRecord) {
 		
 		HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (hFile == INVALID_HANDLE_VALUE) {
-			LogError("CreateFileA() failed. '%'. Last Error: %", path.c_str(), FLastErr(GetLastError()));
+			LogError("CreateFileA() failed. '%s'. Last Error: %s", path.c_str(), StrLastErr(GetLastError()));
 			return;
 		}
 		DEFER(CloseHandle(hFile));
@@ -271,10 +271,10 @@ void Editor::OnFileChanged(const FileChangeRecord* fileChangeRecord) {
 		FILETIME currentLastWriteTime = {};
 		GetFileTime(hFile, nullptr, nullptr, &currentLastWriteTime);
 			
-		LogDetail("checking file modification for '%'...", path);
+		LogTrace("checking file modification for '%s'...", path.c_str());
 		
 		if (lastWriteTime.dwLowDateTime == currentLastWriteTime.dwLowDateTime && lastWriteTime.dwHighDateTime == currentLastWriteTime.dwHighDateTime) {
-			LogDetail("file was not modified.");
+			LogTrace("file was not modified.");
 			return;
 		}
 				
@@ -287,7 +287,7 @@ void Editor::OnFileChanged(const FileChangeRecord* fileChangeRecord) {
 				MB_ICONQUESTION | MB_YESNO);
 			
 			if (result == IDNO) {
-				LogDetail("file will not be reloaded");
+				LogTrace("file will not be reloaded");
 				lastWriteTime = currentLastWriteTime;
 				return;
 			}
@@ -805,7 +805,7 @@ void Editor::OnUpdate() {
 			
 			const HRESULT hr = settings.fontEditor.fontFace->GetGlyphIndices(digitChars, 10, digitGlyphIndicies);
 			if (hr != S_OK) {
-				LogError("failed render line numbers. GetGlyphIndices() failed. HRESULT: %", FHr(hr));
+				LogError("failed render line numbers. GetGlyphIndices() failed. HRESULT: %", StrHr(hr));
 				return;
 			}
 		}
@@ -898,7 +898,7 @@ void Editor::OnUpdate() {
 			}
 			
 			if (HRESULT hr = renderTargetText->EndDraw(); hr != S_OK) {
-				LogError("EndDraw() failed for renderTargetText. HRESULT: %", FHr(hr));
+				LogError("EndDraw() failed for renderTargetText. HRESULT: %", StrHr(hr));
 				return;
 			}
 
@@ -912,7 +912,7 @@ void Editor::OnUpdate() {
 		{
 			ID2D1BitmapRenderTarget* renderTargetColor = nullptr;
 			if (HRESULT hr = mainWindow.deviceContext->CreateCompatibleRenderTarget(textAreaSize, &renderTargetColor); hr != S_OK) {
-				LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", FHr(hr));
+				LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", StrHr(hr));
 				return;
 			}
 			DEFER(renderTargetColor->Release());
@@ -929,7 +929,7 @@ void Editor::OnUpdate() {
 			}
 			
 			if (HRESULT hr = renderTargetColor->EndDraw(); hr != S_OK) {
-				LogError("EndDraw() failed for renderTargetColor. HRESULT: %", FHr(hr));
+				LogError("EndDraw() failed for renderTargetColor. HRESULT: %", StrHr(hr));
 				return;
 			}
 
@@ -1236,7 +1236,6 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
 				LogError("EditorGotoLine::Make() failed");
 		}
 	
-	// @TODO keybind event.vkeycode == VK_OEM_PLUS && event.ctrl && !event.alt
 	} else if (command.id == Command::Id_Editor_OpenDiagnosticsList) {
 		
 		if (toolWindow && toolWindow->IsDiagnosticsList()) {

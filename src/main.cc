@@ -8,7 +8,7 @@
 
 #include "language/language.hh"
 #include "language/json-helper.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "file-watcher.hh"
  
 // @DUMMY
@@ -18,12 +18,12 @@
 static bool GetPerformanceFrequency(u64* ticksPerMs) {
 	LARGE_INTEGER freq;
 	if (!QueryPerformanceFrequency(&freq)) {
-		LogError("QueryPerformanceFrequency() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("QueryPerformanceFrequency() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 	
 	*ticksPerMs = (freq.QuadPart / 1000);
-	LogInfo("Performance Frequency: %/ms", *ticksPerMs);
+	LogInfo("Performance Frequency: %zu/ms", *ticksPerMs);
 	return true;
 }
 

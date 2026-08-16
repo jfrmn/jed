@@ -1,6 +1,6 @@
  #include "font.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/string-util.hh"
 
 #include "graphics/factories.hh"
@@ -17,7 +17,7 @@ bool Font::Init(const Description& desc) {
 	//
 	IDWriteFontCollection* fontCollection = nullptr;
 	if (auto hr = dwFactory->GetSystemFontCollection(&fontCollection); hr != S_OK) {
-		LogError("GetSystemFontCollection() failed. HRESULT: % ", FHr(hr));
+		LogError("GetSystemFontCollection() failed. HRESULT: % ", StrHr(hr));
 		return false;
 	}
 	DEFER(fontCollection->Release());;
@@ -85,7 +85,7 @@ bool Font::Init(const Description& desc) {
 				static_cast<DWRITE_FONT_STRETCH>(desc.stretch),
 				static_cast<DWRITE_FONT_STYLE>(desc.style),
 				&matchingFonts); hr != S_OK) {
-			LogError("GetMatchingFonts() failed. HRESULT: %", FHr(hr));
+			LogError("GetMatchingFonts() failed. HRESULT: %", StrHr(hr));
 			return false;
 		}
 
@@ -96,20 +96,20 @@ bool Font::Init(const Description& desc) {
 
 		IDWriteFont* dwfont = nullptr;
 		if (HRESULT hr = matchingFonts->GetFont(0, &dwfont); hr != S_OK) {
-			LogError("GetFont() failed. HRESULT: %", FHr(hr));
+			LogError("GetFont() failed. HRESULT: %", StrHr(hr));
 			return false;
 		}
 		DEFER(dwfont->Release());;
 
 		IDWriteFontFace* fontFace = nullptr;
 		if (HRESULT hr = dwfont->CreateFontFace(&fontFace); hr != S_OK) {
-			LogError("CreateFontFace() failed. HRESULT: %", FHr(hr));
+			LogError("CreateFontFace() failed. HRESULT: %", StrHr(hr));
 			return false;
 		}
 		DEFER(fontFace->Release());;
 
 		if (HRESULT hr = fontFace->QueryInterface(&fontFace1); hr != S_OK) {
-			LogError("QueryInterface() for IDWriteFontFace1 failed. HRESULT: %", FHr(hr));
+			LogError("QueryInterface() for IDWriteFontFace1 failed. HRESULT: %", StrHr(hr));
 			return false;
 		}
 	}

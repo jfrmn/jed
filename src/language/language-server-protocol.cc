@@ -33,7 +33,7 @@ template<class T>
 static void ReadJson(const cJSON* json, std::optional<T>* optionalValue) {
 	if (cJSON_IsNull(json)) return;
 	
-	if constexpr (typeid(T) != typeid(bool)) {
+	if constexpr (!std::is_same_v<T, bool>) {
 		if (cJSON_IsFalse(json)) return;
 		if (cJSON_IsTrue(json)) {
 			optionalValue->emplace();
@@ -818,4 +818,24 @@ void WriteJson(const Lsp::InitializedNotification* value, JsonWriteBuffer* write
 void WriteJson(const Lsp::ExitNotification* value, JsonWriteBuffer* writeBuffer) {
 	writeBuffer->WriteObjectStart();
 	writeBuffer->WriteObjectEnd();
+}
+
+const char* Str(Lsp::ErrorResponse::Code code) {
+	switch (code) {
+		case Lsp::ErrorResponse::Code_Success: return "Success";
+		case Lsp::ErrorResponse::Code_ClientParseError: return "ClientParseError";
+		case Lsp::ErrorResponse::Code_ClientInconclusiveMessage: return "ClientInconclusiveMessage";
+		case Lsp::ErrorResponse::Code_ParseError: return "ParseError";
+		case Lsp::ErrorResponse::Code_InvalidRequest: return "InvalidRequest";
+		case Lsp::ErrorResponse::Code_MethodNotFound: return "MethodNotFound";
+		case Lsp::ErrorResponse::Code_InvalidParams: return "InvalidParams";
+		case Lsp::ErrorResponse::Code_InternalError: return "InternalError";
+		case Lsp::ErrorResponse::Code_ServerNotInitialized: return "ServerNotInitialized";
+		case Lsp::ErrorResponse::Code_UnknownErrorCode: return "UnknownErrorCode";
+		case Lsp::ErrorResponse::Code_RequestFailed: return "RequestFailed";
+		case Lsp::ErrorResponse::Code_ServerCancelled: return "ServerCancelled";
+		case Lsp::ErrorResponse::Code_ContentModified: return "ContentModified";
+		case Lsp::ErrorResponse::Code_RequestCancelled: return "RequestCancelled";
+		default: return "??";
+	}
 }

@@ -1,5 +1,5 @@
 #include "language-server.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include <cJSON/cJSON.h>
 
@@ -20,11 +20,8 @@ static bool SendRequest(LanguageServer* self, const TReq& request, void* userdat
 			return false;
 	}
 	
-	Logger* prevLogger = SetActiveLogger(&self->logger);
-	DEFER(activeLogger = prevLogger);
-	
 	const u64 requestId = self->requestIdCounter++;
-	LogInfo("sending request % '%'", requestId, TReq::METHOD);
+	LogInfo(&self->logger, "sending request %zu '%s'", requestId, TReq::METHOD);
 
 	//
 	// place pending request
@@ -63,17 +60,22 @@ static bool SendRequest(LanguageServer* self, const TReq& request, void* userdat
 	//	
 	{
 		const std::string_view contentString = writeBuffer.GetString();
-		activeLogger->LogWithArgs(LogLevel_Detail, contentString, {});
+		LogTrace(&self->logger, "%.*s", SIZE_AND_DATA(contentString));
 
 		char headerBuffer[32] {};
-		const u64 headerSize = FormatToBuffer(headerBuffer, "Content-Length: %\r\n\r\n", contentString.length());
+		const int headerSize = sprintf_s(headerBuffer, "Content-Length: %zu\r\n\r\n", contentString.length());
+		if (headerSize < 0) {
+			LogError(&self->logger, "failed to format Content-Length");
+			return false;
+		}
+			
 	
 		bool res = true;
-		res &= self->process.WriteToStdin(std::string_view {headerBuffer, headerSize});
+		res &= self->process.WriteToStdin(std::string_view {headerBuffer, static_cast<u64>(headerSize)});
 		res &= self->process.WriteToStdin(contentString);
 	
 		if (!res) {
-			LogError("writing message failed");
+			LogError(&self->logger, "writing message failed");
 			self->pendingRequests.erase(requestId);
 			return false;
 		}
@@ -90,10 +92,7 @@ static bool SendNotification(LanguageServer* self, const TNotif& notification) {
 			return false;
 	}
 	
-	LogInfo("sending notification '%'", TNotif::METHOD);
-			
-	Logger* prevLogger = SetActiveLogger(&self->logger);
-	DEFER(activeLogger = prevLogger);
+	LogInfo(&self->logger, "sending notification '%s'", TNotif::METHOD);
 
 	char staticBuffer[STATIC_PRINT_BUFFER_SIZE] {0};	
 	JsonWriteBuffer writeBuffer {staticBuffer};
@@ -115,17 +114,21 @@ static bool SendNotification(LanguageServer* self, const TNotif& notification) {
 	//	
 	{
 		const std::string_view contentString = writeBuffer.GetString();
-		activeLogger->LogWithArgs(LogLevel_Detail, contentString, {});
+		LogTrace(&self->logger, "%.*s", SIZE_AND_DATA(contentString));
 
 		char headerBuffer[32] {};
-		const u64 headerSize = FormatToBuffer(headerBuffer, "Content-Length: %\r\n\r\n", contentString.length());
+		const int headerLen = sprintf_s(headerBuffer, "Content-Length: %zu\r\n\r\n", contentString.length());
+		if (headerLen < 0) {
+			LogError("formatting Content-Length failed");
+			return false;
+		}
 	
 		bool res = true;
-		res &= self->process.WriteToStdin(std::string_view {headerBuffer, headerSize});
+		res &= self->process.WriteToStdin(std::string_view {headerBuffer, static_cast<u64>(headerLen)});
 		res &= self->process.WriteToStdin(contentString);
 	
 		if (!res) {
-			LogError("writing message failed");
+			LogError(&self->logger, "writing message failed");
 			return false;
 		}
 	}
@@ -144,7 +147,7 @@ static bool ParseHeader(LanguageServer* self, std::string_view data, /*out*/ std
 			const std::from_chars_result fromCharsResult = std::from_chars(data.data(), data.data() + data.length(), header.contentLength);
 
 			if (fromCharsResult.ec != std::errc()) {
-				LogError("failed to parse content-length: %", data.substr(0, 100));
+				LogError(&self->logger, "failed to parse content-length: %", data.substr(0, 100));
 				return false;
 			}
 
@@ -181,7 +184,7 @@ static bool ProcessMessage(LanguageServer* self) {
 	const char* errpos = nullptr;
 	cJSON* json = cJSON_ParseWithLengthOpts(self->readBuffer.data(), self->readBuffer.size(), &errpos, false);
 	if (!json) {
-		LogError("failed to parse message (error at pos %):\n%", errpos - self->readBuffer.data(), self->readBuffer);
+		LogError(&self->logger, "failed to parse message (error at pos %d):\n%.*s", errpos - self->readBuffer.data(), SIZE_AND_DATA(self->readBuffer));
 		return false;
 	}
 	JsonObjectReader objectReader {json};
@@ -190,7 +193,7 @@ static bool ProcessMessage(LanguageServer* self) {
 	// response?
 	//
 	if (u64 requestId = 0u; objectReader.ReadUnsigned(Lsp::JSONRPC_ID, &requestId)) {
-		LogInfo("recieved response to %", requestId);
+		LogInfo(&self->logger, "recieved response to %zu", requestId);
 		
 		LanguageServer::PendingRequest pendingRequest;
 				
@@ -199,7 +202,7 @@ static bool ProcessMessage(LanguageServer* self) {
 			pendingRequest = std::move(node.mapped());
 		
 		} else {
-			LogError("no pending request for id %", requestId);
+			LogError(&self->logger, "no pending request for id %zu", requestId);
 			return false;
 		}
 
@@ -236,11 +239,11 @@ static bool ProcessMessage(LanguageServer* self) {
 	//
 	} else if (std::string_view method; objectReader.ReadString(Lsp::JSONRPC_METHOD, &method)) {
 
-		LogInfo("recieved notification '%'", method);
+		LogInfo(&self->logger, "recieved notification '%s'", method.data());
 		
 		const cJSON* jsonParams = objectReader.Get(Lsp::JSONRPC_PARAMS);
 		if (!jsonParams) {
-			LogError("notification is missing property 'params'");
+			LogError(&self->logger, "notification is missing property 'params'");
 			return false;
 		}
 		
@@ -254,12 +257,12 @@ static bool ProcessMessage(LanguageServer* self) {
 			return true;
 		
 		} else {
-			LogWarning("notification not supported");
+			LogWarning(&self->logger, "notification not supported");
 		}
 
 	// something went wrong
 	} else {
-		LogError("recieved json object has neither 'id' nor 'method'-property");
+		LogError(&self->logger, "recieved json object has neither 'id' nor 'method'-property");
 		return false;
 	}
 
@@ -278,11 +281,14 @@ static void OnInitResponse(void* userdata, Lsp::InitializeResponse* response, Ls
 	auto hEvent = static_cast<EventUserdata*>(userdata)->hEvent;
 
 	if (response) {
-		LogDetail("recieved initialize response");
+		LogTrace(&self->logger, "recieved initialize response");
 		self->initResponse = std::move(*response);
 	
 	} else {
-		LogError("initialize request failed: %", errorResponse);
+		LogError(&self->logger, "initialize request failed: %d (%s) %.*s",
+			errorResponse->code,
+			Str(static_cast<Lsp::ErrorResponse::Code>(errorResponse->code)),
+			SIZE_AND_DATA(errorResponse->message));
 	}
 
 	SetEvent(hEvent);
@@ -290,18 +296,15 @@ static void OnInitResponse(void* userdata, Lsp::InitializeResponse* response, Ls
 
 bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view languageName /*= {}*/) {
 
-	Logger* prevLogger = SetActiveLogger(&logger);
-	DEFER(activeLogger = prevLogger);
-
 	//
 	// init logger
 	//	
 	{
 		logger = Logger {
-			.level  = prevLogger->level,
+			.level  = ::logger.level,
 			.prefix = languageName,
-			.out    = prevLogger->out,
-			.mtx    = prevLogger->mtx };
+			.out    = ::logger.out,
+			.mtx    = ::logger.mtx };
 	}
 
 	//
@@ -311,12 +314,12 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 		process.observer = this;
 
 		if (!process.Start(std::move(startInfo))) {
-			LogError("init process failed.");
+			LogError(&logger, "init process failed.");
 			return false;
 		}
 	}
 
-	LogInfo("server initializing");
+	LogInfo(&logger, "server initializing");
 	state = State_Initializing;
 
 	//
@@ -332,7 +335,7 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 
 		HANDLE hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
 		if (!hEvent) {
-			LogError("CreateEvent() failed");
+			LogError(&logger, "CreateEvent() failed");
 			return false;
 		}
 		
@@ -341,14 +344,14 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 		EventUserdata userdata {this, hEvent};
 
 		if (!SendRequest(this, initRequest, &userdata, OnInitResponse)) {
-			LogError("sending init-request failed");
+			LogError(&logger, "sending init-request failed");
 			return false;
 		}
 
 		const auto res = WaitForSingleObject(hEvent, TIMEOUT_INIT_AND_SHUTDOWN_REQUESTS);
 
 		if (res != WAIT_OBJECT_0) {
-			LogWarning("waiting for initialize response failed: %", FWaitRes(res));
+			LogWarning(&logger, "waiting for initialize response failed: %s", StrWaitRes(res));
 			return false;
 		}
 	}
@@ -359,12 +362,12 @@ bool LanguageServer::Initialize(Process::StartInfo startInfo, std::string_view l
 	{
 		Lsp::InitializedNotification initNotification {};
 		if (!SendNotification(this, initNotification)) {
-			LogError("sending initiallaized notification failed");
+			LogError(&logger, "sending initiallaized notification failed");
 			return false;
 		}
 	}
 
-	LogInfo("server initalized");
+	LogInfo(&logger, "server initalized");
 	state = State_Running;
 	return true;
 }
@@ -374,7 +377,7 @@ static void OnShutdownResponse(void *ud, Lsp::ShutdownResponse *response, Lsp::E
 	auto hEvent = static_cast<EventUserdata*>(ud)->hEvent;
 
 	if (response) {
-		LogInfo("server shut down");
+		LogInfo(&self->logger, "server shut down");
 	} else {
 		//LogWarning("server shutdown failed: $", error);
 	}
@@ -384,7 +387,7 @@ static void OnShutdownResponse(void *ud, Lsp::ShutdownResponse *response, Lsp::E
 
 bool LanguageServer::Exit() {
 
-	LogInfo("shutting down...");
+	LogInfo(&logger, "shutting down...");
 	state = State_ShuttingDown;
 
 	//
@@ -393,7 +396,7 @@ bool LanguageServer::Exit() {
 	{
 		HANDLE hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
 		if (!hEvent) {
-			LogError("CreateEvent() failed");
+			LogError(&logger, "CreateEvent() failed");
 			return false;
 		}
 		
@@ -403,7 +406,7 @@ bool LanguageServer::Exit() {
 
 		Lsp::ShutdownRequest shutdownRequest {};
 		if (!SendRequest(this, shutdownRequest, &userdata, OnShutdownResponse)) {
-			LogError("sending shutdown request failed");
+			LogError(&logger, "sending shutdown request failed");
 			return false;
 		}
 
@@ -411,7 +414,7 @@ bool LanguageServer::Exit() {
 		CloseHandle(hEvent);
 
 		if (res != WAIT_OBJECT_0) {
-			LogWarning("waiting for shutdown response failed: %", FWaitRes(res));
+			LogWarning(&logger, "waiting for shutdown response failed: %s", StrWaitRes(res));
 			return false;
 		}
 	}
@@ -426,12 +429,12 @@ bool LanguageServer::Exit() {
 	{
 		Lsp::ExitNotification exitNotification;
 		if (!SendNotification(this, exitNotification)) {
-			LogError("sending exit-notification failed");
+			LogError(&logger, "sending exit-notification failed");
 			return false;
 		}
 	}
 
-	LogInfo("server exitied");
+	LogInfo(&logger, "server exitied");
 	return true;
 }
 
@@ -491,7 +494,7 @@ bool LanguageServer::SendGotoRequest(const Lsp::GotoImplementationRequest& reque
 void LanguageServer::OnStderr(std::string_view data) {
 	// @FIXME check if data actually ends with a linebreak
 	data.remove_suffix(2); // remove linebreak
-	LogInfo("[log] %", data);
+	LogInfo(&logger, "[log] %.*s", SIZE_AND_DATA(data));
 }
 
 void LanguageServer::OnStdout(std::string_view data) {
@@ -502,7 +505,10 @@ void LanguageServer::OnStdout(std::string_view data) {
 		std::string_view content {};
 		
 		if (!ParseHeader(this, data, content, header)) {
-			LogError("failed to parse header (% bytes):\n%", data.length(), data.substr(0, 100));
+			LogError(&logger, "failed to parse header (%zu bytes):\n%.*s",
+				data.length(),
+				static_cast<int>(std::min(data.size(), 100ull)),
+				data.data());
 			return;
 		}
 		
@@ -514,10 +520,9 @@ void LanguageServer::OnStdout(std::string_view data) {
 		readBuffer.append(data);
 	}
 
-	//ASSERT(readBuffer.size() <= expectedSize);
 	if (readBuffer.size() == expectedSize) {
 		
-		LogDetail("message recieved (length: %)\n%", readBuffer.size(), readBuffer);
+		LogTrace(&logger, "message recieved (length: %ull)\n%.*s", readBuffer.size(), SIZE_AND_DATA(readBuffer));
 		ProcessMessage(this);
 		
 		expectedSize = 0u;
@@ -527,7 +532,6 @@ void LanguageServer::OnStdout(std::string_view data) {
 }
 
 void LanguageServer::OnStarted() {
-	activeLogger = &logger;
 	JsonAllocator::activeAllocator = &jsonAllocator;
 }
 
@@ -536,7 +540,7 @@ void LanguageServer::OnExited(int exitCode) {
 	if (state != State_Exited)
 		state = State_Crashed;
 	
-	LogWarning("server exited unexpectedly (code: %)", exitCode);
+	LogWarning(&logger, "server exited unexpectedly (code: %d)", exitCode);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -3,7 +3,7 @@
 #include "events.hh"
 #include "settings.hh"
 #include "util/rect-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include <algorithm>
 
@@ -80,7 +80,7 @@ void Scrollarea::OnUpdate() {
 			//LogDevVar(mouse.dragArg);
 			
 			vpY = std::clamp(newVpY, 0.0f, max);
-			//LogDev("% - % - %", mouse.dragArg, newVpY, vpY);
+			//LogDev("%d - %d - %d", mouse.dragArg, (int)newVpY, (int)vpY);
 				
 		}
 	}

@@ -6,7 +6,7 @@
 #include "settings.hh"
 
 #include "util/rect-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include "graphics/effects.hh"
 #include "graphics/glyph-run.hh"
@@ -92,7 +92,7 @@ static void CancelSearch(EditorSearch* self) {
 
 		const DWORD res = WaitForSingleObject(self->hThread, 1500);
 		if (res != WAIT_OBJECT_0) {
-			LogWarning("cancling thread failed. Result: %", FWaitRes(res));
+			LogWarning("cancling thread failed. Result: %s", StrWaitRes(res));
 		}
 
 		CloseHandle(self->hThread);
@@ -119,7 +119,7 @@ static bool StartNewSearch(EditorSearch *self, std::string_view searchTerm) {
 	
 	self->hThread = CreateThread(NULL, 0, WorkerThread, self->threadData, 0, nullptr);
 	if (self->hThread == NULL) {
-		LogError("CreateThread() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateThread() failed. Last Error: %s", StrLastErr(GetLastError()));
 
 		delete self->threadData;
 		self->threadData = nullptr;
@@ -278,12 +278,15 @@ void EditorSearch::OnUpdate() {
 					.right  = area.left   + PADDING_X2 + settings.fontUi.lineHeight,
 					.bottom = area.bottom - PADDING });
 
-			const std::string text = (!threadData->isComplete)
-				? "searching..."
-				: FormatString("% results", threadData->results.size());
+			char textBuffer[32] {0};
+			if (!threadData->isComplete) {
+				strcpy_s(textBuffer, "searching...");
+			} else {
+				sprintf_s(textBuffer, "%zu results", threadData->results.size());
+			}
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
-				text,
+				std::string_view {textBuffer},
 				area.left   + settings.fontUi.lineHeight + PADDING_X2 + settings.fontUi.GetSpaceAdvance(),
 				area.bottom - settings.fontUi.lineHeight - PADDING,
 				settings.fontUi,
@@ -311,8 +314,8 @@ void EditorSearch::OnUpdate() {
 				
 				const SearchResult &result = threadData->results[i];
 				
-				char locationBuffer[32] {};
-				const u64 locationBufferLen = FormatToBuffer(locationBuffer, "%,%:", result.from.line, result.from.column);
+				char locationBuffer[32] {0};
+				const u64 locationBufferLen = sprintf_s(locationBuffer, "%zu:%zu", result.from.line, result.from.column);
 
 				if (maxLocationLength < locationBufferLen)
 					maxLocationLength = locationBufferLen;

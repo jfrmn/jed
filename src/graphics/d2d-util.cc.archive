@@ -1,6 +1,6 @@
 #include "d2d-util.hh"
 #include "factories.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/defer.hh"
 
 #include <algorithm>
@@ -27,14 +27,14 @@ ID2D1Bitmap* LoadBitmap(ID2D1RenderTarget* renderTarget, std::wstring_view fileP
 
 	IWICBitmapFrameDecode* frameDecode = nullptr;
 	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
-		LogError("failed to decode frame. HRESULT: %", FHr(hr));
+		LogError("failed to decode frame. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	DEFER_RELEASE(frameDecode);
 	
 	IWICFormatConverter* converter = nullptr;
 	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
-		LogError("CreateFormatConverter() failed. HRESULT: %", FHr(hr));
+		LogError("CreateFormatConverter() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	DEFER_RELEASE(converter);
@@ -48,20 +48,20 @@ ID2D1Bitmap* LoadBitmap(ID2D1RenderTarget* renderTarget, std::wstring_view fileP
 			nullptr,
 			0.0f,
 			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
-		LogError("failed to initialize converter. HRESULT: %", FHr(hr));
+		LogError("failed to initialize converter. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 
 	IWICBitmap* wicBitmap = nullptr;
 	if (HRESULT hr = wicFactory->CreateBitmapFromSource(converter, WICBitmapCreateCacheOption::WICBitmapCacheOnDemand, &wicBitmap); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	DEFER_RELEASE(wicBitmap);
 	
 	ID2D1Bitmap* bitmap = nullptr;
 	if (HRESULT hr = renderTarget->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
-		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", FHr(hr));
+		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 
@@ -84,7 +84,7 @@ ID2D1Bitmap* CopyFromRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_POI
 				.dpiX = dpiX,
 				.dpiY = dpiY},
 			&bitmap); hr != S_OK) {
-		LogError("CreateBitmap() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmap() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -96,7 +96,7 @@ ID2D1Bitmap* CopyFromRenderTarget(ID2D1RenderTarget* renderTarget, const D2D_POI
 		.bottom = static_cast<UINT32>(pos.y + size.height) };
 	
 	if (HRESULT hr = bitmap->CopyFromRenderTarget(&destination, renderTarget, &sourceRect); hr != S_OK) {
-		LogError("CopyFromRenderTarget failed. HRESULT: %", FHr(hr));
+		LogError("CopyFromRenderTarget failed. HRESULT: %", StrHr(hr));
 		bitmap->Release();
 		return nullptr;
 	}
@@ -109,7 +109,7 @@ ID2D1BitmapRenderTarget* MakeBitmapRenderTarget(ID2D1RenderTarget* renderTarget,
 		
 	ID2D1BitmapRenderTarget* bitmapRenderTarget = nullptr;
 	if (HRESULT hr = renderTarget->CreateCompatibleRenderTarget(desiredSize, &bitmapRenderTarget); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 
@@ -121,7 +121,7 @@ ID2D1SolidColorBrush* MakeSolidColorBrush(ID2D1RenderTarget* renderTarget, const
 	
 	ID2D1SolidColorBrush* brush = nullptr;
 	if (HRESULT hr = renderTarget->CreateSolidColorBrush(color,&brush); hr != S_OK) {
-		LogError("CreateSolidColorBrush() failed. HRESULT: %", FHr(hr));
+		LogError("CreateSolidColorBrush() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 
@@ -143,7 +143,7 @@ static ID2D1Effect* LoadEffect(ID2D1DeviceContext* deviceContext, const GUID& gu
 	
 	ID2D1Effect* effect = nullptr;
 	if (HRESULT hr = deviceContext->CreateEffect(guid, &effect); hr != S_OK) {
-		LogError("CreateEffect() failed. GUID: %, HRESULT: %", FGuid(guid), FHr(hr));
+		LogError("CreateEffect() failed. GUID: %, HRESULT: %", FGuid(guid), StrHr(hr));
 		return nullptr;
 	}
 
@@ -198,7 +198,7 @@ ID2D1RoundedRectangleGeometry* MakeRoundedRectGeometry(const D2D1_ROUNDED_RECT& 
 	
 	ID2D1RoundedRectangleGeometry* geometry = nullptr;
 	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(roundedRect, &geometry); hr != S_OK) {
-		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", FHr(hr));
+		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	

@@ -1,5 +1,5 @@
 #include "process.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -29,7 +29,7 @@ bool Process::StartDetached(StartInfo startInfo) {
 			NULL,
 			&startupInfo,
 			&processInfo)) {
-		LogError("CreateProcess() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateProcess() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 
@@ -53,17 +53,17 @@ bool Process::Start(StartInfo startInfo) {
 		securityAttributes.lpSecurityDescriptor = NULL;
 
 		if (!CreatePipe(&hPipeStdinRead, &hPipeStdinWrite, &securityAttributes, 0)) {
-			LogError("CreatePipe() failed for stdin. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreatePipe() failed for stdin. Last Error: %s",StrLastErr(GetLastError()));
 			return false;
 		}
 
 		if (!CreatePipe(&hPipeStdoutRead, &hPipeStdoutWrite, &securityAttributes, 0)) {
-			LogError("CreatePipe() failed for stdout. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreatePipe() failed for stdout. Last Error: %s",StrLastErr(GetLastError()));
 			return false;
 		}
 
 		if (!CreatePipe(&hPipeStderrRead, &hPipeStderrWrite, &securityAttributes, 0)) {
-			LogError("CreatePipe() failed for stderr. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreatePipe() failed for stderr. Last Error: %s",StrLastErr(GetLastError()));
 			return false;
 		}
 
@@ -97,7 +97,7 @@ bool Process::Start(StartInfo startInfo) {
 				NULL,
 				&startupInfo,
 				&processInfo)) {
-			LogError("CreateProcess() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreateProcess() failed. Last Error: %s",StrLastErr(GetLastError()));
 			return false;
 		}
 
@@ -124,7 +124,7 @@ bool Process::Start(StartInfo startInfo) {
 		hThreadReadStdout = CreateThread(NULL, 0, ReadThreadProc, &threadDataStdout, 0, &threadId);
 
 		if (hThreadReadStdout == NULL) {
-			LogError("CreateThread() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreateThread() failed. Last Error: %s",StrLastErr(GetLastError()));
 			TerminateProcess(hProcess, -1);
 			return false;
 		}
@@ -133,7 +133,7 @@ bool Process::Start(StartInfo startInfo) {
 		hThreadReadStderr = CreateThread(NULL, 0, ReadThreadProc, &threadDataStderr, 0, &threadId);
 
 		if (hThreadReadStderr == NULL) {
-			LogError("CreateThread() failed. Last Error: %", FLastErr(GetLastError()));
+			LogError("CreateThread() failed. Last Error: %s",StrLastErr(GetLastError()));
 			TerminateProcess(hProcess, -1);
 			return false;
 		}
@@ -163,7 +163,7 @@ bool Process::WriteToStdin(std::string_view data) {
 
 	ASSERT(numBytesWritten == data.length());
 	if (!res) {
-		LogError("WriteFile() to stdin of pid % failed. LastError: %", GetProcessId(hProcess), FLastErr(GetLastError()));
+		LogError("WriteFile() to stdin of pid % failed. LastError: %s",GetProcessId(hProcess), StrLastErr(GetLastError()));
 		return false;
 	}
 
@@ -261,7 +261,7 @@ static DWORD WINAPI ReadThreadProc(LPVOID userdata) {
 			
 			// some actual error occured
 			} else {
-				LogWarning("ReadFile() on % failed. Last Error: %", (isStdout ? "stdout" : "stderr"), FLastErr(lastError));
+				LogWarning("ReadFile() on %s failed. Last Error: %s", (isStdout ? "stdout" : "stderr"), StrLastErr(lastError));
 				return THREAD_EXIT_WITHERROR;
 			}
 		}

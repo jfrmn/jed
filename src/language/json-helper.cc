@@ -1,5 +1,5 @@
 #include "json-helper.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "settings.hh"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +110,7 @@ static void WriteNumber(JsonWriteBuffer* self, T value) {
 		return;
 	}
 	if (tcr.ec != std::errc()) {
-		LogError("to_chars() failed for value %. Error: %", value, F(tcr));
+		LogError("to_chars() failed for value %. Error: %", value, Str(tcr));
 		return;
 	}
 	
@@ -371,7 +371,7 @@ void JsonAllocator::Reset() {
 	nodesOccupied = 0u;
 	stringOccupied = 0u;
 	
-	LogDetail("allocator: node: %/% string: %/%  memblocks: %", statNodes, nodesCapacity, statString, stringCapacity, statMemblocks);
+	LogTrace("allocator: node: %lu/%lu string: %lu/%lu  memblocks: %lu", statNodes, nodesCapacity, statString, stringCapacity, statMemblocks);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -422,7 +422,7 @@ bool JsonExpectType(const cJSON* json, int types, /*out*/ std::string* errorStr 
 		.push_back(']');
 	
 	if (errorStr) *errorStr = std::move(errorString);
-	else LogError("json: '%' %", (json->string ? json->string : ""), errorString);
+	else LogError("json: '%s' %s", (json->string ? json->string : ""), errorString);
 	return false;
 }
 

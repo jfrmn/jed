@@ -5,8 +5,9 @@
 #include "ui/constants.h"
 #include "graphics/effects.hh"
 
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/rect-util.hh"
+#include "util/string-util.hh"
 
 #include <algorithm>
 
@@ -37,14 +38,14 @@ static void SetReadError(FilePreview* self, u32 lastErr) {
 	else if (lastErr == ERROR_LOCK_VIOLATION)
 		buffer->assign("File is locked");
 	else
-		FormatToString(buffer, "Error: %", FLastErr(lastErr));
+		FormatString(buffer, "Error: %s", StrLastErr(lastErr));
 		
-	LogWarning("file preview: %", *buffer);
+	LogWarning("file preview: %s", buffer->c_str());
 };
 
 bool FilePreview::Load(const LoadArgs& args) {
 
-	LogDetail("loading file preview for '%' in mode %", args.path, args.mode);
+	LogTrace("loading file preview for '%.*s' in mode %u", SIZE_AND_DATA(args.path), args.mode);
 
 	// reset prev. error
 	this->hasError = false;

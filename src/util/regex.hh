@@ -84,5 +84,5 @@ struct Regex {
 	~Regex() noexcept;
 };
 
-FormatArgument F(const RegexError& error);
+const char* Str(const RegexError& error);
 

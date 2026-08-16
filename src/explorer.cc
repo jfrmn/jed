@@ -6,7 +6,7 @@
 #include "util/file-util.hh"
 #include "util/rect-util.hh"
 #include "util/string-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include "ui/constants.h"
 #include "graphics/effects.hh"
@@ -34,8 +34,6 @@ constexpr float INSERT_ANIMATION_SPEED = 0.002f;
 
 constexpr float ACTIVE_ITEM_ANIMATION_MAX = (F32_PI * 2.0f) * 10.0f; // 10 cycles
 constexpr float ACTIVE_ITEM_ANIMATION_SPEED = 0.004f;
-
-static const char* LAYER = "Explorer";
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
@@ -122,7 +120,7 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 		
 		if (dirIt.Failed()) {
 			panel->activeItem = &panel->items.front();
-			LogError("failed to read directory '%'", directoryPath);
+			LogError("failed to read directory '%s'", directoryPath.c_str());
 			return false;
 		}
 	}
@@ -277,7 +275,7 @@ static void CommandCopyOrCut(Explorer* self, bool cut) {
 	}
 
 	if (!OpenClipboard(mainWindow.hWnd)) {
-		LogError("OpenClipboard() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("OpenClipboard() failed. Last Error: %s", StrLastErr(GetLastError()));
 		GlobalFree(hGlobalDropfiles);
 		GlobalFree(hGlobalDropEffect);
 		return;
@@ -312,7 +310,7 @@ static void CommandPaste(Explorer* self) {
 	}
 		
 	if (!OpenClipboard(mainWindow.hWnd)) {
-		LogError("OpenClipboard() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("OpenClipboard() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return;
 	}
 		
@@ -342,12 +340,12 @@ static void CommandPaste(Explorer* self) {
 					operation = FO_MOVE;
 						
 				} else {
-					LogError("Unrecognized prefered dropeffect: %", preferedDropEffect);
+					LogError("Unrecognized prefered dropeffect: %u", *preferedDropEffect);
 					return;
 				}
 					
 			} else {
-				LogWarning("GetClipboardData() failed. Last Error: %", FLastErr(GetLastError()));
+				LogWarning("GetClipboardData() failed. Last Error: %s", StrLastErr(GetLastError()));
 			}
 		}
 	}
@@ -357,13 +355,13 @@ static void CommandPaste(Explorer* self) {
 	//
 	HANDLE hDrop = GetClipboardData(CF_HDROP);
 	if (hDrop == NULL) {
-		LogError("GetClipboardData() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("GetClipboardData() failed. Last Error: %s", StrLastErr(GetLastError()));
 		return;
 	}
 	
 	const u8* memory = static_cast<const u8*>(GlobalLock(hDrop));
 	if (!memory) {
-		LogError("GlobalLock() returned null: %", FLastErr(GetLastError()));
+		LogError("GlobalLock() returned null: %s", StrLastErr(GetLastError()));
 		return;
 	}
 	
@@ -403,7 +401,7 @@ static void CommandPaste(Explorer* self) {
 	if (result != 0) {
 		// @TODO error handling could be improved
 		// see: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
-		LogError("SHFileOperation failed. Return code: %", FLastErr(result));
+		LogError("SHFileOperation failed. Return code: %s", StrLastErr(result));
 	}
 	
 	//
@@ -438,7 +436,7 @@ static void ActionDelete(Explorer* self) {
 	if (result != 0) {
 		// @TODO error handling could be improved
 		// see: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
-		LogError("SHFileOperation failed. Return code: %", FLastErr(result));
+		LogError("SHFileOperation failed. Return code: %s", StrLastErr(result));
 	}
 	
 	// @TODO: we calculate it twice: here and in CopyFilenamesOfSelectedItems
@@ -476,7 +474,7 @@ static void CommandShellExecute(Explorer* self) {
 			default: errorMsg = "(unknown)"; break;
 		}
 		
-		LogError("ShellExecuteA() failed: % %. Last Error: %", result, errorMsg, FLastErr(GetLastError()));
+		LogError("ShellExecuteA() failed: %ld %.*s. Last Error: %s", result, (int)errorMsg.size(), errorMsg.data(), StrLastErr(GetLastError()));
 	}
 }
 
@@ -501,7 +499,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 		buffer[length] = '\0';
 		
 		if (HRESULT hr = SHParseDisplayName(buffer, nullptr, &idlistBase, 0, nullptr); hr != S_OK) {
-			LogError("SHParseDisplayName() failed. HRESULT: %", FHr(hr));
+			LogError("SHParseDisplayName() failed. HRESULT: %s", StrHr(hr));
 			return;
 		}
 	}
@@ -516,7 +514,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 			nullptr, 
 			__uuidof(IShellFolder),
 			reinterpret_cast<void**>(&shellFolder)); hr != S_OK) {
-		LogError("SHBindToObject failed. HRESULT: %", FHr(hr));
+		LogError("SHBindToObject failed. HRESULT: %s", StrHr(hr));
 		return;
 	}
 	DEFER(shellFolder->Release());
@@ -526,7 +524,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 	//
 	IEnumIDList* enumIdList = nullptr;
 	if (HRESULT hr = shellFolder->EnumObjects(mainWindow.hWnd, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &enumIdList); hr != S_OK) {
-		LogError("IShellFolder::EnumObjects failed. HRESULT: %", hr);
+		LogError("IShellFolder::EnumObjects failed. HRESULT: %s", StrHr(hr));
 		return;
 	}
 	DEFER(enumIdList->Release());
@@ -554,7 +552,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 		
 		STRRET strret;
 		if (HRESULT hr = shellFolder->GetDisplayNameOf(childItemId, SHGDN_INFOLDER | SHGDN_FORPARSING, &strret); hr != S_OK) {
-			LogError("IShellFolder::GetDisplayNameOf failed. HRESULT: %", hr);
+			LogError("IShellFolder::GetDisplayNameOf failed. HRESULT: %s", StrHr(hr));
 			continue;
 		}
 			
@@ -597,7 +595,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 			} break;
 			
 			default: {
-				LogError("Unknown uType in STRRET: %", strret.uType);
+				LogError("Unknown uType in STRRET: %u", strret.uType);
 			} break;
 		}
 	}
@@ -610,7 +608,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 	// open the windows explorer
 	//
 	if (HRESULT hr = SHOpenFolderAndSelectItems(idlistBase, static_cast<UINT>(itemsToSelect.size()), itemsToSelect.data(), 0); hr != S_OK) {
-		LogError("SHOpenFolderAndSelectItems failed. HRESULT: %", hr);
+		LogError("SHOpenFolderAndSelectItems failed. HRESULT: %08x", hr);
 		return;
 	}
 }
@@ -648,11 +646,25 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 	ASSERT(self->newItemDialog);
 	
 	const std::string directoryPath = BuildPanelPath(self->activePanel);
-	const std::string targetPath = FormatString("%\\%", directoryPath, self->newItemDialog->textbox.GetText());
+	std::string targetPath;
+	{
+		const std::string_view filename = self->newItemDialog->textbox.GetText();
+		targetPath.reserve(directoryPath.size() + 1 + filename.size());
+		targetPath.append(directoryPath);
+		targetPath.push_back('\\');
+		targetPath.append(filename);
+	}
+			
 	
 	if (self->newItemDialog->isRename) {
 		
-		const std::string sourcePath = FormatString("%\\%", directoryPath, self->activePanel->activeItem->filename);
+		std::string sourcePath;
+		{
+			sourcePath.reserve(directoryPath.size() + 1 + self->activePanel->activeItem->filename.size());
+			sourcePath.append(directoryPath);
+			sourcePath.push_back('\\');
+			sourcePath.append(self->activePanel->activeItem->filename);
+		}
 		
 		SHFILEOPSTRUCTA fileOperation {
 			.hwnd = mainWindow.hWnd,
@@ -665,7 +677,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 		if (result != 0) {
 			// @TODO error handling could be improved
 			// see: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
-			LogError("SHFileOperation failed. Return code: %", FLastErr(result));
+			LogError("SHFileOperation failed. Return code: %s", StrLastErr(result));
 		}
 			
 	} else {
@@ -683,7 +695,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 			if (hFile == INVALID_HANDLE_VALUE) {
 				
 				const unsigned int lastErr = GetLastError();
-				LogWarning("CreateFileA failed: %", FLastErr(lastErr));
+				LogWarning("CreateFileA failed: %s", StrLastErr(lastErr));
 				
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				
@@ -701,7 +713,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 			
 			if (!ok) {
 				const unsigned int lastErr = GetLastError();
-				LogWarning("CreateDirectoryA failed: %", FLastErr(lastErr));
+				LogWarning("CreateDirectoryA failed: %s", StrLastErr(lastErr));
 				
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				

@@ -1,8 +1,9 @@
 #pragma once
-#include "language-server-protocol.hh"
-#include "json-helper.hh"
+#include "logging.hh"
+#include "language/language-server-protocol.hh"
+#include "language/json-helper.hh"
 #include "util/process.hh"
-#include "util/logging.hh"
+
 
 #include <atomic>
 #include <unordered_map>

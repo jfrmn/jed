@@ -1,5 +1,5 @@
 #include "tools.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -20,7 +20,7 @@ static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, 
 	auto valGroup = table->get_as<s64>(key);
 	if (!valGroup) return;
 	if (valGroup->get() >= regex.captureGroupCount + 1u || valGroup->get() < 0u) {
-		LogWarning("%: value is out of range. regex only provides % groups", F(valGroup->source()), regex.captureGroupCount + 1u);
+		LogWarning("%s: value is out of range. regex only provides %u groups", Str(valGroup->source()), regex.captureGroupCount + 1u);
 		return;
 	}
 			
@@ -31,7 +31,7 @@ bool Tool::LoadTools(toml::node* toml) {
 	
 	toml::array* array = toml->as_array();
 	if (!array) {
-		LogError("%: expected an array", F(toml->source()));
+		LogError("%s: expected an array", Str(toml->source()));
 		return false;
 	}
 	
@@ -40,7 +40,7 @@ bool Tool::LoadTools(toml::node* toml) {
 		
 		toml::table* tblTool = node.as_table();
 		if (!tblTool) {
-			LogError("%: expected a table", F(node.source()));
+			LogError("%s: expected a table", Str(node.source()));
 			continue;
 		}
 		
@@ -49,7 +49,7 @@ bool Tool::LoadTools(toml::node* toml) {
 		//
 		auto valName = tblTool->get_as<std::string>("name");
 		if (!valName) {
-			LogError("%: expected entry 'name' as string", F(tblTool->source()));
+			LogError("%s: expected entry 'name' as string", Str(tblTool->source()));
 			continue;
 		}
 		tool.name = std::move(valName->get());
@@ -59,7 +59,7 @@ bool Tool::LoadTools(toml::node* toml) {
 		//
 		auto valCommand = tblTool->get_as<std::string>("command");
 		if (!valCommand) {
-			LogError("%: expected entry 'command' as string", F(tblTool->source()));
+			LogError("%s: expected entry 'command' as string", Str(tblTool->source()));
 			continue;	
 		}
 		tool.command = std::move(valCommand->get());
@@ -127,7 +127,7 @@ bool Tool::LoadTools(toml::node* toml) {
 			else if (valOpenFlags->get() == "always")
 				tool.consoleOpenFlags = ConsoleOpenFlags::ConsoleOpenFlags_Always;
 			else
-				LogWarning("%: unknown open-console value '%'", F(valOpenFlags->source()), valOpenFlags->get());
+				LogWarning("%s: unknown open-console value '%.*s'", Str(valOpenFlags->source()), (int)valOpenFlags->get().size(), valOpenFlags->get().data());
 		}
 		
 		//
@@ -138,10 +138,10 @@ bool Tool::LoadTools(toml::node* toml) {
 			if (auto valRegex = tblProgress->get_as<std::string>("regex")) {
 				RegexError err;
 				const bool ok = tool.progress.regex.Compile(valRegex->get(), &err);
-				if (!ok) LogError("%: regex did not compile: %,", F(valRegex->source()), F(err));
+				if (!ok) LogError("%s: regex did not compile: %s", Str(valRegex->source()), err.message.c_str());
 				
 			} else {
-				LogWarning("%: expected entry 'regex' as string", F(valRegex->source()));
+				LogWarning("%s: expected entry 'regex' as string", Str(valRegex->source()));
 			}
 			
 			ReadRegexCaptureGroup(tblProgress, tool.progress.regex, "group-value", &tool.progress.captureGroupValue);
@@ -158,7 +158,7 @@ bool Tool::LoadTools(toml::node* toml) {
 				else if (valFormat->get() == "absolute")
 					tool.progress.format = Progress::Format_Absolute;
 				else
-					LogWarning("%: unknown format value: '%'", F(valFormat->source()), valFormat->get());
+					LogWarning("%s: unknown format value: '%.*s'", Str(valFormat->source()), (int)valFormat->get().size(), valFormat->get().data());
 			}
 			
 			if (auto valHideFromStatusBar = tblProgress->get_as<s64>("hide-from-status-bar"))
@@ -173,7 +173,7 @@ bool Tool::LoadTools(toml::node* toml) {
 			if (auto valRegex = tblDiagnostics->get_as<std::string>("regex")) {
 				RegexError err;
 				const bool ok = tool.diagnostics.regex.Compile(valRegex->get(), &err);
-				if (!ok) LogWarning("%: regex did not compile: %", F(valRegex->source()), F(err));
+				if (!ok) LogWarning("%s: regex did not compile: %s", Str(valRegex->source()), err.message.c_str());
 			}
 			
 			ReadRegexCaptureGroup(tblDiagnostics, tool.diagnostics.regex, "group-file", &tool.diagnostics.captureGroupFile);			

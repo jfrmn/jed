@@ -1,6 +1,6 @@
 #include "color.hh"
 #include "basic.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1
@@ -30,8 +30,8 @@ bool Color::FromToml(const toml::node& node, /*out*/ Color* color) {
 		const auto arr = node.as<toml::array>();
 		ASSERT(arr);
 		
-		if (arr->size() < 3) LogWarning("%: insufficient number of values (expected 3 or 4)", F(arr->source()));
-		if (arr->size() > 4) LogWarning("%: too many number of values (expected 3 or 4)", F(arr->source()));
+		if (arr->size() < 3) LogWarning("%s: insufficient number of values (expected 3 or 4)", Str(arr->source()));
+		if (arr->size() > 4) LogWarning("%s: too many number of values (expected 3 or 4)", Str(arr->source()));
 		if (arr->empty()) return false;
 				
 		for (u64 i = 0u; i < std::min(4llu, arr->size()); i++) {
@@ -44,7 +44,7 @@ bool Color::FromToml(const toml::node& node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				color->array[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", F(nodeValue->source()));
+				LogWarning("%s: invalid value type (should be int of float)", Str(nodeValue->source()));
 				color->array[i] = 0.0f;
 			}
 		}
@@ -62,7 +62,7 @@ bool Color::FromToml(const toml::node& node, /*out*/ Color* color) {
 			
 			if (!nodeValue) {
 				if (channelNames[i] != 'a')
-					LogWarning("%: missing entry '%'", F(tbl->source()), channelName);
+					LogWarning("%s: missing entry '%.*s'", Str(tbl->source()), (int)channelName.size(), channelName.data());
 				*channels[i] = 0.0f;
 			} else if (nodeValue->is_integer()) {
 				const s64 asInt = nodeValue->as_integer()->get();
@@ -70,7 +70,7 @@ bool Color::FromToml(const toml::node& node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				*channels[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", F(tbl->source()));
+				LogWarning("%s: invalid value type (should be int of float)", Str(tbl->source()));
 				*channels[i] = 0.0f;
 			}
 		}
@@ -88,12 +88,12 @@ bool Color::FromToml(const toml::node& node, /*out*/ Color* color) {
 		else if (clrName == "white") *color = Color {1.0f, 1.0f, 1.0f, 1.0f};
 		else if (clrName == "transparent") *color = Color {0.0f, 0.0f, 0.0f, 0.0f};
 		else {
-			LogError("%: unknown named color", F(node.source()));
+			LogError("%s: unknown named color", Str(node.source()));
 			return false;
 		}
 	
 	} else {
-		LogError("%: expected a table, array or string", F(node.source()));
+		LogError("%s: expected a table, array or string", Str(node.source()));
 		return false;
 	}
 	

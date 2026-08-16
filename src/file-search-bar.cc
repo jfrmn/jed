@@ -4,7 +4,7 @@
 #include "globals.hh"
 
 #include "util/file-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include <algorithm>
 
@@ -147,7 +147,7 @@ static void SearchDirectory(FileSearchBar::ThreadData* td, DirectoryIterator& it
 	}
 		
 	if (iterator.Failed())
-		LogError("failed to search directory: '%'. Last Error: %", iterator.GetSearchPath(), FLastErr(iterator.lastError));
+		LogError("failed to search directory: '%s'. Last Error: %s", iterator.GetSearchPath().data(), StrLastErr(iterator.lastError));
 }
 
 static DWORD WINAPI ThreadProc(LPVOID param) {
@@ -190,7 +190,7 @@ void FileSearchBar::FilterItems(std::string_view searchText) {
 	
 	hThread = CreateThread(NULL, 0, ThreadProc, threadData, 0, nullptr);
 	if (hThread == NULL) {
-		LogError("CreateThread() failed. Last Error: %", FLastErr(GetLastError()));
+		LogError("CreateThread() failed. Last Error: %s", StrLastErr(GetLastError()));
 		
 		delete threadData;
 		threadData = nullptr;

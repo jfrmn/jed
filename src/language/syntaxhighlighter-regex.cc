@@ -5,7 +5,7 @@
 #include "graphics/effects.hh"
 
 #include "editor/editor.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "text/text-buffer.hh"
 
 #define TOML_ABI_NAMESPACES 0
@@ -18,7 +18,7 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 	
 	toml::array* arrRules = toml->as_array();	
 	if (!arrRules) {
-		LogError("%: expected an array", F(toml->source()));
+		LogError("%s: expected an array", Str(toml->source()));
 		return false;
 	}
 	
@@ -28,19 +28,19 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 	for (toml::node& nodeRule : *arrRules) {
 		toml::table* table = nodeRule.as_table();
 		if (!table) {
-			LogWarning("%: expected a table", F(nodeRule.source()));
+			LogWarning("%s: expected a table", Str(nodeRule.source()));
 			continue;
 		}
 		
 		const toml::value<std::string>* regex = table->get_as<std::string>("regex");
 		if (!regex) {
-			LogWarning("%: 'regex' is missing", table->source());
+			LogWarning("%s: 'regex' is missing", table->source());
 			continue;
 		}
 		
 		Rule rule {};
 		if (RegexError error; !rule.regex.Compile(regex->get(), &error)) {
-			LogWarning("%: regex did not compile: %. Ignoring rule...", F(regex->source()), error.message);
+			LogWarning("%s: regex did not compile: %s. Ignoring rule...", Str(regex->source()), error.message.c_str());
 			continue;
 		}
 		
@@ -54,7 +54,7 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 			for (toml::node& node : *arrLabels) {
 				auto value = node.as_string();
 				if (!value) {
-					LogWarning("%: expected a string", F(node.source()));
+					LogWarning("%s: expected a string", Str(node.source()));
 					continue;
 				}
 				

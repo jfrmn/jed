@@ -1,8 +1,8 @@
 #pragma once
 #include "basic.hh"
-#include "util/format.hh"
 
 #include <string>
+#include <string_view>
 #include <vector>
 #include <optional>
 #include <array>
@@ -1025,4 +1025,4 @@ void WriteJson(const Lsp::InitializedNotification* value, JsonWriteBuffer* write
 void WriteJson(const Lsp::ExitNotification* value, JsonWriteBuffer* writeBuffer);
 
 // for logging
-//FormatArgument F(const Lsp::ErrorResponse* err);
+const char* Str(Lsp::ErrorResponse::Code code);

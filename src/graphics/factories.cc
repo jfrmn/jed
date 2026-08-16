@@ -1,6 +1,6 @@
 #include "factories.hh"
 #include "basic.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -25,22 +25,22 @@ bool InitFactories() {
 	options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 	
 	if (auto hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, options, &d2dFactory); hr != S_OK) {
-		LogError("D2D1CreateFactory() failed. HRESULT: %", FHr(hr));
+		LogError("D2D1CreateFactory() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&dwFactory); hr != S_OK) {
-		LogError("DWriteCreateFactory() failed. HRESULT: %", FHr(hr));
+		LogError("DWriteCreateFactory() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = CoInitialize(NULL); hr != S_OK) {
-		LogError("CoInitialize() failed. HRESULT: %", FHr(hr));
+		LogError("CoInitialize() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wicFactory)); hr != S_OK) {
-		LogError("Failed to create wicFactory! HRESULT: %", FHr(hr));
+		LogError("Failed to create wicFactory! HRESULT: %", StrHr(hr));
 		return false;
 	}
 
@@ -71,7 +71,7 @@ IWICStream* MakeWicStream() {
 	
 	IWICStream* stream = nullptr;
 	if (HRESULT hr = wicFactory->CreateStream(&stream); hr != S_OK) {
-		LogError("CreateStream() failed. HRESULT: %", FHr(hr));
+		LogError("CreateStream() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -84,13 +84,13 @@ IWICBitmapDecoder* MakeDecoder(IWICStream* stream /*= nullptr*/) {
 	
 	if (stream) {
 		if (HRESULT hr = wicFactory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder); hr != S_OK) {
-			LogError("CreateDecoderFromStream() failed. HRESULT: %", FHr(hr));
+			LogError("CreateDecoderFromStream() failed. HRESULT: %", StrHr(hr));
 			return nullptr;
 		}
 	
 	} else {
 		if (HRESULT hr = wicFactory->CreateDecoder(GUID_ContainerFormatPng, nullptr, &decoder); hr != S_OK) {
-			LogError("CreateDecoder() failed. HRESULT: %", FHr(hr));
+			LogError("CreateDecoder() failed. HRESULT: %", StrHr(hr));
 			return nullptr;
 		}
 	}
@@ -103,7 +103,7 @@ IWICFormatConverter* MakeFormatConverter() {
 
 	IWICFormatConverter* converter = nullptr;
 	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
-		LogError("CreateFormatConverter() failed. HRESULT: %", FHr(hr));
+		LogError("CreateFormatConverter() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -113,13 +113,13 @@ IWICFormatConverter* MakeFormatConverter() {
 ID2D1Bitmap* LoadBitmap(IWICStream* wicStream, IWICBitmapDecoder* decoder,  IWICFormatConverter* formatConverter, ID2D1RenderTarget* renderTarget, bool alphaOnly /*= false*/) {
 	
 	if (HRESULT hr = decoder->Initialize(wicStream, WICDecodeMetadataCacheOnDemand); hr != S_OK) {
-		LogError("decoder->Initialize() failed. HRESULT: %", FHr(hr));
+		LogError("decoder->Initialize() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
 	IWICBitmapFrameDecode* frameDecode = nullptr;
 	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
-		LogError("decoder->GetFrame() failed. HRESULT: %", FHr(hr));
+		LogError("decoder->GetFrame() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 
@@ -130,21 +130,21 @@ ID2D1Bitmap* LoadBitmap(IWICStream* wicStream, IWICBitmapDecoder* decoder,  IWIC
 			nullptr,
 			0.0f,
 			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
-		LogError("formatConverter->Initialize() failed. HRESULT: %", FHr(hr));
+		LogError("formatConverter->Initialize() failed. HRESULT: %", StrHr(hr));
 		frameDecode->Release();
 		return nullptr;
 	}
 	
 	IWICBitmap* wicBitmap = nullptr;
 	if (HRESULT hr = wicFactory->CreateBitmapFromSource(formatConverter, WICBitmapCreateCacheOption::WICBitmapCacheOnDemand, &wicBitmap); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", StrHr(hr));
 		frameDecode->Release();
 		return nullptr;
 	}
 	
 	ID2D1Bitmap* bitmap = nullptr;
 	if (HRESULT hr = renderTarget->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
-		LogError("CreateBitmapFromWicBitmap() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmapFromWicBitmap() failed. HRESULT: %", StrHr(hr));
 		frameDecode->Release();
 		wicBitmap->Release();
 		return nullptr;

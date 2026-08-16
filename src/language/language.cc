@@ -8,7 +8,7 @@
 #include "editor/editor-textlocationlist.hh"
 
 #include "util/file-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include <mutex>
 #include <string>
@@ -36,10 +36,11 @@ bool Language::LoadLanguages(std::string_view directory) {
 			continue;
 		
 		char pathBuffer[MAX_PATH] {};
-		const u64 pathLen = FormatToBuffer(pathBuffer, "%\\%\\language.toml", iter.GetSearchPath(), iter.filename);
+		const int pathLen = sprintf_s(pathBuffer, "%.*s\\%.*s\\language.toml", SIZE_AND_DATA(iter.GetSearchPath()), SIZE_AND_DATA(iter.filename));
+		ASSERT(pathLen >= 0)
 		
-		const std::string_view path {pathBuffer, pathLen};
-		LogDetail("reading language: '%'", path);
+		const std::string_view path {pathBuffer, static_cast<u64>(pathLen)};
+		LogTrace("reading language: '%.*s'", SIZE_AND_DATA(path));
 		
 		fileBuffer.clear();
 		if (!ReadEntireFile(path, &fileBuffer))
@@ -48,7 +49,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 		toml::parse_result parseResult = toml::parse(fileBuffer, path);
 		if (parseResult.failed()) {
 			const toml::parse_error& error = parseResult.error();
-			LogError("failed to parse toml %: %. Ignoring language...", F(error.source()), error.description());
+			LogError("failed to parse toml %s: %s. Ignoring language...", Str(error.source()), error.description());
 			continue;
 		}
 		
@@ -71,7 +72,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 			if (auto valCommand = nodeLanguageServer->get_as<std::string>("command")) {
 				language->serverStartInfo.commandLine = valCommand->get();
 			} else {
-				LogError("%: expected entry 'command' as string", F(nodeLanguageServer->source()));
+				LogError("%s: expected entry 'command' as string", Str(nodeLanguageServer->source()));
 				language->serverStartup = Startup_Never;
 				goto skip_startup;
 			}
@@ -81,7 +82,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 				else if (valStartup->get() == "manual") language->serverStartup = Startup_Manual;
 				else if (valStartup->get() == "on-file-open") language->serverStartup = Startup_OnFileOpen;
 				else if (valStartup->get() == "on-app-start") language->serverStartup = Startup_OnAppStart;
-				else LogWarning("%: unknwon startup value '%'", nodeLanguageServer->source(), valStartup->get());
+				else LogWarning("%s: unknwon startup value '%.*s'", Str(nodeLanguageServer->source()), SIZE_AND_DATA(valStartup->get()));
 			}
 		
 		skip_startup: __noop;
@@ -95,7 +96,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 				if (toml::value<std::string>* valEnding = arrBlockComment->get_as<std::string>(i))
 					language->fileEndings.push_back(std::move(valEnding->get()));
 				else
-					LogWarning("%: expected a string", valEnding->source());		
+					LogWarning("%s: expected a string", Str(valEnding->source()));
 			}
 		}
 		
@@ -115,7 +116,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 		if (auto nodeDefaultSyntaxHighlighter = tblLanguage.get_as<std::string>("default-syntax-highlight")) {
 			if      (nodeDefaultSyntaxHighlighter->get() == "none")  language->syntaxHighlighter = nullptr;
 			else if (nodeDefaultSyntaxHighlighter->get() == "regex") language->syntaxHighlighter = &language->syntaxHighlighterRegex;
-			else LogWarning("%: unknwon default-syntax-highlight value '%'", nodeDefaultSyntaxHighlighter->source(), nodeDefaultSyntaxHighlighter->get());
+			else LogWarning("%s: unknwon default-syntax-highlight value '%.*s'", Str(nodeDefaultSyntaxHighlighter->source()), SIZE_AND_DATA(nodeDefaultSyntaxHighlighter->get()));
 		}
 		
 		languages.push_back(std::move(language));
@@ -498,7 +499,7 @@ void Language::OnOpenFile(Editor* editor, std::string_view buffer) {
 					.commandLine = serverStartInfo.commandLine},
 				name)) {
 
-			LogError("failed to start language server for '%'", name);
+			LogError("failed to start language server for '%s'", name.c_str());
 			return;
 		}
 	}

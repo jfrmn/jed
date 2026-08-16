@@ -4,7 +4,7 @@
 
 #include "util/file-util.hh"
 #include "util/string-util.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #include "commands/tools.hh"
 
@@ -327,6 +327,8 @@ Settings settings {
 		{KeyEvent {.vkeycode = 'P',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenCommandSearch}},
 		{KeyEvent {.vkeycode = VK_OEM_1,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
 		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleExplorer}},
+		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_FocusNextTab}},
+		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_FocusPrevTab}},
 		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusNextPanel}},
 		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusPrevPanel}},
 		{KeyEvent {.vkeycode = VK_F10,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_SwapPanels}},
@@ -470,7 +472,7 @@ static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
 	
 	ID2D1BitmapRenderTarget* bitmapRenderTarget = nullptr;
 	if (HRESULT hr = deviceContext->CreateCompatibleRenderTarget({32.0f, 32.0f}, &bitmapRenderTarget); hr != S_OK) {
-		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", FHr(hr));
+		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -480,13 +482,13 @@ static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
 	bitmapRenderTarget->Clear(D2D1_COLOR_F {1.0f, 0.0f, 1.0f, 1.0f});
 		
 	if (HRESULT hr = bitmapRenderTarget->EndDraw(); hr != S_OK) {
-		LogError("EndDraw() failed. HRESULT: %", FHr(hr));
+		LogError("EndDraw() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 		
 	ID2D1Bitmap* dummyIcon = nullptr;
 	if (HRESULT hr = bitmapRenderTarget->GetBitmap(&dummyIcon); hr != S_OK) {
-		LogError("GetBitmap() failed. HRESULT: %", FHr(hr));
+		LogError("GetBitmap() failed. HRESULT: %", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -499,8 +501,8 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 		const auto arr = node->as<toml::array>();
 		ASSERT(arr);
 		
-		if (arr->size() < 3) LogWarning("%: insufficient number of values (expected 3 or 4)", node->source());
-		if (arr->size() > 4) LogWarning("%: too many number of values (expected 3 or 4)", node->source());
+		if (arr->size() < 3) LogWarning("%s: insufficient number of values (expected 3 or 4)", Str(node->source()));
+		if (arr->size() > 4) LogWarning("%s: too many number of values (expected 3 or 4)", Str(node->source()));
 		if (arr->empty()) return false;
 				
 		for (u64 i = 0u; i < std::min(4llu, arr->size()); i++) {
@@ -513,7 +515,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				color->array[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", nodeValue->source());
+				LogWarning("%s: invalid value type (should be int of float)", Str(nodeValue->source()));
 				color->array[i] = 0.0f;
 			}
 		}
@@ -531,7 +533,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			
 			if (!nodeValue) {
 				if (channelNames[i] != 'a')
-					LogWarning("%: missing entry '%'", tbl->source(), channelName);
+					LogWarning("%s: missing entry '%.*s'", Str(tbl->source()), (int)channelName.size(), channelName.data());
 				*channels[i] = 0.0f;
 			} else if (nodeValue->is_integer()) {
 				const s64 asInt = nodeValue->as_integer()->get();
@@ -539,7 +541,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 			} else if (nodeValue->is_floating_point()) {
 				*channels[i] = static_cast<f32>(nodeValue->as_floating_point()->get());
 			} else {
-				LogWarning("%: invalid value type (should be int of float)", tbl->source());
+				LogWarning("%s: invalid value type (should be int of float)", Str(tbl->source()));
 				*channels[i] = 0.0f;
 			}
 		}
@@ -557,12 +559,12 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 		else if (clrName == "white") *color = Color {1.0f, 1.0f, 1.0f, 1.0f};
 		else if (clrName == "transparent") *color = Color {0.0f, 0.0f, 0.0f, 0.0f};
 		else {
-			LogError("%: unknown named color", node->source());
+			LogError("%s: unknown named color", Str(node->source()));
 			return false;
 		}
 	
 	} else {
-		LogError("%: expected a table, array or string", node->source());
+		LogError("%s: expected a table, array or string", Str(node->source()));
 		return false;
 	}
 	
@@ -577,7 +579,7 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 	filePath[length] = '\0';
 
 	if (GetFileAttributesW(filePath) == INVALID_FILE_ATTRIBUTES) {
-		LogError("file does not exists: '%'", utf8Path);
+		LogError("file does not exists: '%s'", SIZE_AND_DATA(utf8Path));
 		return false;
 	}
 
@@ -590,14 +592,14 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 
 	IWICBitmapFrameDecode* frameDecode = nullptr;
 	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
-		LogError("failed to decode frame. HRESULT: %", FHr(hr));
+		LogError("failed to decode frame. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	DEFER(frameDecode->Release());
 	
 	IWICFormatConverter* converter = nullptr;
 	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
-		LogError("CreateFormatConverter() failed. HRESULT: %", FHr(hr));
+		LogError("CreateFormatConverter() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	DEFER(converter->Release());
@@ -609,20 +611,20 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 			nullptr,
 			0.0f,
 			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
-		LogError("failed to initialize converter. HRESULT: %", FHr(hr));
+		LogError("failed to initialize converter. HRESULT: %", StrHr(hr));
 		return false;
 	}
 
 	IWICBitmap* wicBitmap = nullptr;
 	if (HRESULT hr = wicFactory->CreateBitmapFromSource(converter, WICBitmapCreateCacheOption::WICBitmapNoCache, &wicBitmap); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %", FHr(hr));
+		LogError("CreateBitmapFromSource() failed. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	DEFER(wicBitmap->Release());
 	
 	ID2D1Bitmap* bitmap = nullptr;
 	if (HRESULT hr = deviceContext->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
-		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", FHr(hr));
+		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", StrHr(hr));
 		return false;
 	}
 	
@@ -637,7 +639,7 @@ static bool LoadIcon(const toml::node* node, ID2D1DeviceContext* deviceContext, 
 	
 	const toml::value<std::string>* value = node->as_string();
 	if (!value) {
-		LogError("%: expected a string", node->source());
+		LogError("%s: expected a string", Str(node->source()));
 		return false;
 	}
 	
@@ -649,7 +651,7 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	
 	toml::table* table = node->as_table();
 	if (!table) {
-		LogError("%: expected a table", node->source());
+		LogError("%s: expected a table", Str(node->source()));
 		return false;
 	}
 	
@@ -659,7 +661,7 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	if (toml::value<std::string>* valName = table->get_as<std::string>("name")) {
 		fontDescription.name = std::move(valName->get());
 	} else {
-		LogError("%: expected entry 'name' as string", F(table->source()));
+		LogError("%s: expected entry 'name' as string", Str(table->source()));
 		return false;
 	}
 	
@@ -669,7 +671,7 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	{
 		const toml::node* node = table->get("size");
 		if (!node) {
-			LogError("%: required entry 'size' not found", node->source());
+			LogError("%s: required entry 'size' not found", Str(node->source()));
 			return false;
 		}
 		
@@ -678,7 +680,7 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 		} else if (const auto* value = node->as_integer()) {
 			fontDescription.size = static_cast<f32>(value->get());
 		} else {
-			LogError("%: expected a float or int", node->source());
+			LogError("%s: expected a float or int", Str(node->source()));
 			return false;
 		}
 	}
@@ -720,9 +722,10 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	DEFER(dummyIcon->Release());
 	for (u64 i = 0u; i < NUM_ICONS; i++) {
 		char buffer[MAX_PATH] {0};
-		const u64 len = FormatToBuffer(buffer, "./assets/%.png", iconNames[i]);
+		const int len = sprintf_s(buffer, "./assets/%.*s.png", SIZE_AND_DATA(iconNames[i]));
+		ASSERT(len > 0);
 		
-		const bool ok = LoadIcon(std::string_view {buffer, len}, deviceContext, &iconArray[i]);
+		const bool ok = LoadIcon(std::string_view {buffer, static_cast<u64>(len)}, deviceContext, &iconArray[i]);
 		
 		// set to dummy icon if loading fail
 		if (!ok) {
@@ -742,13 +745,13 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	//
 	// parse file
 	//
-	LogInfo("loading settings from '%'", settingsFilepath);
+	LogInfo("loading settings from '%s'", settingsFilepath.c_str());
 	
 	toml::parse_result result = toml::parse_file(settingsFilepath);
 	
 	if (result.failed()) {
 		const toml::parse_error& error = result.error();
-		LogError("file parse settings file '%'\nerror: % at %", settingsFilepath, error.description(), error.source());
+		LogError("file parse settings file '%s'\nerror: %.*s at %s", settingsFilepath.c_str(), SIZE_AND_DATA(error.description()), Str(error.source()));
 		return false;
 	}
 

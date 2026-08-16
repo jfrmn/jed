@@ -4,7 +4,8 @@
 #include "settings.hh"
 
 #include "util/rect-util.hh"
-#include "util/logging.hh"
+#include "util/string-util.hh"
+#include "logging.hh"
 #include "util/string-util.hh"
 #include "util/diagnostics.hh"
 
@@ -98,7 +99,7 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 	if (self->toolParameterValues.size() < self->tool->parameters.size()) {
 		self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-			.message = FormatString("Not enough parameters provided. Expected % but got %", self->toolParameterValues.size(), self->tool->parameters.size())});
+			.message = FormatString("Not enough parameters provided. Expected %u but got %u", self->toolParameterValues.size(), self->tool->parameters.size())});
 		return false;
 	}
 			
@@ -134,7 +135,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 			
 			if (parameterIndex >= self->toolParameterValues.size()) {
 				self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-				 	.message  = FormatString("Parameter with index % not found (% parameters defined)", parameterIndex, self->toolParameterValues.size()),
+				 	.message  = FormatString("Parameter with index %u not found (%u parameters defined)", parameterIndex, self->toolParameterValues.size()),
 				 	.source   = self->tool->command,
 				 	.position = pos-1});
 				return false;
@@ -174,7 +175,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 			}
 			
 			self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-				.message  = FormatString("Parameter with name '%' not found", parameterName),
+				.message  = FormatString("Parameter with name '%.*s' not found", SIZE_AND_DATA(parameterName)),
 				.source   = self->tool->command,
 				.position = pos-1});
 			return false;
@@ -208,7 +209,7 @@ bool Console::StartProcess() {
 			return false;
 		}
 		
-		LogInfo("Running: %", commandLine);
+		LogInfo("Running: %s", commandLine.c_str());
 		
 		Process::StartInfo startInfo {
 			.application = {},
@@ -225,7 +226,7 @@ bool Console::StartProcess() {
 			process = nullptr;
 			toolDiagnostics.clear();
 			toolDiagnostics.push_back(ToolDiagnosticsRecord {
-				.message = FormatString("Failed to start process. Last Error: %", FLastErr(GetLastError()))});
+				.message = FormatString("Failed to start process. Last Error: %s", StrLastErr(GetLastError()))});
 			isOpen = true;
 			showToolDiagnostics = true;
 			return false;
@@ -904,7 +905,7 @@ void Console::OnKeyDown(KeyEvent event, Command command) {
 
 static void WarnMatchedTextParseErr(Console* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
 	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
-		.message  = FormatString("failed to parse matched text for capture group '%': '%'", groupName, F(fcr)),
+		.message  = FormatString("failed to parse matched text for capture group '%.*s': '%s'", SIZE_AND_DATA(groupName), Str(fcr)),
 		.source   = text,
 		.position = U64_MAX});
 }
@@ -915,7 +916,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 	RegexMatch match;
 	if (!self->tool->progress.regex.Match(*line, &match)) return;
 	if (self->tool->progress.captureGroupValue >= match.groupCount) {
-		LogError("capture group 'value' (index %) is out of range. Regex only provided only % capture groups", self->tool->progress.captureGroupValue, self->tool->progress.regex.captureGroupCount);
+		LogError("capture group 'value' (index %u) is out of range. Regex only provided only %u capture groups", self->tool->progress.captureGroupValue, self->tool->progress.regex.captureGroupCount);
 		return;
 	}
 	
@@ -962,7 +963,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 			self->progressText.assign("TOO LARGE");
 			
 		} else {
-			LogWarning("converting to precentage text failed. Error: %", F(tcr));
+			LogWarning("converting to precentage text failed. Error: %s", Str(tcr));
 			self->progressText.assign("ERROR");
 		}
 	
@@ -982,7 +983,7 @@ static void MatchProgress(Console* self, const std::string* line) {
 				self->progressText.append(buffer, resultToCh.ptr);
 			
 			} else {
-				LogWarning("converting to max text failed. Error: %", F(resultToCh));
+				LogWarning("converting to max text failed. Error: %s", Str(resultToCh));
 				self->progressText.append("ERROR");
 			}
 		}
@@ -1150,7 +1151,7 @@ void Console::OnStdout(std::string_view data) {
 void Console::OnStarted() {
 	std::scoped_lock lock {mtx};
 	
-	LogInfo("tool '%' started", tool->name);
+	LogInfo("tool '%.*s' started", SIZE_AND_DATA(tool->name));
 	
 	lines.emplace_back();
 	progressText = (tool->progress.format == Tool::Progress::Format_Percent)
@@ -1166,12 +1167,9 @@ void Console::OnStarted() {
 void Console::OnExited(int exitCode) {	
 	std::scoped_lock lock {mtx};
 	
-	LogInfo("tool '%' exited with code %", tool->name, exitCode);
+	LogInfo("tool '%.*s' exited with code %d", SIZE_AND_DATA(tool->name), exitCode);
 	
-	char buffer[32] {'\0'};
-	const u64 bufferLen = FormatToBuffer(buffer, "Exit %", exitCode);
-	
-	progressText.assign(buffer, bufferLen);
+	FormatString(&progressText, "Exit %d", exitCode);
 	
 	const u32 flagToTest = exitCode == 0
 		? tool->consoleOpenFlags & Tool::ConsoleOpenFlags_OnExitSuccess

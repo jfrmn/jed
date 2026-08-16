@@ -2,10 +2,8 @@
 #include "settings.hh"
 #include "editor/editor.hh"
 #include "graphics/effects.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "util/file-util.hh"
-
-#include <ostream>
 
 #include <tree_sitter/api.h>
 
@@ -22,13 +20,13 @@
 bool SyntaxHighlighterTreeSitter::FromToml(toml::node* toml) {
 	toml::table* table = toml->as_table();	
 	if (!table) {
-		LogError("%: expected a table", F(toml->source()));
+		LogError("%s: expected a table", Str(toml->source()));
 		return false;
 	}
 	
 	auto valLibrary = table->get_as<std::string>("library");
 	if (!valLibrary) {
-		LogError("%: expected entry 'library' as string", F(table->source()));
+		LogError("%s: expected entry 'library' as string", Str(table->source()));
 		return false;
 	}
 	this->modulePath = std::move(valLibrary->get());
@@ -36,7 +34,7 @@ bool SyntaxHighlighterTreeSitter::FromToml(toml::node* toml) {
 	auto valFunctionName  = table->get_as<std::string>("function-name");
 	if (!valFunctionName) {
 		this->modulePath.clear();
-		LogError("%: expected entry 'function-name' as string", F(table->source()));
+		LogError("%s: expected entry 'function-name' as string", Str(table->source()));
 		return false;
 	}
 	this->procName = std::move(valFunctionName->get());
@@ -48,7 +46,7 @@ bool SyntaxHighlighterTreeSitter::FromToml(toml::node* toml) {
 		LogInfo("both 'query-file' and 'query' specified. Concating...");
 		
 		if (!ReadEntireFile(valQueryFile->get(), &this->queryText))
-			LogError("%: failed to read query file", F(valQueryFile->source()));
+			LogError("%s: failed to read query file", Str(valQueryFile->source()));
 		
 		this->queryText.reserve(valQuery->get().size() + 1u);
 		this->queryText.push_back('\n');
@@ -56,13 +54,13 @@ bool SyntaxHighlighterTreeSitter::FromToml(toml::node* toml) {
 			
 	} else if (valQueryFile) {
 		if (!ReadEntireFile(valQueryFile->get(), &this->queryText))
-			LogError("%: failed to read query file", F(valQueryFile->source()));
+			LogError("%s: failed to read query file", Str(valQueryFile->source()));
 		
 	} else if (valQuery) {
 		this->queryText = std::move(valQuery->get());
 	
 	} else {
-		LogWarning("%: no query specified", F(table->source()));
+		LogWarning("%s: no query specified", Str(table->source()));
 	}
 		
 	return true;
@@ -94,13 +92,13 @@ static bool Init(SyntaxHighlighterTreeSitter* self) {
 	
 	HMODULE hModule = LoadLibraryA(self->modulePath.c_str());
 	if (!hModule) {
-		LogError("failed to load library: '%'. Last Error: %", self->modulePath, FLastErr(GetLastError()));
+		LogError("failed to load library: '%s'. Last Error: %s", self->modulePath.c_str(), StrLastErr(GetLastError()));
 		return false;
 	}
 	
 	FARPROC procAddr = GetProcAddress(hModule, self->procName.c_str());
 	if (!procAddr) {
-		LogError("failed to get proc address: '%'. Last Error: %", self->procName, FLastErr(GetLastError()));
+		LogError("failed to get proc address: '%s'. Last Error: %s", self->procName.c_str(), StrLastErr(GetLastError()));
 		FreeLibrary(hModule);
 		return false;
 	}
@@ -115,7 +113,7 @@ static bool Init(SyntaxHighlighterTreeSitter* self) {
 	u32 errorOffset = 0u; TSQueryError error = TSQueryErrorNone;
 	self->query = ts_query_new(self->language, self->queryText.data(), static_cast<u32>(self->queryText.size()), &errorOffset, &error);
 	if (!self->query) {
-		LogError("failed to create tree-sitter query: % at offset %", GetQueryErrorAsStr(error), errorOffset);
+		LogError("failed to create tree-sitter query: %s at offset %u", GetQueryErrorAsStr(error), errorOffset);
 		return false;
 	}
 	
@@ -163,18 +161,19 @@ static TSPoint ToTsPoint(TextPosition pt) {
 		.column = static_cast<u32>(pt.column)};
 }
 
-static FormatArgument F(const TSInputEdit& input) {
-	 return FormatArgument {
-		 .userdata = &input,
-		 .Write = [] (const void* ud, std::ostream* sink) {
-			 auto input = static_cast<const TSInputEdit*>(ud);
-			 (*sink) << '\n'
-			         << "sb: " << input->start_byte << " oeb: " << input->old_end_byte << " neb: " << input->new_end_byte << '\n'
-					 << "sp: " << input->start_point.row << ':' << input->start_point.column << '\n'
-					 << "oep: " << input->old_end_point.row << ':' << input->old_end_point.column << '\n'
-					 << "nep: " << input->new_end_point.row << ':' << input->new_end_point.column;
-		 }
-	};
+static const char* Str(const TSInputEdit& input) {
+	static char buffer[128];
+	memset(buffer, 0, sizeof(buffer));
+	sprintf_s(buffer, "Edit:\n"
+		"sb: %u oeb: %u neb: %u\n"
+		"sp: %u:%u\n"
+		"oep: %u:%u\n"
+		"nep: %u:%u",
+         input.start_byte, input.old_end_byte, input.new_end_byte,
+		 input.start_point.row, input.start_point.column,
+		 input.old_end_point.row, input.old_end_point.column,
+		 input.new_end_point.row, input.new_end_point.column);
+	return buffer;
 }
 
 #define DEBUG_LOG_TREESITTER 0
@@ -206,7 +205,7 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 				.new_end_point = ToTsPoint(operation.insertionEnd)};
 			ts_tree_edit(editor->tsTree, &tsEdit);
 #if DEBUG_LOG_TREESITTER
-			LogDev("edit: %", F(tsEdit));	
+			LogDev("edit: %s", Str(tsEdit));	
 #endif		
 		}
 		
@@ -222,7 +221,7 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 				.new_end_point = startPoint};
 			ts_tree_edit(editor->tsTree, &tsEdit);
 #if DEBUG_LOG_TREESITTER
-			LogDev("edit: %", F(tsEdit));
+			LogDev("edit: %s", Str(tsEdit));
 #endif
 		}
 	}
@@ -243,7 +242,7 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 		
 #if DEBUG_LOG_TREESITTER
 			const std::string_view resultForLogging {result, *bytesRead};
-			LogDev("read at %:% (b %) -> % b \"%\"", position.row, position.column, byteIndex, *bytesRead, resultForLogging);
+			LogDev("read at %u:%u (b %u) -> %u b \"%.*s\"", position.row, position.column, byteIndex, *bytesRead, SIZE_AND_DATA(resultForLogging));
 #endif
 			return result;
 		},

@@ -5,7 +5,7 @@
 #include "settings.hh"
 
 #include "ui/constants.h"
-#include "util/logging.hh"
+#include "logging.hh"
 #include "graphics/effects.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -106,7 +106,7 @@ static u64 GetCurrentLineNumber(EditorGotoLine* self) {
 	std::from_chars_result res = std::from_chars(text.data(), text.data() + text.size(), lineNumber);
 
 	if (res.ec != std::errc()) {
-		LogError("failed to parse line numnber '%'. Error: %", text, F(res));
+		LogError("failed to parse line numnber '%.*s'. Error: %s", (int)text.size(), text.data(), Str(res));
 		return 0;
 	}
 

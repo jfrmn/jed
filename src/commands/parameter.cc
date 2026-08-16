@@ -1,5 +1,5 @@
 #include "parameter.hh"
-#include "util/logging.hh"
+#include "logging.hh"
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1
@@ -15,7 +15,7 @@ std::string_view Parameter::EnumValue::GetValue() const {
 bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 	toml::table* table = node.as_table();
 	if (!table) {
-		LogError("%: expected an array", F(table->source()));
+		LogError("%s: expected an array", Str(table->source()));
 		return false;
 	}
 	
@@ -24,7 +24,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 	//
 	auto valType = table->get_as<std::string>("type");
 	if (!valType) {
-		LogError("%: expected entry 'type' as string", F(table->source()));
+		LogError("%s: expected entry 'type' as string", Str(table->source()));
 		return false;
 	}
 	
@@ -35,7 +35,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 	else if (valType->get() == "bool")   parameter->type = Parameter::Type_Bool;
 	else if (valType->get() == "path")   parameter->type = Parameter::Type_Path;
 	else {
-		LogError("%: unknown parameter type: '%'", F(valType->source()), valType->get());
+		LogError("%s: unknown parameter type: '%.*s'", Str(valType->source()), (int)valType->get().size(), valType->get().data());
 		return false;
 	}
 	
@@ -44,7 +44,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 	//
 	auto valName = table->get_as<std::string>("name");
 	if (!valName) {
-		LogError("%: expected entry 'name' as string", F(table->source()));
+		LogError("%s: expected entry 'name' as string", Str(table->source()));
 		return false;
 	}
 	parameter->name = std::move(valName->get());
@@ -74,7 +74,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 					.value = std::move(valValue->get())});
 			}
 		} else {
-			LogWarning("%: expected an array or a table", F(table->source()));
+			LogWarning("%s: expected an array or a table", Str(table->source()));
 		}
 	}
 	
@@ -84,33 +84,33 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 	if (auto valEmpty = table->get_as<bool>("allow-empty")) {
 		parameter->allowEmpty = valEmpty->get();
 		if (parameter->type != Parameter::Type_String)
-			LogWarning("%: entry is only valid on string parameters", F(valEmpty->source()));
+			LogWarning("%s: entry is only valid on string parameters", Str(valEmpty->source()));
 	}
 	
 	if (auto valMax = table->get_as<s64>("max-value")) {
 		parameter->maxValue = valMax->get();
 		if (parameter->type != Parameter::Type_Number)
-			LogWarning("%: entry is only valid on number parameters", F(valMax->source()));
+			LogWarning("%s: entry is only valid on number parameters", Str(valMax->source()));
 	}
 		
 	if (auto valMin = table->get_as<s64>("min-value")) {
 		parameter->minValue = valMin->get();
 		if (parameter->type != Parameter::Type_Number)
-			LogWarning("%: entry is only valid on number parameters", F(valMin->source()));
+			LogWarning("%s: entry is only valid on number parameters", Str(valMin->source()));
 	}
 	
 	if (auto valIfTrue = table->get_as<std::string>("if-true")) {
 		parameter->ifTrue = std::move(valIfTrue->get());
 		parameter->hasIfTrue = true;
 		if (parameter->type != Parameter::Type_Bool)
-			LogWarning("%: entry is only valid on boolean parameters", F(valIfTrue->source()));
+			LogWarning("%s: entry is only valid on boolean parameters", Str(valIfTrue->source()));
 	}
 		
 	if (auto valIfFalse = table->get_as<std::string>("if-false")) {
 		parameter->ifFalse = std::move(valIfFalse->get());
 		parameter->hasIfFalse = true;
 		if (parameter->type != Parameter::Type_Bool)
-			LogWarning("%: entry is only valid on boolean parameters", F(valIfFalse->source()));
+			LogWarning("%s: entry is only valid on boolean parameters", Str(valIfFalse->source()));
 	}
 		
 	//
@@ -122,7 +122,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 			case Type_String: {
 				auto valDefault = nodeDefault->as<std::string>();
 				if (!valDefault) {
-					LogWarning("%: expected a string", F(nodeDefault->source()));
+					LogWarning("%s: expected a string", Str(nodeDefault->source()));
 					break;
 				}
 				parameter->defaultValue.stringValue = std::move(valDefault->get());
@@ -136,35 +136,35 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 							goto found;
 						}
 					}
-					LogWarning("%: value must be in 'value'", F(valDefault->source()));
+					LogWarning("%s: value must be in 'value'", Str(valDefault->source()));
 				found: break;
 				
 				} else if (auto valDefault = nodeDefault->as<s64>()) {
 					if (valDefault->get() < 0 || valDefault->get() >= static_cast<s64>(parameter->enumValues.size())) {
-						LogWarning("%: value is out of bounds", F(valDefault->source()));
+						LogWarning("%s: value is out of bounds", Str(valDefault->source()));
 						break;
 					}
 					parameter->defaultValue.enumIndex = static_cast<u64>(valDefault->get());
 				
 				} else {
-					LogWarning("%: expected a number or a string", F(nodeDefault->source()));
+					LogWarning("%s: expected a number or a string", Str(nodeDefault->source()));
 				}
 			} break;
 			
 			case Type_Number: {
 				auto valDefault = nodeDefault->as<s64>();
 				if (!valDefault) {
-					LogWarning("%: expected a number", F(valDefault->source()));
+					LogWarning("%s: expected a number", Str(valDefault->source()));
 					break;
 				}
 				
 				if (valDefault->get() < parameter->minValue) {
-					LogWarning("%: default value % is below minimum %", F(valDefault->source()), valDefault->get(), parameter->minValue);
+					LogWarning("%s: default value %d is below minimum %d", Str(valDefault->source()), valDefault->get(), parameter->minValue);
 					break;
 				}
 				
 				if (valDefault->get() > parameter->maxValue) {
-					LogWarning("%: default value % is above maximim %", F(valDefault->source()), valDefault->get(), parameter->maxValue);
+					LogWarning("%s: default value %d is above maximim %d", Str(valDefault->source()), valDefault->get(), parameter->maxValue);
 					break;
 				}
 			
@@ -175,7 +175,7 @@ bool Parameter::FromToml(toml::node& node, Parameter* parameter) {
 			case Type_Bool: {
 				auto valDefault = nodeDefault->as<bool>();
 				if (!valDefault) {
-					LogWarning("%: expected a bool", F(valDefault->source()));
+					LogWarning("%s: expected a bool", Str(valDefault->source()));
 					break;
 				}
 				parameter->defaultValue.boolValue = valDefault->get();

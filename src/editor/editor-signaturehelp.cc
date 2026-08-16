@@ -5,7 +5,6 @@
 #include "settings.hh"
 
 #include "util/rect-util.hh"
-#include "util/format.hh"
 #include "graphics/effects.hh"
 #include "ui/constants.h"
 
@@ -100,7 +99,7 @@ void EditorSignatureHelp::OnUpdate() {
 		runDocumentation.Draw(deviceContext, position.x + PADDING, position.y + PADDING + settings.fontEditor.lineHeight, settings.fontUi, settings.GetBrushUiText(false));
 		
 		if (signatureCount > 1u) {
-			const std::string text = FormatString("%/%", activeSignature + 1u, signatureCount);
+			const std::string text = FormatString("%u/%u", activeSignature + 1u, signatureCount);
 			
 			GlyphRun runSignatureIndex {};
 			runSignatureIndex.Shape(text, settings.fontUi);
