@@ -118,11 +118,10 @@ static void ValidateLineNumber(EditorGotoLine *self) {
 	self->textbox.invalid = (lineNumber < 1 || lineNumber > self->owner->GetBuffer().LineCount());
 }
 
-void EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
+bool EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
 	
 	if (event.vkeycode == VK_RETURN) {
-
-		if (textbox.invalid) return;
+		if (textbox.invalid) return true;
 
 		const u64 lineNumber = GetCurrentLineNumber(this) - 1; // adjust to 0-based
 		ASSERT(lineNumber > 0 && lineNumber < owner->GetBuffer().LineCount());
@@ -132,7 +131,7 @@ void EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
 			ASSERT(owner->toolWindow == this);
 			owner->toolWindow = nullptr;
 			delete this;
-			return;
+			return true;
 		}
 
 		const TextBuffer::Line& line = owner->GetBuffer().GetLineAt(lineNumber);
@@ -143,12 +142,13 @@ void EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
 
 		owner->textController.SetCaretPosition(TextPosition {lineNumber, lineStart});
 		owner->ScrollToLine(lineNumber);
-		return;
+		return true;
 	
+	} else {
+		const bool changed = textbox.OnKeyDown(event, command);
+		if (changed) ValidateLineNumber(this);
+		return true;
 	}
-	
-	const bool changed = textbox.OnKeyDown(event, command);
-	if (changed) ValidateLineNumber(this);
 }
 
 void EditorGotoLine::OnChar(const char* data, u64 len) {

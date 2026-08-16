@@ -113,9 +113,12 @@ CommandDefinition commandDefinitions[] {
 	CommandDefinition {	
 		.name = "close-panel",
 		.description = "closes the current panel"},
-	CommandDefinition {	
-		.name = "add-panel",
+	CommandDefinition {
+		.name = "add-panel-after",
 		.description = "adds a new panel after the current panel"},
+	CommandDefinition {
+		.name = "add-panel-before",
+		.description = "adds a new panel before the current panel"},
 	CommandDefinition {	
 		.name = "new-file",
 		.description = "creates a new file"},

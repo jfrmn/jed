@@ -88,7 +88,7 @@ void EditorSelectGotoType::OnUpdate() {
 	}			
 }
 
-bool EditorSelectGotoType::OnKeyDown(KeyEvent event) {
+bool EditorSelectGotoType::OnKeyEvent(KeyEvent event) {
 
 	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
 		

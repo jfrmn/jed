@@ -217,16 +217,24 @@ void EditorDiagnosticsList::OnUpdate() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void EditorDiagnosticsList::OnKeyEvent(KeyEvent event, Command command) {
+bool EditorDiagnosticsList::OnKeyEvent(KeyEvent event, Command command) {
 	if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
 		
 		selectedItem = event.vkeycode == VK_DOWN
 			? IncrementWrapAround(selectedItem, itemCount)
-			: DecrementWrapAround(selectedItem, itemCount);		
+			: DecrementWrapAround(selectedItem, itemCount);
+			
+		return true;
 	
 	} else if (event.vkeycode == VK_RETURN) {
 		ActionGotoItem(this, selectedItem, (event.modifiers & KM_Ctrl) != 0);
-	}	
+		return true;
+	
+	} else if (command.Id_Editor_OpenDiagnosticsList) {
+		
+	}
+	
+	return false;	
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

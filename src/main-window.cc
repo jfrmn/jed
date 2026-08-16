@@ -828,6 +828,8 @@ found_tab:
 	}
 	
 	self->panels.insert(self->panels.begin() + insertIndex, newPanel);
+	self->focusedPanelIndex = insertIndex;
+	
 	RelinkPanelsAndTabs(self);
 	ResizePanels(self);
 }
@@ -1145,8 +1147,10 @@ void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 		ActionSwapPanels(this);
 	} else if (command.id == Command::Id_ClosePanel) {
 		ActionClosePanel(this);
-	} else if (command.id == Command::Id_AddPanel) {
+	} else if (command.id == Command::Id_AddPanelAfter) {
 		CommandAddPanel(this, false);
+	} else if (command.id == Command::Id_AddPanelBefore) {
+		CommandAddPanel(this, true);
 	} else if (command.id == Command::Id_NewFile) {
 		CommandNewFile(this);
 	} else if (command.id == Command::Id_CloseFile) {

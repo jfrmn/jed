@@ -19,7 +19,7 @@ struct EditorSelectGotoType : public EditorCaretAttached {
 	static EditorSelectGotoType* Make(Editor* owner);	
 	
 	virtual void OnUpdate() override;
-	virtual bool OnKeyDown(KeyEvent event) override;
+	virtual bool OnKeyEvent(KeyEvent event) override;
 	virtual void OnInput() override;
 	
 	virtual ~EditorSelectGotoType() {}

@@ -44,7 +44,7 @@ struct EditorCaretAttached {
 	
 	virtual void OnUpdate() = 0;
 	virtual void OnInput() = 0;
-	virtual bool OnKeyDown(KeyEvent event) = 0;	
+	virtual bool OnKeyEvent(KeyEvent event) = 0;	
 		
 	virtual ~EditorCaretAttached() noexcept {} 
 };

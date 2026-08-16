@@ -108,7 +108,7 @@ void EditorSignatureHelp::OnUpdate() {
 	}
 }
 
-bool EditorSignatureHelp::OnKeyDown(KeyEvent event) {
+bool EditorSignatureHelp::OnKeyEvent(KeyEvent event) {
 	if (state != State_Completed) return false;
 	
 	if (signatureCount > 1u && (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_Alt) {

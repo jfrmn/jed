@@ -331,6 +331,8 @@ Settings settings {
 		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_FocusPrevTab}},
 		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusNextPanel}},
 		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusPrevPanel}},
+		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_AddPanelAfter}},
+		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_AddPanelBefore}},
 		{KeyEvent {.vkeycode = VK_F10,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_SwapPanels}},
 		{KeyEvent {.vkeycode = VK_F11,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_ClosePanel}},
 		{KeyEvent {.vkeycode = VK_F12,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_CloseFile}},

@@ -65,7 +65,7 @@ struct EditorSearch : public EditorToolWindow {
 
 	virtual void OnUpdate() override;
 	
-	virtual void OnKeyEvent(KeyEvent event, Command command) override;
+	virtual bool OnKeyEvent(KeyEvent event, Command command) override;
 	virtual void OnChar(const char* data, u64 len) override;
 
 	static void OnToggleCaseSensitivity(void* userdata) {}

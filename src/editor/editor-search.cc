@@ -27,8 +27,6 @@
 static DWORD WINAPI WorkerThread(LPVOID userdata);
 static bool StartNewSearch(EditorSearch* self, std::string_view searchTerm);
 
-static const char* LAYER = "Editor.Search";
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 	
@@ -583,7 +581,7 @@ static void ActionSetCaretToEveryResult(EditorSearch* self, bool select) {
 	}
 }
 
-void EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
+bool EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 	
 	if (event.vkeycode == VK_RETURN) {
 	
@@ -638,12 +636,27 @@ void EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 
 			ASSERT(textboxSearch.inactive ^ textboxReplace.inactive);
 		}
-	
+
+	} else if (command.id == Command::Id_Editor_OpenSearch) {
+		if (command.parameters->boolValue) {
+			isReplaceTextboxVisible = true;
+			textboxSearch.inactive = true;
+			textboxReplace.inactive = false;
+			focusedTextbox = &textboxReplace;
+		} else {
+			isReplaceTextboxVisible = false;
+			textboxSearch.inactive = false;
+			textboxReplace.inactive = true;
+			focusedTextbox = &textboxSearch;
+		}
+		
 	} else {
 		ASSERT(focusedTextbox);
 		const bool changed = focusedTextbox->OnKeyDown(event, command);
 		searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
-	}	
+	}
+	
+	return true;
 }
 
 void EditorSearch::OnChar(const char* data, u64 len) {

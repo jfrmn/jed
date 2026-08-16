@@ -17,6 +17,6 @@ struct EditorToolWindow {
 	virtual bool IsDiagnosticsList() const;
 	
 	virtual void OnUpdate() = 0;
-	virtual void OnKeyEvent(KeyEvent event, Command command);
+	virtual bool OnKeyEvent(KeyEvent event, Command command);
 	virtual void OnChar(const char* data, u64 len);
 };

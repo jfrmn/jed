@@ -201,7 +201,7 @@ void EditorAutocomplete::SortItems() {
 	});
 }
 
-bool EditorAutocomplete::OnKeyDown(KeyEvent event) {
+bool EditorAutocomplete::OnKeyEvent(KeyEvent event) {
 	if (!items || itemCount == 0u) return false;
 
 	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
@@ -218,7 +218,7 @@ bool EditorAutocomplete::OnKeyDown(KeyEvent event) {
 		return true;
 	
 	} else if (signatureHelp) {
-		return signatureHelp->OnKeyDown(event);
+		return signatureHelp->OnKeyEvent(event);
 	}
 	
 	return false;

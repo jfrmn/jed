@@ -134,7 +134,7 @@ void EditorTextLocationList::UpdateFilePreview() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorTextLocationList::OnKeyDown(KeyEvent event) {
+bool EditorTextLocationList::OnKeyEvent(KeyEvent event) {
 	
 	if (event.vkeycode == VK_RETURN) {
 		if (selectedItem < U64_MAX) {

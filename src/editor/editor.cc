@@ -1188,27 +1188,26 @@ void Editor::OnMouseWheel(f32 distance) {
 
 void Editor::OnKeyEvent(KeyEvent event, Command command) {
 
-	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None && (toolWindow || editorCaretAttached)) {
-
+	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
 		if (toolWindow) {
 			delete toolWindow;
 			toolWindow = nullptr;
+			return;
 		
 		} else if (editorCaretAttached) {
 		 	editorCaretAttached->RemoveReference();
 		 	editorCaretAttached = nullptr;
-		
-		} else {
-			ASSERT_UNREACHABLE;
-		}
+		 	return;
+	 	}
+	}
 	
-	} else if (toolWindow) {
-		toolWindow->OnKeyEvent(event, command);
+	if (toolWindow && toolWindow->OnKeyEvent(event, command))
+		return;
 	
-	} else if (editorCaretAttached) {
-		editorCaretAttached->OnKeyDown(event);
+	if (editorCaretAttached && editorCaretAttached->OnKeyEvent(event))
+		return;
 		
-	} else if (command.id == Command::Id_Editor_OpenSearch) {		
+	if (command.id == Command::Id_Editor_OpenSearch) {		
 		const bool showReplace = command.parameters->boolValue;
 		
 		if (auto search = dynamic_cast<EditorSearch*>(toolWindow)) {

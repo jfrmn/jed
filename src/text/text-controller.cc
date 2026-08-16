@@ -260,7 +260,7 @@ static void AdjustFollowingCarets(TextController* self, u64 currentCaretIndex, c
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void MoveBackward(TextController* self, TextPosition* position) {
+static void MovePrevChar(TextController* self, TextPosition* position) {
 
 	// wrap around line start
 	if (position->column == 0u) {
@@ -284,7 +284,7 @@ static void MoveBackward(TextController* self, TextPosition* position) {
 	}
 }
 
-static void MoveForward(TextController* self, TextPosition* position) {
+static void MoveNextChar(TextController* self, TextPosition* position) {
 
 	// wrap around line ending
 	if (position->column == self->buffer.GetLineAt(position->line).length) {
@@ -773,7 +773,7 @@ static void CommandRepeatText(TextController* self, ParameterValue* parameters, 
 
 static void CommandTransformCase(TextController* self, ParameterValue* parameters, TextChange** change) {
 	
-	const int targetCase = parameters[0].numberValue;
+	const s64 targetCase = parameters[0].numberValue;
 	const bool capitalizeFirstLetter = parameters[1].numberValue;
 	
 	for (TextController::Caret& caret : self->carets) {
@@ -814,7 +814,7 @@ static void CommandToUpperOrLowerCase(TextController* self, TextChange** outChan
 		
 		if (!caret.GetSelection(&from, &to)) {
 			from = to = caret.position;
-			MoveForward(self, &to);
+			MoveNextChar(self, &to);
 		}
 		
 		TextChangeOperation* operation = change->NewOperation();
@@ -1692,9 +1692,9 @@ static void CommandGotoNextCaret(TextController* self) {
 
 static void OnKeyDownEditMutiCursor(TextController* self, KeyEvent event, Command command) {
 	if      (event.vkeycode == VK_UP     && event.modifiers == KM_None) MoveLineUp(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None) MoveForward(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None) MoveNextChar(self, &self->editCaretsPosition);
 	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_None) MoveLineDown(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None) MoveBackward(self, &self->editCaretsPosition);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None) MovePrevChar(self, &self->editCaretsPosition);
 	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) LeaveEditMultiCaretMode(self);
 	else if (event.vkeycode == VK_RETURN && event.modifiers == KM_None) self->ToggleCaret();
 	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Ctrl) MoveToPrevWord(self, &self->editCaretsPosition);
@@ -1705,8 +1705,8 @@ static void OnKeyDownEditMutiCursor(TextController* self, KeyEvent event, Comman
 	else if (event.vkeycode == VK_END    && event.modifiers == KM_Ctrl) MoveToBufferEnd(self, &self->editCaretsPosition);
 	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_None) MovePageUp(self, &self->editCaretsPosition);
 	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_None) MovePageDown(self, &self->editCaretsPosition);
-	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) ShiftCaret(self, MoveBackward);
-	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) ShiftCaret(self, MoveForward);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) ShiftCaret(self, MoveNextChar);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) ShiftCaret(self, MovePrevChar);
 	else if (event.vkeycode == VK_UP     && event.modifiers == KM_Shift) ShiftCaret(self, MoveLineUp);
 	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_Shift) ShiftCaret(self, MoveLineDown);
 	else if (event.vkeycode == VK_RIGHT  && event.modifiers == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToNextWord);
@@ -1732,9 +1732,9 @@ void TextController::OnKeyDown(KeyEvent event, Command command, /*out*/ TextChan
 	}
 			
 	if      (event.vkeycode == VK_UP     && event.modifiers == KM_None)  MoveCaret(this, MoveLineUp);
-	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None)  MoveCaret(this, MoveForward);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_None)  MoveCaret(this, MoveNextChar);
 	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_None)  MoveCaret(this, MoveLineDown);
-	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None)  MoveCaret(this, MoveBackward);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_None)  MoveCaret(this, MovePrevChar);
 	else if (event.vkeycode == VK_RETURN && event.modifiers == KM_None)  InsertNewLine(this, change);
 	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None)  ClearMultiCarets(this, true);
 	else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_Ctrl)  ClearMultiCarets(this, false);
@@ -1746,8 +1746,8 @@ void TextController::OnKeyDown(KeyEvent event, Command command, /*out*/ TextChan
 	else if (event.vkeycode == VK_END    && event.modifiers == KM_Ctrl)  MoveCaret(this, MoveToBufferEnd);
 	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_None)  MoveCaret(this, MovePageUp);
 	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_None)  MoveCaret(this, MovePageDown);
-	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) Select(this, MoveBackward);
-	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) Select(this, MoveForward);
+	else if (event.vkeycode == VK_RIGHT  && event.modifiers == KM_Shift) Select(this, MoveNextChar);
+	else if (event.vkeycode == VK_LEFT   && event.modifiers == KM_Shift) Select(this, MovePrevChar);
 	else if (event.vkeycode == VK_UP     && event.modifiers == KM_Shift) Select(this, MoveLineUp);
 	else if (event.vkeycode == VK_DOWN   && event.modifiers == KM_Shift) Select(this, MoveLineDown);
 	else if (event.vkeycode == VK_RIGHT  && event.modifiers == (KM_Ctrl | KM_Shift)) Select(this, MoveToNextWord);
@@ -1758,8 +1758,8 @@ void TextController::OnKeyDown(KeyEvent event, Command command, /*out*/ TextChan
 	else if (event.vkeycode == VK_END    && event.modifiers == KM_Shift) Select(this, MoveToBufferEnd);
 	else if (event.vkeycode == VK_PRIOR  && event.modifiers == KM_Shift) Select(this, MovePageUp);
 	else if (event.vkeycode == VK_NEXT   && event.modifiers == KM_Shift) Select(this, MovePageDown);
-	else if (event.vkeycode == VK_BACK   && event.modifiers == KM_None)  Delete(this, change, MoveBackward);
-	else if (event.vkeycode == VK_DELETE && event.modifiers == KM_None)  Delete(this, change, MoveForward);
+	else if (event.vkeycode == VK_BACK   && event.modifiers == KM_None)  Delete(this, change, MovePrevChar);
+	else if (event.vkeycode == VK_DELETE && event.modifiers == KM_None)  Delete(this, change, MoveNextChar);
 	else if (event.vkeycode == VK_BACK   && event.modifiers == KM_Ctrl)  Delete(this, change, MoveToPrevWord);
 	else if (event.vkeycode == VK_DELETE && event.modifiers == KM_Ctrl)  Delete(this, change, MoveToNextWord);
 	else if (command.id == Command::Id_Text_MoveCaret)        CommandMoveCaret(this, command.parameters);
