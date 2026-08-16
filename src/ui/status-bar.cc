@@ -31,7 +31,7 @@ static const f32 LANGUAGE_STATUS_INDICATOR_WIDTH = 5.0f;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// H E L P E R
+// Helper
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +59,7 @@ static D2D_RECT_F GetArea(const f32 posX, const f32 width, bool l2r) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// S T A T U S   B A R   E L E M E N T S
+// Status Bar Elements
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -126,29 +126,29 @@ static f32 UpdateConsoleButton(StatusBar* self, f32 posX, u64 i) {
 // Console Progress
 
 static bool IsVisibleConsoleProgress() {
-	if (!mainWindow.console.tool) return false;
-	if (mainWindow.console.tool->progress.hideFromStatusBar) return false;
-	if (!mainWindow.console.tool->progress.regex.isOk) return false;
+	if (!mainWindow.toolOutput.tool) return false;
+	if (mainWindow.toolOutput.tool->progress.hideFromStatusBar) return false;
+	if (!mainWindow.toolOutput.tool->progress.regex.isOk) return false;
 	return true;
 }
 
 static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
-	if (!mainWindow.console.tool) return posX;
-	if (mainWindow.console.tool->progress.hideFromStatusBar) return posX;
-	if (!mainWindow.console.tool->progress.regex.isOk) return posX;
+	if (!mainWindow.toolOutput.tool) return posX;
+	if (mainWindow.toolOutput.tool->progress.hideFromStatusBar) return posX;
+	if (!mainWindow.toolOutput.tool->progress.regex.isOk) return posX;
 	
 	constexpr f32 PROGRESS_BAR_WIDTH = 100.0f;
 
 	const bool l2r = IsL2R(self, i);	
 	const D2D_RECT_F area = GetArea(posX, PROGRESS_BAR_WIDTH, l2r);
 	
-	const std::scoped_lock lock {mainWindow.console.mtx};
+	const std::scoped_lock lock {mainWindow.toolOutput.mtx};
 	
 	deviceContext->FillRoundedRectangle(
 		MakeRoundedRect(
 			area.left,
 			area.top + PADDING,
-			PROGRESS_BAR_WIDTH * mainWindow.console.progressValue,
+			PROGRESS_BAR_WIDTH * mainWindow.toolOutput.progressValue,
 			settings.fontUi.lineHeight,
 			RADIUS),
 		GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
@@ -163,7 +163,7 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 		settings.GetBrushUiText());
 	
 	GlyphRun run;
-	run.Shape(mainWindow.console.progressText, settings.fontUi);
+	run.Shape(mainWindow.toolOutput.progressText, settings.fontUi);
 	run.DrawCenter(deviceContext,
 		area.left,
 		area.top + PADDING,

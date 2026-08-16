@@ -35,7 +35,7 @@ void ToolSearchBar::FilterItems(std::string_view text) {
 
 static bool CheckIfAToolIsAlreadyRunnung(ToolSearchBar* self) {
 	
-	if (mainWindow.console.process && mainWindow.console.process->IsRunning()) {
+	if (mainWindow.toolOutput.process && mainWindow.toolOutput.process->IsRunning()) {
 		MessageBoxA(mainWindow.hWnd,
 			"There is already a tool running.\nCurrently only on tool at a time can be run.\nSorry!",
 			"Tool already running",
@@ -59,9 +59,9 @@ void ToolSearchBar::AcceptItem(u64 item, const KeyEvent* event) {
 	if (!CheckIfAToolIsAlreadyRunnung(this))
 		return;
 	
-	tool.GetDefaultValues(&mainWindow.console.toolParameterValues);
-	mainWindow.console.tool = &tool;
-	if (!mainWindow.console.StartProcess())
+	tool.GetDefaultValues(&mainWindow.toolOutput.toolParameterValues);
+	mainWindow.toolOutput.tool = &tool;
+	if (!mainWindow.toolOutput.StartProcess())
 		LogError("failed to launch tool");
 	
 	shouldClose = true;
@@ -87,9 +87,9 @@ void ToolSearchBar::OnFinishedParameterConfiguration() {
 		ASSERT(selectedItem < filteredTools.size());	
 		const Tool& tool = Tool::tools[selectedItem];
 		
-		parameterConfigurator->GetParameterValues(&mainWindow.console.toolParameterValues);
-		mainWindow.console.tool = &tool;
-		if (!mainWindow.console.StartProcess())
+		parameterConfigurator->GetParameterValues(&mainWindow.toolOutput.toolParameterValues);
+		mainWindow.toolOutput.tool = &tool;
+		if (!mainWindow.toolOutput.StartProcess())
 			LogError("failed to launch tool");
 		
 		shouldClose = true;

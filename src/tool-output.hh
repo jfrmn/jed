@@ -21,7 +21,7 @@ struct GlyphRun;
 struct Tool;
 struct KeyEvent;
 
-struct Console : public Process::Observer {
+struct ToolOutput : public Process::Observer {
 	
 	//------------------------------------------
 	// types

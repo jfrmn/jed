@@ -1,6 +1,6 @@
 #pragma once
 #include "events.hh"
-#include "console.hh"
+#include "tool-output.hh"
 #include "commands.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
@@ -13,7 +13,7 @@ struct Prompt;
 struct SearchBar;
 struct Explorer;
 struct TextPosition;
-struct Console;
+struct ToolOutput;
 
 // @DUMMY
 struct ParameterConfigurator;
@@ -56,7 +56,7 @@ struct MainWindow : public Window {
 
 	SearchBar* searchBar = nullptr;
 	Explorer*  explorer = nullptr;
-	Console    console = {};
+	ToolOutput toolOutput = {};
 	StatusBar  statusBar = {};
 	
 	std::vector<Tab>   tabs   = {};

@@ -1,4 +1,4 @@
-#include "console.hh"
+#include "tool-output.hh"
 #include "globals.hh"
 #include "main-window.hh"
 #include "settings.hh"
@@ -26,13 +26,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool Console::Init() {
+bool ToolOutput::Init() {
 	scrollarea.barWidth = SCROLLBAR_WIDTH_WIDE;
 	filePreview.Init();
 	return true;
 }
 
-static void Reset(Console* self) {
+static void Reset(ToolOutput* self) {
 	ASSERT(!self->process || !self->process->IsRunning());
 	
 	self->toolDiagnostics.clear();
@@ -96,9 +96,9 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 	};
 }
 
-static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
+static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 	if (self->toolParameterValues.size() < self->tool->parameters.size()) {
-		self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
+		self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
 			.message = FormatString("Not enough parameters provided. Expected %u but got %u", self->toolParameterValues.size(), self->tool->parameters.size())});
 		return false;
 	}
@@ -134,7 +134,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 			ASSERT(parameterIndex < U64_MAX);
 			
 			if (parameterIndex >= self->toolParameterValues.size()) {
-				self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
+				self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
 				 	.message  = FormatString("Parameter with index %u not found (%u parameters defined)", parameterIndex, self->toolParameterValues.size()),
 				 	.source   = self->tool->command,
 				 	.position = pos-1});
@@ -155,7 +155,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 			
 			const u64 posEnd = self->tool->command.find(')', pos);
 			if (posEnd == std::string::npos) {
-				self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
+				self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
 					.message  = "Missing closing ')' for parameter-reference by name",
 					.source   = self->tool->command,
 					.position = pos-1});
@@ -174,7 +174,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 				}
 			}
 			
-			self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
+			self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
 				.message  = FormatString("Parameter with name '%.*s' not found", SIZE_AND_DATA(parameterName)),
 				.source   = self->tool->command,
 				.position = pos-1});
@@ -189,7 +189,7 @@ static bool CompileCommand(Console* self, /*out*/ std::string* commandLine) {
 	return true;
 }
 
-bool Console::StartProcess() {
+bool ToolOutput::StartProcess() {
 	
 	if (process && process->IsRunning()) {
 		LogError("a process already running");
@@ -246,7 +246,7 @@ static f32 GetToolbarHeight() {
 	return MARGIN_X2 + settings.fontUi.lineHeight;
 }
 
-static void UpdateFilePreview(Console* self, const Console::EditorDiagnosticsRecord& record) {
+static void UpdateFilePreview(ToolOutput* self, const ToolOutput::EditorDiagnosticsRecord& record) {
 	self->selectionStart = TextPosition {record.originLine, record.originFromColumn};
 	self->selectionEnd   = TextPosition {record.originLine, record.originToColumn};
 	self->filePreview.Load(FilePreview::LoadArgs {
@@ -259,7 +259,7 @@ static void UpdateFilePreview(Console* self, const Console::EditorDiagnosticsRec
 static void OnOpenConfigurator(void* ud, u64) {}
 
 static void OnClickedKillProcess(void* ud, u64) {
-	auto self = static_cast<Console*>(ud);
+	auto self = static_cast<ToolOutput*>(ud);
 	
 	ASSERT(self->process);
 	self->process->Terminate();
@@ -268,12 +268,12 @@ static void OnClickedKillProcess(void* ud, u64) {
 static void OnRerunProcess(void* ud, u64) {}
 
 static void OnClickToggleShowToolDiagnostics(void* ud, u64) {
-	auto self = static_cast<Console*>(ud);
+	auto self = static_cast<ToolOutput*>(ud);
 	self->showToolDiagnostics = !self->showToolDiagnostics;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void RenderOutput(Console* self) {
+static void RenderOutput(ToolOutput* self) {
 	
 	const f32 toolbarHeight = GetToolbarHeight();
 	
@@ -355,32 +355,32 @@ static void RenderOutput(Console* self) {
 		
 		for (u64 i = 0u; i < self->styleChanges.size(); i++) {
 			
-			const Console::StyleChange* styleChange = &self->styleChanges[i];
+			const ToolOutput::StyleChange* styleChange = &self->styleChanges[i];
 			
 			IterateTextRange(start, styleChange->position, ApplyStyle);
 			
 			// do the style change
 			switch (styleChange->type) {
-				case Console::StyleChangeType_Bold: break; // @TODO
-				case Console::StyleChangeType_Underline: state.hasUnderline = styleChange->value; break;
-				case Console::StyleChangeType_Negative: {
+				case ToolOutput::StyleChangeType_Bold: break; // @TODO
+				case ToolOutput::StyleChangeType_Underline: state.hasUnderline = styleChange->value; break;
+				case ToolOutput::StyleChangeType_Negative: {
 					state.hasNegative = styleChange->value;
 				} break;
-				case Console::StyleChangeType_Foreground: {
+				case ToolOutput::StyleChangeType_Foreground: {
 					brushForeground->SetColor(styleChange->color.ToD2D());
 					state.hasForegroundColor = true;
 				} break;
-				case Console::StyleChangeType_ForegroundDefault: {
+				case ToolOutput::StyleChangeType_ForegroundDefault: {
 					state.hasForegroundColor = false;
 				} break;
-				case Console::StyleChangeType_Background: {
+				case ToolOutput::StyleChangeType_Background: {
 					brushBackground->SetColor(styleChange->color.ToD2D());
 					state.hasBackgroundColor = true;
 				} break;
-				case Console::StyleChangeType_BackgroundDefault: {
+				case ToolOutput::StyleChangeType_BackgroundDefault: {
 					state.hasBackgroundColor = false;
 				} break;
-				case Console::StyleChangeType_Reset: {
+				case ToolOutput::StyleChangeType_Reset: {
 					state.hasUnderline = false;
 					state.hasNegative = false;
 					state.hasForegroundColor = false;
@@ -436,7 +436,7 @@ static void RenderOutput(Console* self) {
 	//
 	{		
 		for (u64 i = 0; i < self->diagnosticsRecords.size(); i++) {
-			const Console::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
+			const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
 			
 			ASSERT(record.originLine < self->glyphRunCache.size());
 			const GlyphRun& run = self->glyphRunCache[record.originLine];
@@ -505,7 +505,7 @@ static void RenderOutput(Console* self) {
 				
 				// check if we hit a matched diagnostic record
 				for (u64 i = 0u; i < self->diagnosticsRecords.size(); i++) {
-					const Console::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
+					const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
 					
 					const bool hitThisRecord = record.originLine == hitLine &&
 				                           	record.originFromColumn <= hitColumn &&
@@ -534,7 +534,7 @@ static void RenderOutput(Console* self) {
 	// update file preview
 	//
 	if (self->selectedDiagnosticsRecord != U64_MAX) {
-		const Console::EditorDiagnosticsRecord& record = self->diagnosticsRecords[self->selectedDiagnosticsRecord];
+		const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[self->selectedDiagnosticsRecord];
 	
 		self->filePreview.x = self->area.left - self->filePreview.width;
 		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - self->scrollarea.vpY;
@@ -546,7 +546,7 @@ static void RenderOutput(Console* self) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void RenderToolDiagnostics(Console* self) {
+static void RenderToolDiagnostics(ToolOutput* self) {
 	
 	const f32 toolbarHeight = GetToolbarHeight();	
 	
@@ -562,7 +562,7 @@ static void RenderToolDiagnostics(Console* self) {
 	GlyphRun run;
 	f32 offsetTop = 0.0f;
 	for (u64 i = 0; i < self->toolDiagnostics.size(); i++) {
-		const Console::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
+		const ToolOutput::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
 		
 		run.Shape(record.message, settings.fontEditor);
 		
@@ -601,7 +601,7 @@ static void RenderToolDiagnostics(Console* self) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void Console::OnUpdate() {
+void ToolOutput::OnUpdate() {
 		
 	//
 	// draw backgound
@@ -826,7 +826,7 @@ void Console::OnUpdate() {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Console::OnResize(f32 newWidth, f32 newHeight) {
+void ToolOutput::OnResize(f32 newWidth, f32 newHeight) {
 	area = D2D_RECT_F {
 		.left = std::floor(mainWindow.width * 0.6f),
 		.top = PADDING_X2 + settings.fontUi.lineHeight,
@@ -841,13 +841,13 @@ void Console::OnResize(f32 newWidth, f32 newHeight) {
 		.height = RectHeight(area) - GetToolbarHeight()};
 }
 
-void Console::OnMouseWheel(f32 distance) {
+void ToolOutput::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
 	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5);
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
-void Console::OnKeyDown(KeyEvent event, Command command) {
+void ToolOutput::OnKeyDown(KeyEvent event, Command command) {
 	
 	if (command.id == Command::Id_GotoNextDiagnosticRecord) {
 		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
@@ -903,14 +903,14 @@ void Console::OnKeyDown(KeyEvent event, Command command) {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void WarnMatchedTextParseErr(Console* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
-	self->toolDiagnostics.push_back(Console::ToolDiagnosticsRecord {
+static void WarnMatchedTextParseErr(ToolOutput* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
+	self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
 		.message  = FormatString("failed to parse matched text for capture group '%.*s': '%s'", SIZE_AND_DATA(groupName), Str(fcr)),
 		.source   = text,
 		.position = U64_MAX});
 }
 
-static void MatchProgress(Console* self, const std::string* line) {
+static void MatchProgress(ToolOutput* self, const std::string* line) {
 	if (!self->tool->progress.regex.isOk) return;
 	
 	RegexMatch match;
@@ -994,13 +994,13 @@ static void MatchProgress(Console* self, const std::string* line) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void MatchDiagnostics(Console* self, const std::string* line) {
+static void MatchDiagnostics(ToolOutput* self, const std::string* line) {
  	if (!self->tool->diagnostics.regex.isOk) return;
 	 
 	RegexMatch match {};
 	if (!self->tool->diagnostics.regex.Match(*line, &match)) return;
 
-	Console::EditorDiagnosticsRecord record {};
+	ToolOutput::EditorDiagnosticsRecord record {};
 	record.color = settings.colors.editorText;
 	record.originLine = self->lines.size() - 1u;
 	
@@ -1044,9 +1044,9 @@ static void MatchDiagnostics(Console* self, const std::string* line) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static Console::StyleChange GetStyleChange(int value);
+static ToolOutput::StyleChange GetStyleChange(int value);
 
-static void ParseChunk(Console* self, std::string_view data) {
+static void ParseChunk(ToolOutput* self, std::string_view data) {
 
 	const std::scoped_lock lock {self->mtx};
 	
@@ -1087,8 +1087,8 @@ static void ParseChunk(Console* self, std::string_view data) {
 				
 				u64 j = (result.ptr - data.data());
 				
-				Console::StyleChange styleChange = GetStyleChange(value);
-				if (styleChange.type == Console::StyleChangeType_Unknown) continue;
+				ToolOutput::StyleChange styleChange = GetStyleChange(value);
+				if (styleChange.type == ToolOutput::StyleChangeType_Unknown) continue;
 				
 				// extended colors
 				if (value == 38 || value == 48) {
@@ -1138,17 +1138,17 @@ static void ParseChunk(Console* self, std::string_view data) {
 }
 
 
-void Console::OnStderr(std::string_view data) {
+void ToolOutput::OnStderr(std::string_view data) {
 	ParseChunk(this, data);
 	mainWindow.PostUpdate();
 }
 
-void Console::OnStdout(std::string_view data) {
+void ToolOutput::OnStdout(std::string_view data) {
 	ParseChunk(this, data);
 	mainWindow.PostUpdate();
 }
 
-void Console::OnStarted() {
+void ToolOutput::OnStarted() {
 	std::scoped_lock lock {mtx};
 	
 	LogInfo("tool '%.*s' started", SIZE_AND_DATA(tool->name));
@@ -1164,7 +1164,7 @@ void Console::OnStarted() {
 	mainWindow.PostUpdate();
 }
 
-void Console::OnExited(int exitCode) {	
+void ToolOutput::OnExited(int exitCode) {	
 	std::scoped_lock lock {mtx};
 	
 	LogInfo("tool '%.*s' exited with code %d", SIZE_AND_DATA(tool->name), exitCode);
@@ -1181,179 +1181,179 @@ void Console::OnExited(int exitCode) {
 	mainWindow.PostUpdate();
 }
 
-Console::StyleChange GetStyleChange(int value) {
+ToolOutput::StyleChange GetStyleChange(int value) {
 	switch (value) {
-		case 0: return Console::StyleChange {
-			.type = Console::StyleChangeType_Reset};
+		case 0: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Reset};
 		
 		// boldness	
-		case 1: return Console::StyleChange {
-			.type = Console::StyleChangeType_Bold,
+		case 1: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Bold,
 			.value = true};
 			
-		case 22: return Console::StyleChange {
-			.type = Console::StyleChangeType_Bold,
+		case 22: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Bold,
 			.value = false};
 		
 		// underline	
-		case 4: return Console::StyleChange {
-			.type = Console::StyleChangeType_Underline,
+		case 4: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Underline,
 			.value = true};
 			 
-		case 24: return Console::StyleChange {
-			.type = Console::StyleChangeType_Underline,
+		case 24: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Underline,
 			.value = false};
 		
 		// negative	
-		case 7: return Console::StyleChange {
-			.type = Console::StyleChangeType_Negative,
+		case 7: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Negative,
 			.value = true};
 		
-		case 27: return Console::StyleChange {
-			.type = Console::StyleChangeType_Negative,
+		case 27: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Negative,
 			.value = false};
 		
 		// foreground	
-		case 30: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 30: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Black)};
 			
-		case 31: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 31: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Red)};
 		
-		case 32: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 32: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Green)};
 			
-		case 33: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 33: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Yellow)};
 			
-		case 34: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 34: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Blue)};
 			
-		case 35: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 35: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Magenta)};
 
-		case 36: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 36: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::Cyan)};
 
-		case 37: return Console::StyleChange {
-			.type = Console::StyleChangeType_ForegroundDefault};
+		case 37: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_ForegroundDefault};
 
-		case 38: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground}; // extended - color set on caller site
+		case 38: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground}; // extended - color set on caller site
 			
-		case 39: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 39: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = settings.colors.editorText}; // default
 			
 		// background
-		case 40: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 40: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Black)};
 			
-		case 41: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 41: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Red)};
 		
-		case 42: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 42: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Green)};
 			
-		case 43: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 43: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Yellow)};
 			
-		case 44: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 44: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Blue)};
 			
-		case 45: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 45: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Magenta)};
 
-		case 46: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 46: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::Cyan)};
 
-		case 47: return Console::StyleChange {
-			.type = Console::StyleChangeType_BackgroundDefault};
+		case 47: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_BackgroundDefault};
 
-		case 48: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background}; // extended - color set on caller site
+		case 48: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background}; // extended - color set on caller site
 		
 		// bright foreground
-		case 90: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 90: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::DarkGray)};
 			
-		case 91: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 91: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::DarkSalmon)};
 		
-		case 92: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 92: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::LightGreen)};
 			
-		case 93: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 93: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::LightYellow)};
 			
-		case 94: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 94: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::LightBlue)};
 			
-		case 95: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 95: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::HotPink)};
 
-		case 96: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 96: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::LightCyan)};
 
-		case 97: return Console::StyleChange {
-			.type = Console::StyleChangeType_Foreground,
+		case 97: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Foreground,
 			.color = Color::FromKnown(D2D1::ColorF::LightGray)};	
 		
 		// bright background
-		case 100: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 100: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::DarkGray)};
 			
-		case 101: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 101: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::DarkSalmon)};
 		
-		case 102: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 102: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::LightGreen)};
 			
-		case 103: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 103: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::LightYellow)};
 			
-		case 104: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 104: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::LightBlue)};
 			
-		case 105: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 105: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::HotPink)};
 
-		case 106: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 106: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::LightCyan)};
 
-		case 107: return Console::StyleChange {
-			.type = Console::StyleChangeType_Background,
+		case 107: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Background,
 			.color = Color::FromKnown(D2D1::ColorF::LightGray)};
 		
-		default: return Console::StyleChange {
-			.type = Console::StyleChangeType_Unknown};
+		default: return ToolOutput::StyleChange {
+			.type = ToolOutput::StyleChangeType_Unknown};
 	}
 }

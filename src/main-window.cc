@@ -7,7 +7,7 @@
 #include "file-search-bar.hh"
 #include "command-search-bar.hh"
 #include "explorer.hh"
-#include "console.hh"
+#include "tool-output.hh"
 #include "commands/tool-search-bar.hh"
 
 #include "logging.hh"
@@ -54,7 +54,7 @@ bool MainWindow::Init() {
 		return false;
 	}
 	
-	if (!console.Init()) {
+	if (!toolOutput.Init()) {
 		LogError("init status bar failed");
 		return false;
 	}
@@ -737,8 +737,8 @@ void MainWindow::OnUpdate() {
 	//
 	// draw console
 	//
-	if (console.isOpen)
-		console.OnUpdate();
+	if (toolOutput.isOpen)
+		toolOutput.OnUpdate();
 	
 	//
 	// draw explorer
@@ -1068,7 +1068,7 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
 	ResizePanels(this);
 	
-	console.OnResize(newWidth, newHeight);
+	toolOutput.OnResize(newWidth, newHeight);
 	
 	//if (explorer)
 	//	explorer->OnResize();
@@ -1079,8 +1079,8 @@ void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
 
 bool MainWindow::OnMouseWheel(f32 distance) {
 	
-	if (console.isOpen && RectContains(console.area, mouse.x, mouse.y)) {
-		console.OnMouseWheel(distance);
+	if (toolOutput.isOpen && RectContains(toolOutput.area, mouse.x, mouse.y)) {
+		toolOutput.OnMouseWheel(distance);
 		return true;
 	}
 	
@@ -1117,8 +1117,8 @@ void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 			searchBar = nullptr;
 		}
 	
-	} else if (console.isOpen) {
-		console.OnKeyDown(event, command);
+	} else if (toolOutput.isOpen) {
+		toolOutput.OnKeyDown(event, command);
 	
 	} else if (command.id == Command::Id_OpenFileSearch) {
 		if (!searchBar) searchBar = FileSearchBar::Make();
@@ -1127,7 +1127,7 @@ void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 	} else if (command.id == Command::Id_OpenCommandSearch) {
 		if (!searchBar) searchBar = CommandSearchBar::Make();
 	} else if (command.id == Command::Id_ToggleToolOutput) {
-		console.isOpen = !console.isOpen;
+		toolOutput.isOpen = !toolOutput.isOpen;
 	} else if (command.id == Command::Id_ToggleExplorer) {
 		if (explorer) {
 			delete explorer;
