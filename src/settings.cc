@@ -325,7 +325,7 @@ Settings settings {
 		{KeyEvent {.vkeycode = VK_OEM_COMMA, .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenFileSearch}},
 		{KeyEvent {.vkeycode = 'T',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenToolSearch}},
 		{KeyEvent {.vkeycode = 'P',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenCommandSearch}},
-		{KeyEvent {.vkeycode = VK_OEM_1,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
+		{KeyEvent {.vkeycode = VK_OEM_2,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
 		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleExplorer}},
 		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_FocusNextTab}},
 		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_FocusPrevTab}},

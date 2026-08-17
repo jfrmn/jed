@@ -1101,26 +1101,7 @@ bool MainWindow::OnMouseWheel(f32 distance) {
 
 void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 
-	if (explorer) {
-		explorer->OnKeyDown(event, command);
-		
-		if (explorer->shouldClose) {
-			delete explorer;
-			explorer = nullptr;
-		}
-				
-	} else if (searchBar) {
-		searchBar->OnKeyDown(event, command);
-		
-		if (searchBar->shouldClose) {
-			delete searchBar;
-			searchBar = nullptr;
-		}
-	
-	} else if (toolOutput.isOpen) {
-		toolOutput.OnKeyDown(event, command);
-	
-	} else if (command.id == Command::Id_OpenFileSearch) {
+	if (command.id == Command::Id_OpenFileSearch) {
 		if (!searchBar) searchBar = FileSearchBar::Make();
 	} else if (command.id == Command::Id_OpenToolSearch) {
 		if (!searchBar) searchBar = ToolSearchBar::Make();
@@ -1165,6 +1146,25 @@ void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 		ActionCloseTabAndPanel(this);
 	} else if (command.id == Command::Id_SaveAll) {
 		CommandSaveAll(this);
+		
+	} else if (explorer) {
+		explorer->OnKeyDown(event, command);
+		
+		if (explorer->shouldClose) {
+			delete explorer;
+			explorer = nullptr;
+		}
+				
+	} else if (searchBar) {
+		searchBar->OnKeyDown(event, command);
+		
+		if (searchBar->shouldClose) {
+			delete searchBar;
+			searchBar = nullptr;
+		}
+	
+	} else if (toolOutput.isOpen) {
+		toolOutput.OnKeyDown(event, command);
 	
 	} else if (Editor* focusedEditor = GetFocusedEditor()) {
 		focusedEditor->OnKeyEvent(event, command);

@@ -83,7 +83,7 @@ struct ToolOutput : public Process::Observer {
 	std::string progressText = {};
 	
 	std::vector<EditorDiagnosticsRecord> diagnosticsRecords = {};
-	u64         selectedDiagnosticsRecord = 0;
+	u64         selectedDiagnosticsRecord = U64_MAX;
 	FilePreview filePreview = {};
 	
 	Process*    process = nullptr;
