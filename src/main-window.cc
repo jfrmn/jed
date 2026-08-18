@@ -255,8 +255,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = false;
 		
-		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent) {
-			ASSERT(!panels.empty());
+		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent && !panels.empty()) {
 			ASSERT(focusedPanelIndex != U64_MAX);
 			ASSERT(!tabs.empty());
 			
@@ -321,6 +320,13 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			} else if (openBehavior == MainWindow::OpenBehavior_TabOnly) {
 				newTab.panelIndex = U64_MAX;
 			
+			} else if (panels.empty()) {
+				auto newPanel = panels.emplace_back();
+				newPanel.tabIndex = tabs.size() - 1;
+				newPanel.editor = newTab.editor;
+				focusedPanelIndex = 0u;
+				newTab.panelIndex = 0u;
+				
 			} else {
 				ASSERT_UNREACHABLE;
 			}

@@ -295,13 +295,12 @@ int CompareFuzzyMatchResults(const FuzzyMatchResult& lhs, const FuzzyMatchResult
 
 static void FormatString(std::string* str, const char* fmt, va_list args) {
 	char buffer[64] {0};
-	const int len = vsprintf_s(buffer, fmt, args);
-	if (len < 0) {
-		const int required = vsnprintf(nullptr, 0, fmt, args);
-		if (required < 0) return;
-		
-		str->resize(static_cast<u64>(required));
+	const int maxCharaceters = sizeof(buffer) - 1u;
+	const int len = vsnprintf(buffer, maxCharaceters, fmt, args);
+	if (len > maxCharaceters) {
+		str->resize(static_cast<u64>(len + 1)); // need one more for the null-terminator
 		vsprintf_s(str->data(), str->size(), fmt, args);
+		str->pop_back(); // no more need for the null terminator
 	
 	} else {
 		str->resize(static_cast<u64>(len));

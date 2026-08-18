@@ -8,7 +8,7 @@ union Color {
 	//-----------------------------------------------------
 	// data
 	
-	float array[4] {0.0f, 0.0f, 0.0f, 0.0f};
+	float array[4] {0.0f, 0.0f, 0.0f, 1.0f};
 	struct {
 		float r;
 		float g;
