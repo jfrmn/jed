@@ -6,7 +6,7 @@
 #include <span>
 #include <unordered_map>
 
-#include <cJSON/cJSON.h>
+#include <cJSON.h>
 
 //=============================================================================
 // JsonWriteBuffer

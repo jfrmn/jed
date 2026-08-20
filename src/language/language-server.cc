@@ -1,7 +1,7 @@
 #include "language-server.hh"
 #include "logging.hh"
 
-#include <cJSON/cJSON.h>
+#include <cJSON.h>
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

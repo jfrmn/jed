@@ -1,7 +1,7 @@
 #include "doctest/doctest.h"
 #include "language/language-server-protocol.hh"
 #include "language/json-helper.hh"
-#include <cJSON/cJSON.h>
+#include <cJSON.h>
 #include <string>
 #include <ostream> // won't compile without this - idk why
 

@@ -11,17 +11,6 @@ set (CMAKE_CXX_FLAGS_RELEASE "/MD  /Ob2 /O2 /DRELEASE")
 set (BUILD_SHARED_LIBS OFF)
 
 add_executable (slick-edit)
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-##if (BuildcJSON)
-#	add_library(cJSON STATIC)
-#	target_include_directories (cJSON PRIVATE "${DependenciesDir}/cJSON")
-#    target_compile_options(cJSON PRIVATE "/GS" "/Za" "/sdl" "/W4" "/wd4001" "/D_CRT_SECURE_NO_WARNINGS" "/TC")
-#	target_sources (cJSON PRIVATE
-#		"${DependenciesDir}/cJSON/cJSON.c"
-#		"${DependenciesDir}/cJSON/cJSON_Utils.c")
-##endif()
-
 #
 # toml++
 #
@@ -33,7 +22,7 @@ target_include_directories (slick-edit PRIVATE "deps/tomlplusplus/include")
 set (PCRE2_BUILD_PCRE2_8 ON)
 set (BUILD_STATIC_LIBS ON)
 set (PCRE2_NEWLINE ANYCRLF)
-set(PCRE2_SUPPORT_JIT ON CACHE BOOL "Enable JIT support" FORCE)
+set (PCRE2_SUPPORT_JIT ON CACHE BOOL "Enable JIT support" FORCE)
 set (PCRE2_NEVER_BACKSLASH_C OFF)
 set (PCRE2_BUILD_PCRE2GREP OFF)
 set (PCRE2_BUILD_TESTS OFF)
@@ -54,7 +43,7 @@ set (CJSON_BUILD_SHARED_LIBS OFF)
 
 add_subdirectory ("deps/cJSON")
 target_link_libraries(slick-edit cjson)
-target_include_directories (slick-edit PRIVATE "deps")
+target_include_directories (slick-edit PRIVATE "deps/cJSON")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # main executable

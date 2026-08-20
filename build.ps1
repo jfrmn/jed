@@ -2,13 +2,14 @@ param(
 	[Alias("c")]
 	[switch] $clean = $false,
 	
-	[Alias("r")]
+	[Alias("re", "reconf")]
 	[switch] $reconfigure = $false,
 		
 	[Alias("p")]
-	[string] $preset = "debug",
+	[ValidateSet("debug", "stable", "release")]
+	[string] $profile = "debug",
 	
-	[Alias("go")]
+	[Alias("r")]
 	[switch] $run = $false,
 
 	[Alias("t")]
@@ -24,34 +25,37 @@ if (-not $env:_VSDEVSHELL) {
 	$env:_VSDEVSHELL = "-arch=x64 -host_arch=x64"
 }
 
+function Write-Step($message) {
+	Write-Output "`e[1;36m > $message`e[0m";
+}
+
 # set tab color and title
-Write-Output "`e];build`a`e[2;0;1,|";
+Write-Output "`e];build`a`e[2;0;1,|" > $null;
 
 if ($clean) {
+	Write-Step "cleaning";
 	
-	Write-Output "cleaning...";
-	
-	if (Test-Path ".\out\$preset") {
-		Remove-Item -Path ".\out\$preset" -Recurse -Force;
+	if (Test-Path ".\out\$profile") {
+		Remove-Item -Path ".\out\$profile" -Recurse -Force;
 	}
 }
 
-if (-not (Test-Path ".\out\$preset")) {
-	New-Item -ItemType 'directory' .\out\$preset;
+if (-not (Test-Path ".\out\$profile")) {
+	New-Item -ItemType 'directory' .\out\$profile;
 	$reconfigure = $true;
 }
 	
 if ($reconfigure) {
-	Write-Output "configuring...";
-	& cmake --preset=$preset;
+	Write-Step "reconfiguring";
+	& cmake -S . -B .\out\$profile -G "Ninja" -DCMAKE_BUILD_TYPE="$profile";
 
 	if ($LASTEXITCODE -ne 0) {
 		exit;
 	}
 }
 
-Write-Output "compiling...";
-& cmake --build --preset=$preset
+Write-Step "compiling";
+& cmake --build .\out\$profile;
 
 if ($LASTEXITCODE -ne 0) {
 	exit;
@@ -60,23 +64,20 @@ if ($LASTEXITCODE -ne 0) {
 if ($install) {
 	
 	if (-not $installDir) {
-		$installDir = "out/$preset/install";
+		$installDir = "out/$profile/install";
 	}
 		
-	Write-Output "installing...($installDir)";
+	Write-Step "installing (dir=$installDir)";
 
-	if (-not (Test-Path ".\out\$preset\install")) {
-		New-Item -ItemType 'directory' .\out\$preset\install;
-	}
-
-	& cmake --install ./out/$preset/build --prefix $installDir 
+	& cmake --install ./out/$profile/build --prefix $installDir;
 }
 
 if ($test) {
-	Write-Output "running tests...";
-	& ./out/$preset/slick-edit-tests.exe
+	Write-Step "running tests";
+	& ./out/$profile/slick-edit-tests.exe
 }
 
 if ($run) {
-	& ./out/$preset/slick-edit.exe
+	Write-Step "running";
+	& ./out/$profile/slick-edit.exe
 }

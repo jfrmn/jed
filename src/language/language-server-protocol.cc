@@ -1,7 +1,7 @@
 #include "language-server-protocol.hh"
 #include "json-helper.hh"
 
-#include <cJSON/cJSON.h>
+#include <cJSON.h>
 
 #define MARKUP_KIND_MAPPING(X)\
 	X(Lsp::MarkupKind_Plaintext, "plaintext")\

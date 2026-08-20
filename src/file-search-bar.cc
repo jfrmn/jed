@@ -150,7 +150,7 @@ static void SearchDirectory(FileSearchBar::ThreadData* td, DirectoryIterator& it
 		LogError("failed to search directory: '%s'. Last Error: %s", iterator.GetSearchPath().data(), StrLastErr(iterator.lastError));
 }
 
-static DWORD WINAPI ThreadProc(LPVOID param) {
+DWORD WINAPI ThreadProcSearchDirectory(LPVOID param) {
 	auto threadData = static_cast<FileSearchBar::ThreadData*>(param);
 	
 	DirectoryIterator iter {"."};
@@ -188,7 +188,7 @@ void FileSearchBar::FilterItems(std::string_view searchText) {
 	threadData->searchTerm = searchText;
 	threadData->references = 2;
 	
-	hThread = CreateThread(NULL, 0, ThreadProc, threadData, 0, nullptr);
+	hThread = CreateThread(NULL, 0, ThreadProcSearchDirectory, threadData, 0, nullptr);
 	if (hThread == NULL) {
 		LogError("CreateThread() failed. Last Error: %s", StrLastErr(GetLastError()));
 		
