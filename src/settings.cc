@@ -2,8 +2,7 @@
 #include "graphics/factories.hh"
 #include "graphics/effects.hh"
 
-#include "util/file-util.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 #include "logging.hh"
 
 #include "commands/tools.hh"

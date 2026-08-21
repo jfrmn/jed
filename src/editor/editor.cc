@@ -8,8 +8,7 @@
 #include "ui/constants.h"
 
 #include "logging.hh"
-#include "util/file-util.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 
 #include "editor/editor-caretattached.hh"
 #include "editor/editor-autocomplete.hh"

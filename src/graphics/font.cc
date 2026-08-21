@@ -1,7 +1,6 @@
  #include "font.hh"
-
+ #include "util.hh"
 #include "logging.hh"
-#include "util/string-util.hh"
 
 #include "graphics/factories.hh"
 

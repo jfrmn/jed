@@ -1,5 +1,5 @@
 #include "events.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool KeyEvent::operator==(KeyEvent other) const {

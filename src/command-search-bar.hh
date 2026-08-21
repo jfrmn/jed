@@ -1,6 +1,6 @@
 #pragma once
 #include "ui/search-bar.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 #include "commands.hh"
 
 struct CommandSearchBar : public SearchBar {

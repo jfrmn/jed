@@ -11,7 +11,7 @@
 #include "graphics/glyph-run.hh"
 #include "graphics/effects.hh"
 
-#include "util/rect-util.hh"
+#include "util.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

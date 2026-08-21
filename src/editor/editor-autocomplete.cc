@@ -4,9 +4,9 @@
 #include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
+#include "util.hh"
 
 #include "ui/constants.h"
-#include "util/rect-util.hh"
 #include "text/text-position.hh"
 #include "graphics/effects.hh"
 

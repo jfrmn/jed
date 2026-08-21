@@ -3,7 +3,7 @@
 #include "editor/editor.hh"
 #include "graphics/effects.hh"
 #include "logging.hh"
-#include "util/file-util.hh"
+#include "util.hh"
 
 #include <tree_sitter/api.h>
 

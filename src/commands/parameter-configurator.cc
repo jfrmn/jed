@@ -5,7 +5,7 @@
 #include "settings.hh"
 
 #include "logging.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 #include "ui/constants.h"
 #include "graphics/effects.hh"
 
@@ -165,13 +165,11 @@ void ParameterConfigurator::OnUpdate() {
 	 			const D2D_RECT_F textBoxArea = item.textBox.GetArea();
 	 			
 	 			{
-					const D2D1_ROUNDED_RECT areaMinusButton = MakeRoundedRect(
-						D2D_RECT_F {
-							.left = textBoxArea.left - btnWidth,
-							.top = textBoxArea.top,
-							.right = textBoxArea.left,
-							.bottom = textBoxArea.bottom},
-						RADIUS);
+					const D2D1_ROUNDED_RECT areaMinusButton = ToRounded(D2D_RECT_F {
+						.left = textBoxArea.left - btnWidth,
+						.top = textBoxArea.top,
+						.right = textBoxArea.left,
+						.bottom = textBoxArea.bottom});
 						
 					deviceContext->DrawRoundedRectangle(areaMinusButton, settings.GetBrushUiText(isSelected));
 					if (mouse.Hittest(areaMinusButton.rect, this, OnClickMinus, i))
@@ -179,13 +177,11 @@ void ParameterConfigurator::OnUpdate() {
 				}
 				
 				{
-					const D2D1_ROUNDED_RECT areaPlusButton = MakeRoundedRect(
-						D2D_RECT_F {
-							.left = textBoxArea.right,
-							.top = textBoxArea.top,
-							.right = textBoxArea.right + btnWidth,
-							.bottom = textBoxArea.bottom},
-						RADIUS);
+					const D2D1_ROUNDED_RECT areaPlusButton = ToRounded(D2D_RECT_F {
+						.left = textBoxArea.right,
+						.top = textBoxArea.top,
+						.right = textBoxArea.right + btnWidth,
+						.bottom = textBoxArea.bottom});
 				
 					deviceContext->DrawRoundedRectangle(areaPlusButton, settings.GetBrushUiText(isSelected));
 					if (mouse.Hittest(areaPlusButton.rect, this, OnClickPlus, i))

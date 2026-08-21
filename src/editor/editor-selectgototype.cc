@@ -7,7 +7,7 @@
 
 #include "ui/constants.h"
 
-#include "util/rect-util.hh"
+#include "util.hh"
 #include "graphics/effects.hh"
 
 #define WIN32_LEAN_AND_MEAN

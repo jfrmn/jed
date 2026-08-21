@@ -1,12 +1,12 @@
 #pragma once
 #include "basic.hh"
 #include "commands.hh"
+#include "util.hh"
 
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
 
 #include "ui/scrollarea.hh"
-#include "util/string-util.hh"
 #include "graphics/glyph-run.hh"
 
 #include "editor/editor-diagnostics.hh"
@@ -61,8 +61,6 @@ struct Editor {
 	bool fileRemoved = false;
 	bool isDirty = false;
 	
-	Encoding encoding = Encoding_Utf8;
-
 	TextController textController = {};
 	EditorDiagnostics editorDiagnostics = {};
 	

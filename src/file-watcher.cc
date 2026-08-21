@@ -1,6 +1,6 @@
 #include "file-watcher.hh"
 #include "logging.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 #include "main-window.hh"
 
 #define WIN32_LEAN_AND_MEAN

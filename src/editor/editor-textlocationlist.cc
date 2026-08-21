@@ -11,8 +11,7 @@
 #include "graphics/effects.hh"
 
 #include "logging.hh"
-#include "util/file-util.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 
 #include <algorithm>
 

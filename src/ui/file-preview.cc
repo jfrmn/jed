@@ -6,8 +6,7 @@
 #include "graphics/effects.hh"
 
 #include "logging.hh"
-#include "util/rect-util.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 
 #include <algorithm>
 

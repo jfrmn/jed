@@ -2,10 +2,7 @@
 #include "main-window.hh"
 #include "globals.hh"
 #include "settings.hh"
-
-#include "util/file-util.hh"
-#include "util/rect-util.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 #include "logging.hh"
 
 #include "ui/constants.h"
@@ -13,6 +10,7 @@
 #include "graphics/glyph-run.hh"
 
 #include <string>
+#include <algorithm>
 
 #define WIN32_LEAN_AND_MEAN
 #define STRICT_TYPED_ITEMIDS // we want the defines for PIDLIST_ABSOLUTE and such
@@ -558,7 +556,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 			
 		switch (strret.uType) {
 			case STRRET_CSTR: {
-				std::string_view childName {strret.cStr};
+				const std::string_view childName {strret.cStr};
 				for (const Explorer::Item& item : self->activePanel->items) {
 					if (item.filename == childName) {
 						if (item.isSelected || &item == self->activePanel->activeItem) {
@@ -572,7 +570,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 			
 			case STRRET_OFFSET:
 			case STRRET_WSTR: {
-				const wchar* childName = nullptr;
+				std::wstring_view childName {};
 				if (strret.uType == STRRET_OFFSET) {
 					childName = reinterpret_cast<const wchar*>(
 						reinterpret_cast<const u8*>(childItemId) + strret.uOffset);
@@ -581,7 +579,7 @@ static void CommandRevealInExplorer(Explorer* self) {
 				}
 				
 				for (const Explorer::Item& item : self->activePanel->items) {
-					if (StringEquals(item.filename, std::wstring_view {childName})) {
+					if (StringEqualsCaseInsen(item.filename, childName)) {
 						if (item.isSelected || &item == self->activePanel->activeItem) {
 							itemsToSelect.push_back(childItemId);
 							childItemId = nullptr;
@@ -853,7 +851,7 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		//
 		{
 			if (item.isSelected)
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(itemArea, RADIUS), settings.GetBrushSelection());
+				deviceContext->FillRoundedRectangle(ToRounded(itemArea), settings.GetBrushSelection());
 				
 			if (item.flags & Explorer::Item::Flag_Inserted) {
 				ID2D1SolidColorBrush* insertAnimBrush = settings.GetBrushSelection();

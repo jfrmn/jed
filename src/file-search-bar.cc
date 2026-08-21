@@ -3,7 +3,7 @@
 #include "main-window.hh"
 #include "globals.hh"
 
-#include "util/file-util.hh"
+#include "util.hh"
 #include "logging.hh"
 
 #include <algorithm>

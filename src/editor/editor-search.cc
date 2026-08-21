@@ -5,7 +5,7 @@
 #include "main-window.hh"
 #include "settings.hh"
 
-#include "util/rect-util.hh"
+#include "util.hh"
 #include "logging.hh"
 
 #include "graphics/effects.hh"
@@ -297,7 +297,7 @@ void EditorSearch::OnUpdate() {
 				.bottom = area.bottom};
 			
 			if (mouse.Hittest(resultListButtonArea, this, OnClickToggleResultList))
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(resultListButtonArea, RADIUS), settings.GetBrushHover(mouse.isDown));
+				deviceContext->FillRoundedRectangle(ToRounded(resultListButtonArea), settings.GetBrushHover(mouse.isDown));
 		}
 
 		//

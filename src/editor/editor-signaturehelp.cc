@@ -3,8 +3,8 @@
 #include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
+#include "util.hh"
 
-#include "util/rect-util.hh"
 #include "graphics/effects.hh"
 #include "ui/constants.h"
 

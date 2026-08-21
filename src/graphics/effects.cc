@@ -1,10 +1,10 @@
 #include "effects.hh"
 #include "settings.hh"
+#include "logging.hh"
+#include "util.hh"
+
 #include "ui/constants.h"
 #include "graphics/factories.hh"
-
-#include "logging.hh"
-#include "util/rect-util.hh"
 #include "util/color.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -179,11 +179,9 @@ void BlendImages(ID2D1DeviceContext* deviceContext, const D2D_POINT_2F& pos, ID2
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& boundingBox) {
-	PushLayer(deviceContext, D2D1_ROUNDED_RECT {
-		.rect = boundingBox,
-		.radiusX = RADIUS,
-		.radiusY = RADIUS});
+	PushLayer(deviceContext, ToRounded(boundingBox));
 }
+
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D1_ROUNDED_RECT& boundingBox) {
 	ID2D1RoundedRectangleGeometry* geometry = nullptr;
 	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(boundingBox, &geometry); hr != S_OK) {

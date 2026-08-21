@@ -9,8 +9,6 @@
 #define MARGIN 10.0f
 #define MARGIN_X2 (MARGIN * 2.0f)
 
-#define RADIUS 5.0f
-
 #define SCROLLBAR_WIDTH_WIDE   15.0f
 #define SCROLLBAR_WIDTH_NARROW  5.0f
 

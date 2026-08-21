@@ -2,13 +2,10 @@
 #include "globals.hh"
 #include "main-window.hh"
 #include "settings.hh"
-
-#include "util/rect-util.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 #include "logging.hh"
-#include "util/string-util.hh"
-#include "util/diagnostics.hh"
 
+#include "util/diagnostics.hh"
 #include "ui/constants.h"
 #include "graphics/effects.hh"
 #include "commands/tools.hh"
@@ -123,7 +120,7 @@ static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 		}
 		
 		// check if it's reference to a parameter by index - e.g. %1
-		if (pos < self->tool->command.size()-1 && IsNumeric(self->tool->command[pos+1])) {
+		if (pos < self->tool->command.size()-1 && std::isdigit(self->tool->command[pos+1]) != 0) {
 			pos += 1;
 			
 			u64 parameterIndex = U64_MAX;
@@ -672,16 +669,16 @@ void ToolOutput::OnUpdate() {
 			// draw progress bar
 			if (tool->progress.regex.isOk) {
 				
-				deviceContext->FillRoundedRectangle(
-					MakeRoundedRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea), RADIUS),
+				deviceContext->FillRoundedRectangle(ToRounded(
+					MakeRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea))),
 					GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
 				
-				deviceContext->DrawRoundedRectangle(
-					MakeRoundedRect(progressArea, RADIUS),	
+				deviceContext->DrawRoundedRectangle(ToRounded(
+					progressArea),
 					settings.GetBrushUiText());
 			} else {
-				deviceContext->FillRoundedRectangle(
-					MakeRoundedRect(progressArea, RADIUS),
+				deviceContext->FillRoundedRectangle(ToRounded(
+					progressArea),
 					settings.GetBrushUiBackground(false));
 			}
 				
@@ -718,7 +715,7 @@ void ToolOutput::OnUpdate() {
 				}
 				
 				if (mouse.Hittest(progressArea, this, onClickFunc)) {
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(progressArea, RADIUS), settings.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(ToRounded(progressArea), settings.GetBrushHover(mouse.isDown));
 					
 					brush->SetColor(hoverLabelColor.ToD2D());
 					run.Shape(hoverLabel, settings.fontUi);
@@ -743,10 +740,10 @@ void ToolOutput::OnUpdate() {
 					.bottom = toolbarArea.bottom - MARGIN + PADDING};
 				
 				if (showToolDiagnostics)
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), settings.GetBrushUiBackground(false));
+					deviceContext->FillRoundedRectangle(ToRounded(areaBothIcons), settings.GetBrushUiBackground(false));
 					
 				if (mouse.Hittest(areaBothIcons, this, OnClickToggleShowToolDiagnostics))
-					deviceContext->FillRoundedRectangle(MakeRoundedRect(areaBothIcons, RADIUS), settings.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(ToRounded(areaBothIcons), settings.GetBrushHover(mouse.isDown));
 				
 				deviceContext->DrawBitmap(
 					settings.icons.editorDiagnosticsWarning,
@@ -1013,7 +1010,7 @@ static void MatchDiagnostics(ToolOutput* self, const std::string* line) {
 		const RegexMatch::Group& group = match.GetGroup(self->tool->diagnostics.captureGroupColor);
 		
 		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnostics.colorMapping) {
-			if (StringEqualsCasesInsen(entry.key, group.GetText())) {
+			if (StringEqualsCaseInsen(entry.key, group.GetText())) {
 				record.color = entry.color;
 				break;
 			}

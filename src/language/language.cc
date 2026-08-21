@@ -7,7 +7,7 @@
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-textlocationlist.hh"
 
-#include "util/file-util.hh"
+#include "util.hh"
 #include "logging.hh"
 
 #include <mutex>

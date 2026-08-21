@@ -3,7 +3,7 @@
 
 #include "graphics/factories.hh"
 #include "logging.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

@@ -7,7 +7,7 @@
 #include "ui/constants.h"
 
 #include "logging.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 
 bool TextBox::Init(Font* fontToUse, std::string_view placeholderText /*= {}*/, std::string initalText /*= {}*/) {
 
@@ -63,8 +63,7 @@ void TextBox::OnUpdate() {
 		else if (inactive) brush = settings.GetBrushUiBackground(false);
 		else               brush = settings.GetBrushUiBackground(true);
 		
-		const D2D1_ROUNDED_RECT roundedArea = MakeRoundedRect(area, RADIUS);
-		deviceContext->FillRoundedRectangle(roundedArea, brush);
+		deviceContext->FillRoundedRectangle(ToRounded(area), brush);
 	}
 
 	//

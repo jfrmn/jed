@@ -1,7 +1,7 @@
 #pragma once
 #include "editor/editor-caretattached.hh"
 #include "text/text-position.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 
 #include <string>
 

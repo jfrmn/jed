@@ -8,7 +8,7 @@
 #include "editor/editor-diagnosticslist.hh"
 
 #include "ui/constants.h"
-#include "util/rect-util.hh"
+#include "util.hh"
 #include "language/language.hh"
 #include "graphics/effects.hh"
 #include "commands/tools.hh"
@@ -144,22 +144,20 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 	
 	const std::scoped_lock lock {mainWindow.toolOutput.mtx};
 	
-	deviceContext->FillRoundedRectangle(
-		MakeRoundedRect(
+	deviceContext->FillRoundedRectangle(ToRounded(
+		MakeRect(
 			area.left,
 			area.top + PADDING,
 			PROGRESS_BAR_WIDTH * mainWindow.toolOutput.progressValue,
-			settings.fontUi.lineHeight,
-			RADIUS),
+			settings.fontUi.lineHeight)),
 		GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
 	
-	deviceContext->DrawRoundedRectangle(
-		MakeRoundedRect(
-			area.left,
-			area.top + PADDING,
-			PROGRESS_BAR_WIDTH,
-			settings.fontUi.lineHeight,
-			RADIUS),
+	deviceContext->DrawRoundedRectangle(ToRounded(
+		D2D_RECT_F {
+			.left = area.left,
+			.top = area.top + PADDING,
+			.right = area.left + PROGRESS_BAR_WIDTH,
+			.bottom = area.top + PADDING + settings.fontUi.lineHeight}),
 		settings.GetBrushUiText());
 	
 	GlyphRun run;
@@ -609,14 +607,12 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		f32 offsetFrom, offsetTo;
 		run.MeasureOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
 		
-		deviceContext->FillRoundedRectangle(
-			MakeRoundedRect(
-				D2D_RECT_F {
-					.left = area.left + PADDING + offsetFrom,
-					.top = area.top + PADDING,
-					.right = area.left + PADDING + offsetTo,
-					.bottom = area.bottom - PADDING},
-				RADIUS),
+		deviceContext->FillRoundedRectangle(ToRounded(
+			D2D_RECT_F {
+				.left = area.left + PADDING + offsetFrom,
+				.top = area.top + PADDING,
+				.right = area.left + PADDING + offsetTo,
+				.bottom = area.bottom - PADDING}),
 			GetBrush(caretInfoText.bgColor));
 	}
 	

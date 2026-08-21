@@ -11,8 +11,7 @@
 #include "commands/tool-search-bar.hh"
 
 #include "logging.hh"
-#include "util/file-util.hh"
-#include "util/rect-util.hh"
+#include "util.hh"
 
 #include "graphics/effects.hh"
 #include "editor/editor.hh"
@@ -608,8 +607,8 @@ void MainWindow::OnUpdate() {
 						deviceContext->PushAxisAlignedClip(previewPanelArea, D2D1_ANTIALIAS_MODE_ALIASED);
 						
 						// draw header						
-						deviceContext->FillRoundedRectangle(
-							MakeRoundedRect(previewPanelArea.left, previewPanelArea.top, width, settings.fontUi.lineHeight + PADDING_X2, RADIUS),
+						deviceContext->FillRoundedRectangle(ToRounded(
+							MakeRect(previewPanelArea.left, previewPanelArea.top, width, settings.fontUi.lineHeight + PADDING_X2)),
 							settings.GetBrushUiBackground());
 						
 						staticGlyphRun.Draw(deviceContext,
@@ -721,15 +720,15 @@ void MainWindow::OnUpdate() {
 				.right  = (width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
 				.bottom = (height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
 			
-			deviceContext->DrawRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushUiBackground());
+			deviceContext->DrawRoundedRectangle(ToRounded(buttonRect), settings.GetBrushUiBackground());
 			
 			if ((i == 0 && searchBar) || i == 1 && explorer)
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushUiBackground());
+				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.GetBrushUiBackground());
 			
 			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.GetBrushUiText());
 			
 			if (mouse.Hittest(buttonRect, this, OnClickStartPage, i))
-				deviceContext->FillRoundedRectangle(MakeRoundedRect(buttonRect, RADIUS), settings.GetBrushHover(mouse.isDown));
+				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.GetBrushHover(mouse.isDown));
 			
 			offsetY += settings.fontUi.lineHeight + PADDING_X2 + MARGIN_X2;
 		}

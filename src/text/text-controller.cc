@@ -3,7 +3,7 @@
 
 #include "editor/editor.hh"
 #include "logging.hh"
-#include "util/string-util.hh"
+#include "util.hh"
 
 // need hWnd for Clipboard operations
 #include "main-window.hh"
@@ -178,7 +178,7 @@ static u64 GetIndentationEnd(TextController* self, u64 linenr) {
 
 	u64 col = 0;
 	for (; col < line.length; col++) {
-		if (!IsWhitespace(line.data[col])) {
+		if (!std::isspace(line.data[col]) != 0) {
 			return col;
 		}
 	}
@@ -348,11 +348,11 @@ static void MoveToNextWord(TextController* self, TextPosition* position) {
 	}
 
 	char currentChar = line.data[position->column];
-	const bool wasAlphaNumeric = IsAlphanumeric(currentChar);
+	const int wasAlphaNumeric = std::isalnum(currentChar);
 
 	// @FIXME does not respect multibyte-codepoints
 
-	while (IsAlphanumeric(currentChar) == wasAlphaNumeric
+	while (std::isalnum(currentChar) == wasAlphaNumeric
 		|| IsMultibyteCodepointMember(currentChar)) {
 
 		position->column++;
@@ -382,9 +382,9 @@ static void MoveToPrevWord(TextController* self, TextPosition* position) {
 	u64 prevColumn = position->column - 1;
 	char prevChar = line.data[prevColumn];
 
-	const bool wasAlphaNumeric = IsAlphanumeric(prevChar);
+	const int wasAlphaNumeric = std::isalnum(prevChar);
 
-	while (IsAlphanumeric(prevChar) == wasAlphaNumeric
+	while (std::isalnum(prevChar) == wasAlphaNumeric
 		|| IsMultibyteCodepointMember(prevChar)) {
 		
 		if (prevColumn == 0u) {
