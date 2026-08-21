@@ -29,7 +29,7 @@ std::vector<Language*> Language::languages = {};
 bool Language::LoadLanguages(std::string_view directory) {
 	std::string fileBuffer = {};
 	
-	DirectoryIterator iter {std::string(directory)};	
+	DirectoryIterator iter {directory};	
 	while (iter.Next()) {
 
 		if (!iter.IsDirectory())
