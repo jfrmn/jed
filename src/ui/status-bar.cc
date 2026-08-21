@@ -11,7 +11,7 @@
 #include "util.hh"
 #include "language/language.hh"
 #include "graphics/effects.hh"
-#include "commands/tools.hh"
+#include "tools.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

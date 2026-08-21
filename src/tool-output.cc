@@ -4,11 +4,11 @@
 #include "settings.hh"
 #include "util.hh"
 #include "logging.hh"
+#include "tools.hh"
 
 #include "util/diagnostics.hh"
 #include "ui/constants.h"
 #include "graphics/effects.hh"
-#include "commands/tools.hh"
 
 #include <charconv>
 #include <algorithm>

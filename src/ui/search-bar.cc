@@ -8,7 +8,7 @@
 
 #include "ui/constants.h"
 #include "graphics/effects.hh"
-#include "commands/parameter-configurator.hh"
+#include "ui/parameter-configurator.hh"
 
 #include <cmath>
 

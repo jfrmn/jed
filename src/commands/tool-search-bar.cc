@@ -1,9 +1,8 @@
 #include "tool-search-bar.hh"
 #include "tools.hh"
-#include "parameter-configurator.hh"
 #include "main-window.hh"
-
 #include "logging.hh"
+#include "ui/parameter-configurator.hh"
 
 ToolSearchBar* ToolSearchBar::Make() {
 	auto self = new ToolSearchBar();

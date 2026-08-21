@@ -2,7 +2,7 @@
 #include <vector>
 #include "text/text-position.hh"
 #include "graphics/glyph-run.hh"
-#include "commands/parameter.hh"
+#include "util/parameter.hh"
 #include "commands.hh"
 
 #include "ui/scrollarea.hh"

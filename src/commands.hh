@@ -1,5 +1,5 @@
 #pragma once
-#include "commands/parameter.hh"
+#include "util/parameter.hh"
 
 #include <string_view>
 #include <span>

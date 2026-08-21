@@ -5,7 +5,7 @@
 #include "util.hh"
 #include "logging.hh"
 
-#include "commands/tools.hh"
+#include "tools.hh"
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_ENABLE_UNRELEASED_FEATURES 1

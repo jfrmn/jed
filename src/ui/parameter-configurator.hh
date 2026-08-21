@@ -1,7 +1,7 @@
 #pragma once
 #include "basic.hh"
 #include "ui/text-box.hh"
-#include "commands/parameter.hh"
+#include "util/parameter.hh"
 
 #include <span>
 

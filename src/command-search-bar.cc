@@ -2,7 +2,7 @@
 #include "commands.hh"
 #include "events.hh"
 #include "main-window.hh"
-#include "commands/parameter-configurator.hh"
+#include "ui/parameter-configurator.hh"
 
 #include <algorithm>
 
