@@ -3,13 +3,8 @@
 #include "globals.hh"
 #include "settings.hh"
 #include "file-watcher.hh"
-
-#include "file-search-bar.hh"
-#include "command-search-bar.hh"
 #include "explorer.hh"
 #include "tool-output.hh"
-#include "commands/tool-search-bar.hh"
-
 #include "logging.hh"
 #include "util.hh"
 
@@ -57,6 +52,10 @@ bool MainWindow::Init() {
 		LogError("init status bar failed");
 		return false;
 	}
+
+	searchBarFiles.Init();
+	searchBarTools.Init();
+	searchBarCommands.Init();
 		
 	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	return true;
@@ -64,10 +63,7 @@ bool MainWindow::Init() {
 
 void MainWindow::Shutdown() {
 	Window::CleanUp();
-	
-	if (searchBar)
-		delete searchBar;
-	
+		
 	for (Tab& tab : tabs)
 		delete tab.editor;
 	
@@ -404,7 +400,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
 	auto self = static_cast<MainWindow*>(ud);
 	if (btn == 0) { // search file
 		if (self->searchBar) return;
-		self->searchBar = FileSearchBar::Make();
+		self->searchBar = &self->searchBarFiles;
 		needsUpdate = true;
 	
 	} else if (btn == 1) { // open explorer
@@ -757,10 +753,8 @@ void MainWindow::OnUpdate() {
 	if (searchBar) {
 		searchBar->OnUpdate();
 		
-		if (searchBar->shouldClose) {
-			delete searchBar;
+		if (searchBar->shouldClose)
 			searchBar = nullptr;
-		}
 	}
 }
 
@@ -1107,11 +1101,14 @@ bool MainWindow::OnMouseWheel(f32 distance) {
 void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 
 	if (command.id == Command::Id_OpenFileSearch) {
-		if (!searchBar) searchBar = FileSearchBar::Make();
+		searchBar = &searchBarFiles;
+		searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_OpenToolSearch) {
-		if (!searchBar) searchBar = ToolSearchBar::Make();
+		searchBar = &searchBarTools;
+		searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_OpenCommandSearch) {
-		if (!searchBar) searchBar = CommandSearchBar::Make();
+		searchBar = &searchBarCommands;
+		searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_ToggleToolOutput) {
 		toolOutput.isOpen = !toolOutput.isOpen;
 	} else if (command.id == Command::Id_ToggleExplorer) {
@@ -1163,13 +1160,18 @@ void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
 	} else if (searchBar) {
 		searchBar->OnKeyDown(event, command);
 		
-		if (searchBar->shouldClose) {
-			delete searchBar;
+		if (searchBar->shouldClose)
 			searchBar = nullptr;
-		}
 	
 	} else if (toolOutput.isOpen) {
 		toolOutput.OnKeyDown(event, command);
+
+	} else if (event.vkeycode == VK_ESCAPE && searchBar) {
+		searchBar = nullptr;
+		
+	} else if (event.vkeycode == VK_ESCAPE && explorer) {
+		delete explorer;
+		explorer = nullptr;
 	
 	} else if (Editor* focusedEditor = GetFocusedEditor()) {
 		focusedEditor->OnKeyEvent(event, command);

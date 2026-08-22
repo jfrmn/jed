@@ -1,6 +1,7 @@
 #pragma once
 #include "events.hh"
 #include "tool-output.hh"
+#include "search-bar.hh"
 #include "commands.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
@@ -55,6 +56,10 @@ struct MainWindow : public Window {
 	//-----------------------------------------------------
 
 	SearchBar* searchBar = nullptr;
+	SearchBarFiles searchBarFiles = {};
+	SearchBarTools searchBarTools = {};
+	SearchBarCommands searchBarCommands  = {};
+
 	Explorer*  explorer = nullptr;
 	ToolOutput toolOutput = {};
 	StatusBar  statusBar = {};
