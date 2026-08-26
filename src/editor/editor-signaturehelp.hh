@@ -51,8 +51,8 @@ struct EditorSignatureHelp : public EditorCaretAttached {
 	
 	static EditorSignatureHelp* Make(Editor* owner);
 	
-	virtual void OnUpdate() override;
-	virtual bool OnKeyEvent(KeyEvent event) override;
+	virtual void Update() override;
+	virtual bool HandleEvent(const Event& event, const Command& command) override;
 	virtual void OnInput() override;
 		
 	virtual ~EditorSignatureHelp() noexcept;

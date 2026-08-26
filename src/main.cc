@@ -1,4 +1,4 @@
-#include "main-window.hh"
+#include "app.hh"
 #include "globals.hh"
 #include "settings.hh"
 
@@ -8,6 +8,8 @@
 
 #include "language/language.hh"
 #include "language/json-helper.hh"
+
+#include "ui/window.hh"
 #include "logging.hh"
 #include "file-watcher.hh"
  
@@ -58,7 +60,8 @@ int main(int argc, char** argv) {
 		LogError("init perforamnce counters failed");
 	
 	
-	if (!mainWindow.Create()) {
+	const Window::CreateParams windowCreateParams {.className = "SLICKEDITWND", .title = "slick-edit", .width = 1920, .height = 1080, .hWndParent = NULL};
+	if (!mainWindow.Create(windowCreateParams)) {
 		LogFatal("creating window failed");
 		return -1;
 	}
@@ -80,15 +83,17 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 		
-	if (!mainWindow.Init()) {
+	if (!app.Init()) {
 		LogError("init main window failed");
 		return -1;
 	}
+	
+	mainWindow.Show();
 		
 	LogInfo("running message loop");
 
 	u64 ticksBefore = 0;
-	while (!mainWindow.destroyRecieved) {
+	while (!mainWindow.quitReceived) {
 		
 		if (needsUpdate) {
 			if (MSG message; PeekMessage(&message, NULL, 0, 0, PM_REMOVE)) {
@@ -112,11 +117,14 @@ int main(int argc, char** argv) {
 		}
 		
 		needsUpdate = false;		
-		mainWindow.OnUpdate();
-		mouse.NextFrame();
+		app.HandleEvent();
+		app.Update();
+		mouse.NextFrame(mainWindow.event);
+		mainWindow.ClearEvent();
 	}
 	
-	mainWindow.Shutdown();
+	app.Shutdown();
+	mainWindow.CleanUp();
 	fileWatcher.Shutdown();
 	ShutdownEffects();
 	ShutdownFactories();	

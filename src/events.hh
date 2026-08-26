@@ -1,15 +1,19 @@
 #pragma once
 #include "basic.hh"
+#include <string_view>
+
+struct D2D_RECT_F;
+struct D2D_POINT_2F;
+struct D2D_SIZE_F;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Constants
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define VK_NONE 0
 #define VK_MAX 255
-
-struct D2D_RECT_F;
-struct ParameterValue;
-
-//-----------------------------------------------------------------------------
-// Key event
-//-----------------------------------------------------------------------------
 
 enum KeyModifier : u32 {
 	KM_None  = 0,
@@ -18,16 +22,11 @@ enum KeyModifier : u32 {
 	KM_Alt   = 4
 };
 
-struct KeyEvent {
-	u32 vkeycode = VK_NONE;
-	u32 modifiers = KM_None;
-	
-	bool operator==(KeyEvent other) const;
-};
-
-//-----------------------------------------------------------------------------
-// File changed event
-//-----------------------------------------------------------------------------
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// FileChangedRecord
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct FileChangeRecord {
 	// should match the constants in windows.h
@@ -55,44 +54,94 @@ struct FileChangedEvent {
 	FileChangeRecord records[1] = {};	
 };
 
-//-----------------------------------------------------------------------------
-// Mouse
-//-----------------------------------------------------------------------------
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Event
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Mouse {
+struct Event {
 	
-	enum Event {
-		 Event_None    = 0,
-		 Event_Down    = 1,
-		 Event_Up      = 2
+	enum Type {
+		 Type_None = 0,
+		 Type_KeyPress,
+		 Type_Text,
+		 Type_MouseDown,
+		 Type_MouseUp,
+		 Type_MouseWheel,
+		 Type_Resize,
+		 Type_Close,
+		 Type_FileChange,
+		 Type_DirectCommand  // when user picks a command from the command search bar
 	};
 	
-	using OnClickFunction = void (*)(void* userdata, u64 userint);
+	Type type = Type_None;
+	
+	// could make this a union
+	// but msvc can't handle multiple anonymus structs inside a union (internal compiler error)
+	// we could use named structs but member access is nicer this way
+	// and but we don't allocate this struct often
+		
+	// KeyPress
+	u32 vkcode = VK_NONE;
+	u32 kmods = KM_None;
+	
+	// Text
+	char textData[6]; // 6 is the theroretical maximum for utf8
+	u64 textLen = 0u; 
+	
+	// MouseDown, MouseUp
+	f32 x = 0.0f;
+	f32 y = 0.0f;
+	
+	// MouseWheel
+	f32 wheelDistance = 0.0f;
+	
+	// Resize
+	f32 newWidth = 0.0f;
+	f32 newHeight = 0.0f;
+
+	// FileChangedEvent
+	FileChangedEvent* fileChangedEvent = nullptr;
+	
+	std::string_view GetText() const;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Mouse State
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct MouseState {
+	using Callback = void (*)(void* userdata, u64 userint);
 	
 	struct Element {
+		Callback callback = nullptr;
 		void* userdata = nullptr;
-		OnClickFunction onClickFunc = nullptr;
+		u64 userint = 0u;
 		
-		bool operator==(const Element& other) const;
+		bool operator==(const Element& other) const = default;
 	};
-	
-	Event event = Event_None;
 	
 	f32 x = 0.0f;
 	f32 y = 0.0f;
 	bool isDown = false;
 	bool isDragging = false;
 	
-	Element hotElementNext = {};
-	Element hotElement = {};
+	Element nextHotElement = {};
+	Element currentHotElement = {};
+	f32 dragDeltaX = 0.0f;
+	f32 dragDeltaY = 0.0f;
 	
-	// free variables that can be set by whoever is dragging/clicking
-	f32 dragArg = 0.0f;
-	u64 onClickArg = 0u;
-		
-	bool Hittest(const D2D_RECT_F& area, void* userdata, OnClickFunction onClick, u64 arg = 0u);
+	// preform a hittest and, if successfull, calls Hot()
+	bool Hittest(const D2D_RECT_F& area, void* userdata, Callback onClick = nullptr, u64 userint = 0u);
+	// Set as the nextHotElement. Return if true if the current Hot element
+	bool Hot(void* userdata, Callback onClick = nullptr, u64 userint = 0u);
 	
-	void StartDragging(f32 arg = 0.0f);
+	void StartDragging(f32 dx = 0.0f, f32 dy = 0.0f);
 	
-	void NextFrame();
+	void NextFrame(const Event& event);
 };
+
+extern MouseState mouse;

@@ -2,7 +2,6 @@
 #include "basic.hh"
 #include "globals.hh"
 #include "events.hh"
-#include "main-window.hh"
 #include "settings.hh"
 
 #include "util.hh"
@@ -12,6 +11,7 @@
 #include "graphics/glyph-run.hh"
 #include "editor/editor.hh"
 #include "ui/constants.h"
+#include "ui/window.hh"
 
 #include <algorithm>
 
@@ -184,7 +184,7 @@ static void OnClickResultItem(void* ud, u64 i) {
 	self->owner->textController.SetSelection(result.from, result.to);
 }
 
-void EditorSearch::OnUpdate() {
+void EditorSearch::Update() {
 
 	D2D_RECT_F area {};
 
@@ -255,10 +255,10 @@ void EditorSearch::OnUpdate() {
 			settings.GetBrushUiText());
 	}
 
-	textboxSearch.OnUpdate();
+	textboxSearch.Update();
 		
 	if (isReplaceTextboxVisible)
-		textboxReplace.OnUpdate();	
+		textboxReplace.Update();	
 
 	if (threadData) {
 
@@ -581,9 +581,9 @@ static void ActionSetCaretToEveryResult(EditorSearch* self, bool select) {
 	}
 }
 
-bool EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
+bool EditorSearch::HandleEvent(const Event& event, const Command& command) {
 	
-	if (event.vkeycode == VK_RETURN) {
+	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
 	
 		if (!threadData || searchIsDirty) {
 
@@ -593,13 +593,13 @@ bool EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 			StartNewSearch(this, searchTerm);
 
 			searchIsDirty = false;
-
+			
 		} else if (IsSearchComplete()) {
-				const bool ctrl = (event.modifiers & KM_Ctrl) != 0;
-				const bool shift = (event.modifiers & KM_Shift) != 0;
-				const bool alt = (event.modifiers & KM_Alt) != 0;
+			const bool ctrl = (event.kmods & KM_Ctrl) != 0;
+			const bool shift = (event.kmods & KM_Shift) != 0;
+			const bool alt = (event.kmods & KM_Alt) != 0;
  			
- 			if (!ctrl && !alt) {
+			if (!ctrl && !alt) {
 				if (focusedTextbox == &textboxReplace)
 					ActionReplaceNext(this, shift);
 				else if (focusedTextbox == &textboxSearch)
@@ -615,17 +615,17 @@ bool EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 					ActionReplaceNext(this, shift);
 			
 			} else if (ctrl && alt) {
-				ActionSetCaretToEveryResult(this, shift);	
-			
-			} else if (ctrl && !alt) {
-				ActionReplaceAll(this);	
+				ActionReplaceAll(this);
 			}
 		}
-
-	} else if (event.vkeycode == VK_PAUSE && (event.modifiers & KM_Ctrl) != 0) {
+		
+	} else if (event.vkcode == VK_INSERT && (event.kmods & KM_Ctrl)) {
+		ActionSetCaretToEveryResult(this, event.kmods & KM_Shift);
+				
+	} else if (event.vkcode == VK_PAUSE && event.kmods == KM_Ctrl) {
 		CancelSearch(this);
 
-	} else if (event.vkeycode == VK_TAB && (event.modifiers & KM_Ctrl) != 0) {
+	} else if (event.vkcode == VK_TAB && event.kmods == KM_Ctrl) {
 
 		if (isReplaceTextboxVisible) {
 			textboxSearch.inactive  = !textboxSearch.inactive;
@@ -652,17 +652,12 @@ bool EditorSearch::OnKeyEvent(KeyEvent event, Command command) {
 		
 	} else {
 		ASSERT(focusedTextbox);
-		const bool changed = focusedTextbox->OnKeyDown(event, command);
+		const auto [handled, changed] = focusedTextbox->HandleEvent(event, command);
 		searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
+		return handled;
 	}
 	
 	return true;
-}
-
-void EditorSearch::OnChar(const char* data, u64 len) {
-	ASSERT(focusedTextbox);
-	const bool changed = focusedTextbox->OnChar(data, len);
-	searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

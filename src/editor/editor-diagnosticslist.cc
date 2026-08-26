@@ -62,7 +62,7 @@ static void OnClickItem(void* ud, u64 i) {
 	ActionGotoItem(self, i, false);	
 }
 
-void EditorDiagnosticsList::OnUpdate() {
+void EditorDiagnosticsList::Update() {
 
 	//
 	// update animation
@@ -217,17 +217,17 @@ void EditorDiagnosticsList::OnUpdate() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorDiagnosticsList::OnKeyEvent(KeyEvent event, Command command) {
-	if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
+bool EditorDiagnosticsList::HandleEvent(const Event& event, const Command& command) {
+	if (event.type == Event::Type_KeyPress && (event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
 		
-		selectedItem = event.vkeycode == VK_DOWN
+		selectedItem = event.vkcode == VK_DOWN
 			? IncrementWrapAround(selectedItem, itemCount)
 			: DecrementWrapAround(selectedItem, itemCount);
 			
 		return true;
 	
-	} else if (event.vkeycode == VK_RETURN) {
-		ActionGotoItem(this, selectedItem, (event.modifiers & KM_Ctrl) != 0);
+	} else if (event.vkcode == VK_RETURN) {
+		ActionGotoItem(this, selectedItem, (event.kmods & KM_Ctrl) != 0);
 		return true;
 	
 	} else if (command.Id_Editor_OpenDiagnosticsList) {

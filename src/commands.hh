@@ -105,4 +105,5 @@ struct CommandDefinition {
 	bool forceParameterConfiguration = false;
 };
 
+// @FIXME why is this not const?
 extern CommandDefinition commandDefinitions[];

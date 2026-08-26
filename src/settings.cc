@@ -298,6 +298,10 @@ static constexpr std::pair<std::string_view, u32> stringToVirtualKeyCode[] = {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+static constexpr u64 MakeKey(u64 vkcode, u64 kmods) {
+	return kmods << 32 | vkcode;
+}
+
 Settings settings {
 	.icons = {},
 	
@@ -321,66 +325,66 @@ Settings settings {
 		.uiBackgroundInvalid  = {0.4f, 0.0f, 0.0f, 1.0f}},
 	
 	.keyBinds = {
-		{KeyEvent {.vkeycode = VK_OEM_COMMA, .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenFileSearch}},
-		{KeyEvent {.vkeycode = 'T',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenToolSearch}},
-		{KeyEvent {.vkeycode = 'P',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_OpenCommandSearch}},
-		{KeyEvent {.vkeycode = VK_OEM_2,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
-		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ToggleExplorer}},
-		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_FocusNextTab}},
-		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_FocusPrevTab}},
-		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusNextPanel}},
-		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Alt},   Settings::KeyBind {.commandId = Command::Id_FocusPrevPanel}},
-		{KeyEvent {.vkeycode = VK_RIGHT,     .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_AddPanelAfter}},
-		{KeyEvent {.vkeycode = VK_LEFT,      .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_AddPanelBefore}},
-		{KeyEvent {.vkeycode = VK_F10,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_SwapPanels}},
-		{KeyEvent {.vkeycode = VK_F11,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_ClosePanel}},
-		{KeyEvent {.vkeycode = VK_F12,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_CloseFile}},
-		{KeyEvent {.vkeycode = VK_F12,       .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_ClosePanelAndFile}},
+		{MakeKey(VK_OEM_COMMA, KM_Ctrl),        Settings::KeyBind {.commandId = Command::Id_OpenFileSearch}},
+		{MakeKey('T',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_OpenToolSearch}},
+		{MakeKey('P',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_OpenCommandSearch}},
+		{MakeKey(VK_OEM_2, KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_ToggleToolOutput}},
+		{MakeKey('E',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_ToggleExplorer}},
+		{MakeKey(VK_TAB,   KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_FocusNextTab}},
+		{MakeKey(VK_TAB,   KM_Ctrl | KM_Shift), Settings::KeyBind {.commandId = Command::Id_FocusPrevTab}},
+		{MakeKey(VK_RIGHT, KM_Alt),             Settings::KeyBind {.commandId = Command::Id_FocusNextPanel}},
+		{MakeKey(VK_LEFT,  KM_Alt),             Settings::KeyBind {.commandId = Command::Id_FocusPrevPanel}},
+		{MakeKey(VK_RIGHT, KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_AddPanelAfter}},
+		{MakeKey(VK_LEFT,  KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_AddPanelBefore}},
+		{MakeKey(VK_F10,   KM_None),            Settings::KeyBind {.commandId = Command::Id_SwapPanels}},
+		{MakeKey(VK_F11,   KM_None),            Settings::KeyBind {.commandId = Command::Id_ClosePanel}},
+		{MakeKey(VK_F12,   KM_None),            Settings::KeyBind {.commandId = Command::Id_CloseFile}},
+		{MakeKey(VK_F12,   KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_ClosePanelAndFile}},
 		
-		{KeyEvent {.vkeycode = VK_NEXT,      .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_GotoNextDiagnosticRecord}},
-		{KeyEvent {.vkeycode = VK_PRIOR,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_GotoPrevDiagnosticRecord}},
-		{KeyEvent {.vkeycode = 'E',          .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_OpenInWindowsExplorer}},
+		{MakeKey(VK_NEXT,  KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_GotoNextDiagnosticRecord}},
+		{MakeKey(VK_PRIOR, KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_GotoPrevDiagnosticRecord}},
+		{MakeKey('E',      KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_OpenInWindowsExplorer}},
 		
-		{KeyEvent {.vkeycode = 'F',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = false}}}},
-		{KeyEvent {.vkeycode = 'H',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = true}}}},
-		{KeyEvent {.vkeycode = 'G',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenGotoLine}},
-		{KeyEvent {.vkeycode = VK_OEM_PLUS,  .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_OpenDiagnosticsList}},
-		{KeyEvent {.vkeycode = 'I',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowSignatureHelp}},
-		{KeyEvent {.vkeycode = VK_SPACE,     .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowAutocomplete}},
-		{KeyEvent {.vkeycode = VK_F8,        .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ShowGotoLocation}},
-		{KeyEvent {.vkeycode = 'S',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_SaveFile}},
-		{KeyEvent {.vkeycode = VK_UP,        .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ScrollUp}},
-		{KeyEvent {.vkeycode = VK_DOWN,      .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Editor_ScrollDown}},
+		{MakeKey('F',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = false}}}},
+		{MakeKey('H',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_OpenSearch, .parameters = {ParameterValue {.boolValue = true}}}},
+		{MakeKey('G',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_OpenGotoLine}},
+		{MakeKey(VK_OEM_PLUS, KM_Ctrl),         Settings::KeyBind {.commandId = Command::Id_Editor_OpenDiagnosticsList}},
+		{MakeKey('I',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_ShowSignatureHelp}},
+		{MakeKey(VK_SPACE, KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_ShowAutocomplete}},
+		{MakeKey(VK_F8,    KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_ShowGotoLocation}},
+		{MakeKey('S',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_SaveFile}},
+		{MakeKey(VK_UP,    KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_ScrollUp}},
+		{MakeKey(VK_DOWN,  KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Editor_ScrollDown}},
 		
-		{KeyEvent {.vkeycode = 'A',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectAll}},
-		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_SelectLine}},
-		{KeyEvent {.vkeycode = 'B',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectInBrackets}},
-		{KeyEvent {.vkeycode = 'W',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_SelectWord}},
+		{MakeKey('A',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_SelectAll}},
+		{MakeKey('L',      KM_Ctrl | KM_Shift), Settings::KeyBind {.commandId = Command::Id_Text_SelectLine}},
+		{MakeKey('B',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_SelectInBrackets}},
+		{MakeKey('W',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_SelectWord}},
 		
-		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_DeleteLine}},
-		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_Text_IndentLine}},
-		{KeyEvent {.vkeycode = VK_TAB,       .modifiers = KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_UnIndentLine}},
-		//{KeyEvent {.vkeycode = 'K',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_CommentLine}},
-		{KeyEvent {.vkeycode = 'D',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_DuplicateLine}},
-		{KeyEvent {.vkeycode = 'D',          .modifiers = KM_Ctrl | KM_Shift}, Settings::KeyBind {.commandId = Command::Id_Text_SwapLines}},
+		{MakeKey('L',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_DeleteLine}},
+		{MakeKey(VK_TAB,   KM_None),            Settings::KeyBind {.commandId = Command::Id_Text_IndentLine}},
+		{MakeKey(VK_TAB,   KM_Shift),           Settings::KeyBind {.commandId = Command::Id_Text_UnIndentLine}},
+		//{MakeKey('K', KM_Ctrl),               Settings::KeyBind {.commandId = Command::Id_Text_CommentLine}},
+		{MakeKey('D',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_DuplicateLine}},
+		{MakeKey('D',      KM_Ctrl | KM_Shift), Settings::KeyBind {.commandId = Command::Id_Text_SwapLines}},
 		
-		{KeyEvent {.vkeycode = 'Z',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_Undo}},
-		{KeyEvent {.vkeycode = 'Y',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Text_Redo}},
+		{MakeKey('Z',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_Undo}},
+		{MakeKey('Y',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Text_Redo}},
 		
-		{KeyEvent {.vkeycode = 'X',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Cut}},
-		{KeyEvent {.vkeycode = 'C',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Copy}},
-		{KeyEvent {.vkeycode = 'V',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Clipboard_Paste}},
-		{KeyEvent {.vkeycode = 'L',          .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_Clipboard_CutLines}},
+		{MakeKey('X',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Clipboard_Cut}},
+		{MakeKey('C',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Clipboard_Copy}},
+		{MakeKey('V',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Clipboard_Paste}},
+		{MakeKey('L',      KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_Clipboard_CutLines}},
 		
-		{KeyEvent {.vkeycode = 'M',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_MultiCaret_ToggleEditMode}},
-		{KeyEvent {.vkeycode = VK_UP,        .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretAbove}},
-		{KeyEvent {.vkeycode = VK_DOWN,      .modifiers = KM_Ctrl | KM_Alt}, Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretBelow}},
+		{MakeKey('M',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_MultiCaret_ToggleEditMode}},
+		{MakeKey(VK_UP,    KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretAbove}},
+		{MakeKey(VK_DOWN,  KM_Ctrl | KM_Alt),   Settings::KeyBind {.commandId = Command::Id_MultiCaret_AddCaretBelow}},
 		
-		{KeyEvent {.vkeycode = 'Q',          .modifiers = KM_Ctrl},  Settings::KeyBind {.commandId = Command::Id_Explorer_ShellExecute}},
-		{KeyEvent {.vkeycode = 'N',          .modifiers = KM_Ctrl | KM_Shift},  Settings::KeyBind {.commandId = Command::Id_Explorer_NewDirectory}},
-		{KeyEvent {.vkeycode = VK_F2,        .modifiers = KM_None},  Settings::KeyBind {.commandId = Command::Id_Explorer_Rename}},
+		{MakeKey('Q',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_Explorer_ShellExecute}},
+		{MakeKey('N',      KM_Ctrl | KM_Shift), Settings::KeyBind {.commandId = Command::Id_Explorer_NewDirectory}},
+		{MakeKey(VK_F2,    KM_None),            Settings::KeyBind {.commandId = Command::Id_Explorer_Rename}},
 		
-		{KeyEvent {.vkeycode = 'C',          .modifiers = KM_Ctrl | KM_Shift},  Settings::KeyBind {.commandId = Command::Id_ToolOutput_TerminateProcess}},
+		{MakeKey('C',      KM_Ctrl | KM_Shift), Settings::KeyBind {.commandId = Command::Id_ToolOutput_TerminateProcess}},
 	}
 };
 
@@ -390,13 +394,18 @@ Settings settings {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-Command Settings::LookupKeyBind(KeyEvent ev) {
-	auto it = keyBinds.find(ev);
-	if (it == keyBinds.end()) return Command {Command::Id_None, nullptr};
+Command Settings::LookupKeyBind(const Event& ev) {
+	if (ev.type == Event::Type_KeyPress) {
+		const u64 key = MakeKey(ev.vkcode, ev.kmods);
+		auto it = keyBinds.find(key);
+		if (it != keyBinds.end()) {
+			return Command {
+				.id = it->second.commandId,
+				.parameters = it->second.parameters.data()};
+		}
+	}
 	
-	return Command {
-		.id = it->second.commandId,
-		.parameters = it->second.parameters.data()};
+	return Command {Command::Id_None, nullptr};
 }
 
 ID2D1SolidColorBrush* Settings::GetBrushDropShadow() {
@@ -739,9 +748,8 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 #ifdef _DEBUG
 	 ".\\settings.toml";
 #else
-	GetProcessDirectory() + "\\settings.toml";
+	FormatString("%s\\settings.toml", GetProcessDirectory());
 #endif
-
 	
 	//
 	// parse file

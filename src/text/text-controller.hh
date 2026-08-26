@@ -1,5 +1,4 @@
 #pragma once
-#include "commands.hh"
 #include "text/text-position.hh"
 #include "text/text-buffer.hh"
 #include "text/text-change.hh"
@@ -8,13 +7,15 @@
 #include <vector>
 
 struct Editor;
-struct KeyEvent;
+struct Event;
+struct Command;
 
 struct TextController {
 	
 	//-----------------------------------------------------
 	// types
-	
+	//-----------------------------------------------------
+		
 	enum LineEnding {
 		 LineEnding_CrLf,
 		 LineEnding_Lf,
@@ -35,6 +36,7 @@ struct TextController {
 
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------	
 	
 	Editor* ownerEditor = nullptr;
 
@@ -61,7 +63,8 @@ struct TextController {
 
 	//-----------------------------------------------------
 	// functions
-
+	//-----------------------------------------------------
+	
 	bool InitForTextbox(std::string initialText);
 	bool InitForEditor(Editor* owner);
 
@@ -79,6 +82,5 @@ struct TextController {
 	
 	TextChange* NewTextChange();
 	
-	void OnKeyDown(KeyEvent event, Command command, /*out*/ TextChange** change);
-	void OnChar(const char* data, u64 len, /*out*/ TextChange** change);
+	bool HandleEvent(const Event& event, const Command& command, /*out*/ TextChange** change);
 };

@@ -38,7 +38,7 @@ EditorSelectGotoType* EditorSelectGotoType::Make(Editor* owner) {
 	return self;
 }
 
-void EditorSelectGotoType::OnUpdate() {
+void EditorSelectGotoType::Update() {
 		
 	const D2D1_POINT_2F curPos = owner->GetCaretLocation();
 	const D2D1_POINT_2F position {
@@ -88,17 +88,17 @@ void EditorSelectGotoType::OnUpdate() {
 	}			
 }
 
-bool EditorSelectGotoType::OnKeyEvent(KeyEvent event) {
+bool EditorSelectGotoType::HandleEvent(const Event& event, const Command& command) {
 
-	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
+	if (event.type == Event::Type_KeyPress && (event.vkcode == VK_DOWN || event.vkcode == VK_UP) && event.kmods == KM_None) {
 		
-		selectedItem = event.vkeycode == VK_DOWN ?
+		selectedItem = event.vkcode == VK_DOWN ?
 			IncrementWrapAround(selectedItem, static_cast<u64>(ITEM_COUNT)):
 			DecrementWrapAround(selectedItem, static_cast<u64>(ITEM_COUNT));
 		
 		return true;
 	
-	} else if ((event.vkeycode == VK_RETURN) && event.modifiers == KM_None) {
+	} else if ((event.vkcode == VK_RETURN) && event.kmods == KM_None) {
 		if (!owner->language) return true;
 		
 		ASSERT(selectedItem >= 0u && selectedItem < ITEM_COUNT);

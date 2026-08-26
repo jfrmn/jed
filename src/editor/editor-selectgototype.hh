@@ -5,7 +5,6 @@
 #include <string_view>
 
 struct Editor;
-struct KeyEvent;
 
 struct EditorSelectGotoType : public EditorCaretAttached {
 	
@@ -18,8 +17,8 @@ struct EditorSelectGotoType : public EditorCaretAttached {
 	
 	static EditorSelectGotoType* Make(Editor* owner);	
 	
-	virtual void OnUpdate() override;
-	virtual bool OnKeyEvent(KeyEvent event) override;
+	virtual void Update() override;
+	virtual bool HandleEvent(const Event& event, const Command& command) override;
 	virtual void OnInput() override;
 	
 	virtual ~EditorSelectGotoType() {}

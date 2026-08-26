@@ -1,8 +1,6 @@
 #pragma once
-#include "events.hh"
 #include "tool-output.hh"
 #include "search-bar.hh"
-#include "commands.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
 #include "graphics/glyph-run.hh"
@@ -10,16 +8,9 @@
 #include <vector>
 #include <string>
 
-struct Prompt;
-struct SearchBar;
 struct Explorer;
-struct TextPosition;
-struct ToolOutput;
 
-// @DUMMY
-struct ParameterConfigurator;
-
-struct MainWindow : public Window {
+struct App {
 
 	//-----------------------------------------------------
 	// types
@@ -77,8 +68,6 @@ struct MainWindow : public Window {
 	// functions
 	//-----------------------------------------------------
 
-	bool Create();
-
 	bool Init();
 	void Shutdown();
 	
@@ -87,18 +76,12 @@ struct MainWindow : public Window {
 	Editor* GetFocusedEditor();
 	const Editor* GetFocusedEditor() const;
 	
-	void OnUpdate();
-	void OnKeyEvent(KeyEvent event, Command command);
-	
-	virtual void OnFileChanged(FileChangedEvent* fileChangedEvent) override;
-	virtual bool OnMouseWheel(f32 wheel) override;
-	virtual void OnKeyDown(KeyEvent event) override;
-	virtual void OnChar(const char* data, u64 len) override;
-	virtual void OnResize(f32 newWidth, f32 newHeight) override;
-	virtual bool OnClose() override;
+	void Update();
+	void HandleEvent();
+	void ExecuteCommand(const Command& command);
 };
 
 // Helper function to make open behavior consisten across different feature (explore, file-picker, etc.)
-MainWindow::OpenBehavior OpenBehaviorFromModifiers(KeyEvent event);
+App::OpenBehavior OpenBehaviorFromModifiers(u32 kmods);
 
-extern MainWindow mainWindow;
+extern App app;

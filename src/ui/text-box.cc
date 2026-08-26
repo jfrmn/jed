@@ -50,7 +50,7 @@ float TextBox::Height() const {
 	return (font->lineHeight + PADDING_X2);
 }
 
-void TextBox::OnUpdate() {
+void TextBox::Update() {
 
 	const D2D_RECT_F area = GetArea();
 
@@ -124,16 +124,12 @@ void TextBox::ClearText() {
 	textController.Reset();
 }
 
-bool TextBox::OnKeyDown(KeyEvent event, Command command) {
-	if (event.vkeycode == VK_RETURN) return false;
-
+TextBox::HandleEventResult TextBox::HandleEvent(const Event& event, const Command& command) {
+	
+	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN)
+		return HandleEventResult {.handled = true, .changed = false};
+	
 	TextChange* change = nullptr;
-	textController.OnKeyDown(event, command, &change);
-	return (change != nullptr);
-}
-
-bool TextBox::OnChar(const char* data, u64 len) {	
-	TextChange* change = nullptr;
-	textController.OnChar(data, len, &change);
-	return (change != nullptr);
+	const bool handled = textController.HandleEvent(event, command, &change);
+	return HandleEventResult {.handled = handled, .changed = change != nullptr};
 }

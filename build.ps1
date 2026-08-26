@@ -19,9 +19,15 @@ param(
 	[string] $installDir = ""
 )
 
+#if (-not $env:_VSDEVSHELL) {
+#	Import-Module "D:\Apps\Visual Studio 2022\Common7\Tools\Microsoft.VisualStudio.DevShell.dll";
+#	Enter-VsDevShell a93d51fe -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
+#	$env:_VSDEVSHELL = "-arch=x64 -host_arch=x64"
+#}
+
 if (-not $env:_VSDEVSHELL) {
-	Import-Module "D:\Apps\Visual Studio 2022\Common7\Tools\Microsoft.VisualStudio.DevShell.dll";
-	Enter-VsDevShell a93d51fe -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
+	Import-Module "D:\Apps\Visual Studio 2026\Common7\Tools\Microsoft.VisualStudio.DevShell.dll";
+	Enter-VsDevShell fd534939 -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
 	$env:_VSDEVSHELL = "-arch=x64 -host_arch=x64"
 }
 

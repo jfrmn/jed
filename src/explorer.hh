@@ -1,6 +1,5 @@
 #pragma once
 #include "basic.hh"
-#include "events.hh"
 #include "commands.hh"
 #include "ui/text-box.hh"
 
@@ -8,6 +7,8 @@
 #include <string>
 
 struct ID2D1SolidColorBrush;
+struct Event;
+struct Command;
 
 struct Explorer {
 	
@@ -82,9 +83,6 @@ struct Explorer {
 	static Explorer* Make();
 	~Explorer() noexcept;
 	
-	void OnUpdate();
-	
-	void OnResize();
-	void OnKeyDown(KeyEvent event, Command commaand);
-	void OnChar(const char * utf8, u64 len);
+	void Update();	
+	bool HandleEvent(const Event& event, const Command& commaand);
 };

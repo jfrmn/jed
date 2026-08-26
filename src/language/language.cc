@@ -1,5 +1,4 @@
 #include "language.hh"
-#include "main-window.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
@@ -7,8 +6,10 @@
 #include "editor/editor-autocomplete.hh"
 #include "editor/editor-textlocationlist.hh"
 
+#include "app.hh"
 #include "util.hh"
 #include "logging.hh"
+#include "ui/window.hh"
 
 #include <mutex>
 #include <string>
@@ -620,7 +621,7 @@ void Language::OnPublishDiagnostics(Lsp::PublishDiagnosticsNotification* notific
 	// @TODO Use PostFunctionCall because of thread safty
 	
 	Editor* editor = nullptr;
-	for (MainWindow::Tab& tab : mainWindow.tabs) {
+	for (App::Tab& tab : app.tabs) {
 		if (!tab.editor) continue;
 		if (tab.editor->textDocumentIdentifier.uri == notification->uri) {
 			editor = tab.editor;

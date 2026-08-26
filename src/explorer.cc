@@ -1,11 +1,12 @@
 #include "explorer.hh"
-#include "main-window.hh"
 #include "globals.hh"
+#include "app.hh"
 #include "settings.hh"
 #include "util.hh"
 #include "logging.hh"
 
 #include "ui/constants.h"
+#include "ui/window.hh"
 #include "graphics/effects.hh"
 #include "graphics/glyph-run.hh"
 
@@ -757,12 +758,12 @@ static void ActionOpenDirectory(Explorer* self) {
 	self->activePanel = newPanel.release();	
 }
 
-static void ActionOpenItem(Explorer* self, MainWindow::OpenBehavior openBehav) {
+static void ActionOpenItem(Explorer* self, App::OpenBehavior openBehav) {
 	
 	if (self->activePanel->activeItem->type == Explorer::Item::Type_File) {
 		const std::string path = BuildPanelPath(self->activePanel, self->activePanel->activeItem->filename);
 
-		self->shouldClose = mainWindow.OpenEditor(path, openBehav);
+		self->shouldClose = app.OpenEditor(path, openBehav);
 		
 	} else if (self->activePanel->activeItem->type == Explorer::Item::Type_Directory) {
 		ActionOpenDirectory(self);
@@ -777,7 +778,7 @@ static void ActionClick(Explorer* self, Explorer::Panel* clickedPanel, Explorer:
 	
 	if (self->activePanel == clickedPanel) {
 		clickedPanel->activeItem = clickedItem;
-		ActionOpenItem(self, MainWindow::OpenBehavior_Default);
+		ActionOpenItem(self, App::OpenBehavior_Default);
 	
 	} else {
 		Explorer::Panel* panel = self->activePanel;
@@ -798,7 +799,7 @@ static void ActionClick(Explorer* self, Explorer::Panel* clickedPanel, Explorer:
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
+static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 	const bool isActivePanel = (self->activePanel == panel);
 	
 	//
@@ -924,7 +925,7 @@ static void OnUpdatePanel(Explorer* self, Explorer::Panel* panel) {
 	}
 }
 
-void Explorer::OnUpdate() {
+void Explorer::Update() {
 
 	// advance animations
 	{
@@ -953,9 +954,9 @@ void Explorer::OnUpdate() {
 	// panels
 	{
 		for (Panel* panel = activePanel->parent; panel != nullptr; panel = panel->parent)
-			OnUpdatePanel(this, panel);
+			UpdatePanel(this, panel);
 		
-		OnUpdatePanel(this, activePanel);
+		UpdatePanel(this, activePanel);
 	}
 	
 	// new item panel
@@ -991,7 +992,7 @@ void Explorer::OnUpdate() {
 			settings.fontUi,
 			settings.GetBrushUiText());
 		
-		newItemDialog->textbox.OnUpdate();
+		newItemDialog->textbox.Update();
 		
 		if (!newItemDialog->errorText.empty()) {
 			staticGlyphRun.ShapeAndDraw(deviceContext,
@@ -1004,69 +1005,74 @@ void Explorer::OnUpdate() {
 	}
 }
 
-void Explorer::OnKeyDown(KeyEvent event, Command command) {
+bool Explorer::HandleEvent(const Event& event, const Command& command) {
 	
-	if (newItemDialog) {
-		if (event.vkeycode == VK_ESCAPE || event.vkeycode == VK_RIGHT) {
-			delete newItemDialog;
-			newItemDialog = nullptr;
-		
-		} else if (event.vkeycode == VK_RETURN) {
-			ActionConfirmTextboxPanel(this);
-		
-		} else {
-			newItemDialog->textbox.OnKeyDown(event, command);
-		}
+	if (event.type == Event::Type_KeyPress) {
+		if (newItemDialog) {
+			if (event.vkcode == VK_ESCAPE || event.vkcode == VK_RIGHT) {
+				delete newItemDialog;
+				newItemDialog = nullptr;
 			
-	} else if (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) {
-					
-		Item* oldActiveItem = activePanel->activeItem;
-
-		const u64 oldActiveItemIndex = activePanel->activeItem - activePanel->items.data();
-		const u64 newActiveItemIndex = event.vkeycode == VK_DOWN ?
-			IncrementWrapAround(oldActiveItemIndex, activePanel->items.size()):
-			DecrementWrapAround(oldActiveItemIndex, activePanel->items.size());
+			} else if (event.vkcode == VK_RETURN) {
+				ActionConfirmTextboxPanel(this);
 			
-		activePanel->activeItem = &activePanel->items[newActiveItemIndex];
-			
-		if ((event.modifiers & KM_Shift) != 0) {				
-			if (activePanel->activeItem->isSelected)
-				activePanel->activeItem->isSelected = false;
-			else
-				oldActiveItem->isSelected = true;
-		
-		} else {
-			// reset selection
-			for (Item& item : activePanel->items)
-				item.isSelected = false;
-		}
-		
-		activeItemAnimationValue = 0.0f;
-			
-	} else if (event.vkeycode == VK_RIGHT) {
-		if (activePanel->activeItem->type == Explorer::Item::Type_Directory) {
-			ActionOpenDirectory(this);
+			} else {
+				return newItemDialog->textbox.HandleEvent(event, command).handled;
 			}
-		
-	} else if (event.vkeycode == VK_LEFT) {
-		
-		Panel* closingPanel = activePanel;
-		activePanel = closingPanel->parent;
-		delete closingPanel;
-		
-		if (!activePanel) {
-			shouldClose = true;
-		}
+				
+		} else if (event.vkcode == VK_DOWN || event.vkcode == VK_UP) {
+						
+			Item* oldActiveItem = activePanel->activeItem;
+	
+			const u64 oldActiveItemIndex = activePanel->activeItem - activePanel->items.data();
+			const u64 newActiveItemIndex = event.vkcode == VK_DOWN ?
+				IncrementWrapAround(oldActiveItemIndex, activePanel->items.size()):
+				DecrementWrapAround(oldActiveItemIndex, activePanel->items.size());
+				
+			activePanel->activeItem = &activePanel->items[newActiveItemIndex];
+				
+			if ((event.kmods & KM_Shift) != 0) {				
+				if (activePanel->activeItem->isSelected)
+					activePanel->activeItem->isSelected = false;
+				else
+					oldActiveItem->isSelected = true;
 			
-		activeItemAnimationValue = 0.0f;
+			} else {
+				// reset selection
+				for (Item& item : activePanel->items)
+					item.isSelected = false;
+			}
+			
+			activeItemAnimationValue = 0.0f;
+				
+		} else if (event.vkcode == VK_RIGHT) {
+			if (activePanel->activeItem->type == Explorer::Item::Type_Directory) {
+				ActionOpenDirectory(this);
+			}
+			
+		} else if (event.vkcode == VK_LEFT) {
+			
+			Panel* closingPanel = activePanel;
+			activePanel = closingPanel->parent;
+			delete closingPanel;
+			
+			if (!activePanel) {
+				shouldClose = true;
+			}
+				
+			activeItemAnimationValue = 0.0f;
+		}
 		
-	} else if (event.vkeycode == VK_DELETE) {
+		return true;
+	}
+		
+	if (event.vkcode == VK_DELETE) {
 		ActionDelete(this);
 				
-	} else if (event.vkeycode == VK_RETURN) {
-		ActionOpenItem(this, OpenBehaviorFromModifiers(event));
+	} else if (event.vkcode == VK_RETURN) {
+		ActionOpenItem(this, OpenBehaviorFromModifiers(event.kmods));
 	
-	} else if (event.vkeycode == VK_ESCAPE) {
+	} else if (event.vkcode == VK_ESCAPE) {
 		shouldClose = true;
 	
 	} else if (command.id == Command::Id_Clipboard_Copy) {
@@ -1092,13 +1098,12 @@ void Explorer::OnKeyDown(KeyEvent event, Command command) {
 	
 	} else if (command.id == Command::Id_Explorer_Rename) {
 		CommandRenameItem(this);
+	
+	} else {
+		return false;
 	}
 	
-}
-
-void Explorer::OnChar(const char* utf8, u64 len) {
-	if (newItemDialog)
-		newItemDialog->textbox.OnChar(utf8, len);
+	return true;	
 }
 
 Explorer::~Explorer() noexcept {}

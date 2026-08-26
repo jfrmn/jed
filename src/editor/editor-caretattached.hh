@@ -3,7 +3,8 @@
 #include <atomic>
 #include <string>
 
-struct KeyEvent;
+struct Event;
+struct Command;
 struct Editor;
 struct D2D_POINT_2F;
 struct ID2D1DeviceContext;
@@ -14,6 +15,7 @@ struct EditorCaretAttached {
 	
 	//-------------------------------------------
 	// types
+	//-------------------------------------------
 		
 	enum State {
 		 State_Unknown = 0,
@@ -25,6 +27,7 @@ struct EditorCaretAttached {
 	
 	//-------------------------------------------
 	// data
+	//-------------------------------------------
 	
 	Editor* owner = nullptr;
 	TextPosition triggerPosition = {};
@@ -36,15 +39,16 @@ struct EditorCaretAttached {
 	
 	//-------------------------------------------
 	// functions
+	//-------------------------------------------
 	
 	void AddReference();
 	void RemoveReference();
 	bool DrawIncompleteState(ID2D1DeviceContext* deviceContext, std::string_view noItemsText = "No items.");
 	D2D_POINT_2F GetPosition() const;
 	
-	virtual void OnUpdate() = 0;
+	virtual void Update() = 0;
 	virtual void OnInput() = 0;
-	virtual bool OnKeyEvent(KeyEvent event) = 0;	
+	virtual bool HandleEvent(const Event& event, const Command& command) = 0;
 		
 	virtual ~EditorCaretAttached() noexcept {} 
 };

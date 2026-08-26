@@ -1,60 +1,53 @@
 #include "events.hh"
 #include "util.hh"
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool KeyEvent::operator==(KeyEvent other) const {
-	return this->vkeycode == other.vkeycode && this->modifiers == other.modifiers;
+MouseState mouse {};
+
+std::string_view Event::GetText() const {
+	return std::string_view {textData, textLen};
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool Mouse::Element::operator==(const Element& other) const {
-	return userdata == other.userdata
-		&& onClickFunc == other.onClickFunc;
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool Mouse::Hittest(const D2D_RECT_F& area, void* userdata, Mouse::OnClickFunction onClick, u64 arg /*= 0*/) {
+bool MouseState::Hittest(const D2D_RECT_F& area, void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
+	if (isDragging) return false;
 	
-	const Element newElement {userdata, onClick};
-	
-	if (isDragging)
-		return hotElement == newElement;
+	const Element newElement {callback, userdata, userint};
 	
 	if (RectContains(area, x, y)) {
-		hotElementNext = newElement;
-		onClickArg = arg;
-		return hotElement == newElement;
+		nextHotElement = newElement;
+		return currentHotElement == newElement;
 	}
 	
 	return false;
 }
 
-void Mouse::StartDragging(f32 arg /*= 0.0f*/) {
-	isDragging = true;
-	dragArg = arg;
+bool MouseState::Hot(void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
+	if (isDragging) return false;
 	
-	// not sure if this is needed?
-	hotElementNext = {}; 
-	onClickArg = 0u;
+	const Element newElement {callback, userdata, userint};
+	nextHotElement = newElement;
+	return currentHotElement == newElement;
 }
 
-void Mouse::NextFrame() {
+void MouseState::StartDragging(f32 dx /*= 0.0f*/, f32 dy /*= 0.0f*/) {
+	isDragging = true;
+	dragDeltaX = dx;
+	dragDeltaY = dy;
+	nextHotElement = {};
+}
 
-	if (isDragging) {
-		if (event == Event_Up) {
-			dragArg = 0.0f;
+void MouseState::NextFrame(const Event& event) {
+
+	if (event.type == Event::Type_MouseUp) {
+		if (isDragging) {
 			isDragging = false;
-		}
-
-	} else {
-		hotElement = hotElementNext;
-		hotElementNext = {};
-
-		if (event == Event_Up) {
-			if (hotElement.onClickFunc)
-				hotElement.onClickFunc(hotElement.userdata, onClickArg);
+			dragDeltaX = dragDeltaY = 0.0f;
+		} else if (currentHotElement.callback) {
+			currentHotElement.callback(currentHotElement.userdata, currentHotElement.userint);
 		}
 	}
-	
-	event = Event_None;
+
+	if (!isDragging) {
+		currentHotElement = nextHotElement;
+		nextHotElement = Element {};
+	}
 }

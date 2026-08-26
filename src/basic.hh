@@ -52,14 +52,14 @@ using char32 = char32_t;
 // Asserts
 //-----------------------------------------------------------------------------
 
-// get the debug break function without including windows.h
-extern "C" __declspec(dllimport) void __stdcall DebugBreak(void);
+#define ASSERT(expr) if (!(expr)) { _TriggerHardAssert(#expr, __FILE__, __LINE__, __FUNCTION__); }
+#define ASSERT_SOFT(expr) if (!(expr)) { _TriggerSoftAssert(#expr, __FILE__, __LINE__, __FUNCTION__); }
 
-#define ASSERT(expr) if (!(expr)) { _PrintAssertMessage(#expr, __FILE__, __LINE__, __FUNCTION__); DebugBreak(); }
-#define ASSERT_UNREACHABLE { _PrintAssertMessage("Unreachable code hit", __FILE__, __LINE__, __FUNCTION__); DebugBreak(); }
-#define ASSERT_NOT_IMPLEMENTED { _PrintAssertMessage("Reached a code path that is not implemented yet", __FILE__, __LINE__, __FUNCTION__); }
+#define ASSERT_UNREACHABLE { _TriggerHardAssert("Unreachable code hit", __FILE__, __LINE__, __FUNCTION__); }
+#define ASSERT_NOT_IMPLEMENTED { _TriggerSoftAssert("Reached a code path that is not implemented yet", __FILE__, __LINE__, __FUNCTION__); }
 
-void _PrintAssertMessage(const char* expression, const char* file, int line, const char* function);
+void _TriggerHardAssert(const char* expression, const char* file, int line, const char* function);
+void _TriggerSoftAssert(const char* expression, const char* file, int line, const char* function);
 
 
 //------------------------------------------------------------------------------

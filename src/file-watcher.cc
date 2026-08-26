@@ -1,7 +1,7 @@
 #include "file-watcher.hh"
 #include "logging.hh"
 #include "util.hh"
-#include "main-window.hh"
+#include "ui/window.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -19,6 +19,9 @@ static_assert(FileChangeRecord::Action_RenamedNew == FILE_ACTION_RENAMED_NEW_NAM
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OVERLAPPED* overlapped);
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FileWatcher fileWatcher {};
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct WatchedDirectory {
@@ -154,7 +157,7 @@ static VOID CompletionRoutine(DWORD errorCode, DWORD numberOfBytesTransfered, OV
 	self->StartReadingDirectoryChanges();
 }
 
-DWORD WINAPI ThreadProcWatcher(LPVOID userdata) {
+static DWORD WINAPI ThreadProc(LPVOID userdata) {
 	auto self = static_cast<FileWatcher*>(userdata);
 	
 	while (true) {
@@ -162,7 +165,7 @@ DWORD WINAPI ThreadProcWatcher(LPVOID userdata) {
 		if      (result == WAIT_IO_COMPLETION) continue;
 		else if (result == WAIT_OBJECT_0) break;
 		else {
-			LogError("WaitForSingleObject() in ThreadProcWatcher returned: %s", StrWaitRes(result));
+			LogError("WaitForSingleObject() in ThreadProc returned: %s", StrWaitRes(result));
 			return 1l;
 		}
 	}
@@ -191,7 +194,7 @@ bool FileWatcher::Init() {
 		
 	LogInfo("creating file-watcher thread");
 	
-	hThread = CreateThread(nullptr, 0, ThreadProcWatcher, this, 0, nullptr);
+	hThread = CreateThread(nullptr, 0, ThreadProc, this, 0, nullptr);
 	if (hThread == NULL) {
 		LogError("failed to create file-watcher thread. Last Error: %s", StrLastErr(GetLastError()));
 		return false;

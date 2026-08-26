@@ -3,7 +3,7 @@
 #include "events.hh"
 #include "settings.hh"
 #include "util.hh"
-#include "logging.hh"
+#include "ui/window.hh"
 
 #include <algorithm>
 
@@ -68,20 +68,20 @@ void Scrollarea::OnUpdate() {
 	
 	deviceContext->FillRectangle(vertBar, settings.GetBrushUiBackground());
 
-	if (mouse.Hittest(vertBar, this, nullptr)) {
-		if (mouse.event == Mouse::Event_Down)
-			mouse.StartDragging(mouse.y - vertBar.top);
+	if (mouse.Hittest(vertBar, this)) {
+		if (mainWindow.event.type == Event::Type_MouseDown)
+			mouse.StartDragging(mouse.x - vertBar.left,
+			                    mouse.y - vertBar.top);
 		
 		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(mouse.isDragging));
 		
 		if (mouse.isDragging) {
-			const f32 newVpY = -(mouse.dragArg - mouse.y + position.y) / ratio;
+			//const f32 newVpY = -(mouse.dragArg - mouse.y + position.y) / ratio;
+			const f32 newVpY = -(mouse.dragDeltaY + position.y) / ratio;
 			const f32 max = GetMaxPositionY();
 			//LogDevVar(mouse.dragArg);
 			
-			vpY = std::clamp(newVpY, 0.0f, max);
-			//LogDev("%d - %d - %d", mouse.dragArg, (int)newVpY, (int)vpY);
-				
+			vpY = std::clamp(newVpY, 0.0f, max);				
 		}
 	}
 }

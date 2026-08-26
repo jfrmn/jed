@@ -1,7 +1,5 @@
 #pragma once
 #include "basic.hh"
-#include "commands.hh"
-#include "util.hh"
 
 #include "text/text-position.hh"
 #include "text/text-controller.hh"
@@ -13,12 +11,11 @@
 
 #include <string>
 
-struct ID2D1DeviceContext;
-struct ID2D1SolidColorBrush;
+struct Event;
+struct Command;
 
 struct Language;
 struct TextChange;
-struct MouseEvent;
 struct FileChangeRecord;
 
 struct EditorCaretAttached;
@@ -107,11 +104,10 @@ struct Editor {
 	void AddInsertAnimationData(TextPosition from, TextPosition to);
 	void StartInsertAnimation();
 	
-	void OnUpdate();	
-	void OnFileChanged(const FileChangeRecord* changeRecord);
-	void OnChar(const char* str, u64 len);
-	void OnMouseWheel(f32 scrollValue);
-	void OnKeyEvent(KeyEvent event, Command command);
-	void OnResize(D2D1_RECT_F newArea);
-	bool OnClose();	
+	void Update();
+	
+	void OnResize(const D2D_RECT_F& newArea);
+	void OnMouseWheel(f32 distance);
+	void OnFileChange(const FileChangeRecord* fileChangeRecord);
+	bool HandleEvent(const Event& event, const Command& command);	
 };

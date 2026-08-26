@@ -1,11 +1,11 @@
 #include "editor.hh"
 #include "globals.hh"
-#include "main-window.hh"
 #include "settings.hh"
 
 #include "graphics/effects.hh"
 #include "language/language.hh"
 #include "ui/constants.h"
+#include "ui/window.hh"
 
 #include "logging.hh"
 #include "util.hh"
@@ -250,80 +250,6 @@ bool Editor::SaveFile() {
 	return true;
 }
 
-void Editor::OnFileChanged(const FileChangeRecord* fileChangeRecord) {
-	
-	if (fileChangeRecord->action == FileChangeRecord::Action_Added) {
-		fileRemoved = false;
-	
-	} else if (fileChangeRecord->action == FileChangeRecord::Action_Removed) {
-		fileRemoved = true;
-			
-	} else if (fileChangeRecord->action == FileChangeRecord::Action_Modified) {
-		
-		HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			LogError("CreateFileA() failed. '%s'. Last Error: %s", path.c_str(), StrLastErr(GetLastError()));
-			return;
-		}
-		DEFER(CloseHandle(hFile));
-		
-		FILETIME currentLastWriteTime = {};
-		GetFileTime(hFile, nullptr, nullptr, &currentLastWriteTime);
-			
-		LogTrace("checking file modification for '%s'...", path.c_str());
-		
-		if (lastWriteTime.dwLowDateTime == currentLastWriteTime.dwLowDateTime && lastWriteTime.dwHighDateTime == currentLastWriteTime.dwHighDateTime) {
-			LogTrace("file was not modified.");
-			return;
-		}
-				
-		LogInfo("file was modified externally.");
-		
-		if (isDirty) {
-			const UINT result = MessageBoxA(mainWindow.hWnd,
-				"File has been modified externally.\nWould like to discard all local modification and reload the file?",
-				"File modified",
-				MB_ICONQUESTION | MB_YESNO);
-			
-			if (result == IDNO) {
-				LogTrace("file will not be reloaded");
-				lastWriteTime = currentLastWriteTime;
-				return;
-			}
-			
-			isDirty = false;
-		}
-		
-		LogInfo("reloading file");
-		
-		UnloadFile(this);
-		LoadFile(this);
-		
-		const u64 newLine = std::min(textController.carets.front().position.line, textController.buffer.GetMaxLine());
-		textController.SetCaretPosition(TextPosition {
-			.line   = newLine,
-			.column = std::min(textController.carets.front().position.column, textController.buffer.GetLineAt(newLine).length)});
-		scrollarea.vpX = std::min(scrollarea.vpX, scrollarea.GetMaxPositionX());
-		scrollarea.vpY = std::min(scrollarea.vpY, scrollarea.GetMaxPositionY());	
-	
-	} else if (fileChangeRecord->action == FileChangeRecord::Action_RenamedNew) {
-		
-		if (language)
-			language->OnCloseFile(this);
-		
-		path = std::string(fileChangeRecord->filename, fileChangeRecord->filenameLength);	
-		textDocumentIdentifier.uri = MakeUriFromPath(path);
-			
-		const std::string buffer = textController.buffer.GetText();
-		
-		if (language)
-			language->OnOpenFile(this, buffer);
-	
-	} else {
-		LogError("Unexpected file changed action: %", fileChangeRecord->action);
-		ASSERT_UNREACHABLE;
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -732,7 +658,7 @@ static void OnClickScrollArea(void* ud, u64 i) {
 	self->ScrollToLine(record.from.line);
 }
 
-void Editor::OnUpdate() {
+void Editor::Update() {
 
 	//
 	// reshape glyphs
@@ -740,14 +666,14 @@ void Editor::OnUpdate() {
 	{
 		scrollarea.totalSize.height = glyphRuns.size() * settings.fontEditor.lineHeight;
 		
-		const bool hovered = mouse.Hittest(area, this, nullptr);
-		if (hovered) {
-			if (mouse.event == Mouse::Event_Down) {
+		if (mouse.Hot(this)) {
+			if (mainWindow.event.type == Event::Type_MouseDown) {
 				mouse.StartDragging();
 				
 				const TextPosition mouseTextPosition = Hittest(this, mouse.x, mouse.y);
 				textController.SetCaretPosition(mouseTextPosition);
 			
+			// @CHECK does this still work!
 			} else if (mouse.isDragging) {
 				ASSERT(textController.carets.size() == 1u);
 				
@@ -1127,14 +1053,10 @@ void Editor::OnUpdate() {
 			if (recordClosestToMouse != U64_MAX) {
 				const EditorDiagnostics::Record& record = editorDiagnostics[recordClosestToMouse];
 				
-				if (!mouse.isDragging) {
-					mouse.hotElementNext = Mouse::Element {this, OnClickScrollArea};
-					mouse.onClickArg = recordClosestToMouse;
-					mouse.dragArg = 0.0f;
+				if (mouse.Hot(this, OnClickScrollArea, recordClosestToMouse)) {
+					DrawDiagnosticsTooltip(this, deviceContext, record, true);
+					DrawScrollbarMarker(this, deviceContext, record.from.line, 2.0f, Diagnostics::GetServerityBrush(record.severity));
 				}
-				
-				DrawDiagnosticsTooltip(this, deviceContext, record, true);
-				DrawScrollbarMarker(this, deviceContext, record.from.line, 2.0f, Diagnostics::GetServerityBrush(record.severity));
 			}
 		}
 	}
@@ -1144,68 +1066,127 @@ void Editor::OnUpdate() {
 	//
 	{
 		if (editorCaretAttached)
-		 	editorCaretAttached->OnUpdate();
+			editorCaretAttached->Update();
 		 	
 		if (toolWindow)
-			toolWindow->OnUpdate();
+			toolWindow->Update();
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Input
+// Events
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Editor::OnResize(D2D1_RECT_F newArea) {
+void Editor::OnResize(const D2D1_RECT_F& newArea) {
 	this->area = newArea;
 	this->scrollarea.OnResize(newArea);
 }
 
-void Editor::OnChar(const char* data, u64 len) {
-	
-	if (toolWindow) {
-		toolWindow->OnChar(data, len);
-		return;
-	}
-	
-	TextChange* change = nullptr;
-	textController.OnChar(data, len, &change);
-
-	ProcessTextChange(change);
-
-	if (editorCaretAttached)
- 		editorCaretAttached->OnInput();
- 	
-	cursorBlinkValue = 0.0f;	
-}
-
 void Editor::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
-	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5.0f);
 }
 
-void Editor::OnKeyEvent(KeyEvent event, Command command) {
+void Editor::OnFileChange(const FileChangeRecord* fileChangeRecord) {
+	
+	if (fileChangeRecord->action == FileChangeRecord::Action_Added) {
+		fileRemoved = false;
+	
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_Removed) {
+		fileRemoved = true;
+			
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_Modified) {
+		
+		HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hFile == INVALID_HANDLE_VALUE) {
+			LogError("CreateFileA() failed. '%s'. Last Error: %s", path.c_str(), StrLastErr(GetLastError()));
+			return;
+		}
+		DEFER(CloseHandle(hFile));
+		
+		FILETIME currentLastWriteTime = {};
+		GetFileTime(hFile, nullptr, nullptr, &currentLastWriteTime);
+			
+		LogTrace("checking file modification for '%s'...", path.c_str());
+		
+		if (lastWriteTime.dwLowDateTime == currentLastWriteTime.dwLowDateTime && lastWriteTime.dwHighDateTime == currentLastWriteTime.dwHighDateTime) {
+			LogTrace("file was not modified.");
+			return;
+		}
+				
+		LogInfo("file was modified externally.");
+		
+		if (isDirty) {
+			const UINT result = MessageBoxA(mainWindow.hWnd,
+				"File has been modified externally.\nWould like to discard all local modification and reload the file?",
+				"File modified",
+				MB_ICONQUESTION | MB_YESNO);
+			
+			if (result == IDNO) {
+				LogTrace("file will not be reloaded");
+				lastWriteTime = currentLastWriteTime;
+				return;
+			}
+			
+			isDirty = false;
+		}
+		
+		LogInfo("reloading file");
+		
+		UnloadFile(this);
+		LoadFile(this);
+		
+		const u64 newLine = std::min(textController.carets.front().position.line, textController.buffer.GetMaxLine());
+		textController.SetCaretPosition(TextPosition {
+			.line   = newLine,
+			.column = std::min(textController.carets.front().position.column, textController.buffer.GetLineAt(newLine).length)});
+		scrollarea.vpX = std::min(scrollarea.vpX, scrollarea.GetMaxPositionX());
+		scrollarea.vpY = std::min(scrollarea.vpY, scrollarea.GetMaxPositionY());	
+	
+	} else if (fileChangeRecord->action == FileChangeRecord::Action_RenamedNew) {
+		
+		if (language)
+			language->OnCloseFile(this);
+		
+		path = std::string(fileChangeRecord->filename, fileChangeRecord->filenameLength);	
+		textDocumentIdentifier.uri = MakeUriFromPath(path);
+			
+		const std::string buffer = textController.buffer.GetText();
+		
+		if (language)
+			language->OnOpenFile(this, buffer);
+	
+	} else {
+		LogError("Unexpected file changed action: %", fileChangeRecord->action);
+		ASSERT_UNREACHABLE;
+	}
+}
 
-	if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
+bool Editor::HandleEvent(const Event& event, const Command& command) {
+
+	if (toolWindow && toolWindow->HandleEvent(event, command))
+		return true;
+	
+	if (editorCaretAttached && editorCaretAttached->HandleEvent(event, command))
+		return true;
+	
+	if (event.type == Event::Type_KeyPress && event.vkcode == VK_ESCAPE && event.kmods == KM_None) {
 		if (toolWindow) {
 			delete toolWindow;
 			toolWindow = nullptr;
-			return;
+			return true;
 		
 		} else if (editorCaretAttached) {
 		 	editorCaretAttached->RemoveReference();
 		 	editorCaretAttached = nullptr;
-		 	return;
+		 	return true;
 	 	}
+	 	
+	 	return false;
 	}
-	
-	if (toolWindow && toolWindow->OnKeyEvent(event, command))
-		return;
-	
-	if (editorCaretAttached && editorCaretAttached->OnKeyEvent(event))
-		return;
-		
+			
 	if (command.id == Command::Id_Editor_OpenSearch) {		
 		const bool showReplace = command.parameters->boolValue;
 		
@@ -1249,7 +1230,7 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
 		}
 	
 	} else if (command.id == Command::Id_Editor_ShowGotoLocation) {
-		if (!language) return;
+		if (!language) return true;
 			
 		if (editorCaretAttached) {
 			editorCaretAttached->RemoveReference();
@@ -1259,7 +1240,7 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
     	editorCaretAttached = EditorSelectGotoType::Make(this);
 	
 	} else if (command.id == Command::Id_Editor_ShowSignatureHelp) {
-		if (!language) return;	
+		if (!language) return true;
 		
 		if (editorCaretAttached) {
 			editorCaretAttached->RemoveReference();
@@ -1269,7 +1250,7 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
     	editorCaretAttached = language->GetSignatureHelp(this);
     	
 	} else if (command.id == Command::Id_Editor_ShowAutocomplete) {
-		if (!language) return;
+		if (!language) return true;
 		
 		EditorSignatureHelp* signatureHelp = dynamic_cast<EditorSignatureHelp*>(editorCaretAttached);
 		if (signatureHelp) signatureHelp->AddReference();
@@ -1303,9 +1284,7 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
 		if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
 			scrollarea.vpY  = scrollarea.GetMaxPositionY();
 	
-	} else {
-		TextChange* change = nullptr;
-		textController.OnKeyDown(event, command, &change);
+	} else if (TextChange* change = nullptr; textController.HandleEvent(event, command, &change)) {
 		if (change) {
 	
 			ProcessTextChange(change);
@@ -1315,14 +1294,9 @@ void Editor::OnKeyEvent(KeyEvent event, Command command) {
 			
 			cursorBlinkValue = 0u;
 		}
-	}
-}
-
-bool Editor::OnClose() {
-	if (isDirty) {
-		const FileResult closeResult = CloseFile();
-		if (closeResult == FileResult::FileResult_Failure)
-			return false;
+	
+	} else {
+		return false;
 	}
 	
 	return true;

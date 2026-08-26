@@ -1,17 +1,18 @@
 #include "search-bar.hh"
 #include "basic.hh"
-#include "main-window.hh"
 #include "globals.hh"
 #include "commands.hh"
 #include "tools.hh"
 #include "events.hh"
 #include "settings.hh"
+#include "app.hh"
 #include "util.hh"
 #include "logging.hh"
 
 #include "ui/constants.h"
-#include "graphics/effects.hh"
+#include "ui/window.hh"
 #include "ui/parameter-configurator.hh"
+#include "graphics/effects.hh"
 
 #include <cmath>
 #include <algorithm>
@@ -60,7 +61,7 @@ static void OnClickItem(void* ud, u64 i) {
 void SearchBar::OnUpdate() {
 
 	if (parameterConfigurator) {
-		parameterConfigurator->OnUpdate();
+		parameterConfigurator->Update();
 		return;
 	}
 		
@@ -108,7 +109,7 @@ void SearchBar::OnUpdate() {
 	// textbox
 	//
 	{
-		textBox.OnUpdate();
+		textBox.Update();
 	}
 	
 	//
@@ -221,47 +222,45 @@ void SearchBar::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void SearchBar::OnKeyDown(KeyEvent event, Command command) {
+bool SearchBar::HandleEvent(const Event& event, const Command& command) {
 	if (parameterConfigurator) {
-		parameterConfigurator->OnKeyDown(event, command);
+		const bool handled = parameterConfigurator->HandleEvent(event, command);
 		if (parameterConfigurator->result != ParameterConfigurator::Result_Unfinished)
 			OnFinishedParameterConfiguration();
+		return handled;
 	}
 	
-	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP)) {
-		if (itemCount == 0u) {
-			selectedItem = U64_MAX;
-		
-		} else if (event.vkeycode == VK_DOWN) {
-			selectedItem = IncrementWrapAround(selectedItem, itemCount);
-
-		} else if (event.vkeycode == VK_UP) {
-			selectedItem = DecrementWrapAround(selectedItem, itemCount);
-		}
-		
-		itemHighlightAnimationValue = .0f;
+	if (event.type == Event::Type_KeyPress) {
+		if ((event.vkcode == VK_DOWN || event.vkcode == VK_UP)) {
+			if (itemCount == 0u) {
+				selectedItem = U64_MAX;
+			
+			} else if (event.vkcode == VK_DOWN) {
+				selectedItem = IncrementWrapAround(selectedItem, itemCount);
 	
-	} else if (event.vkeycode == VK_RETURN) {
+			} else if (event.vkcode == VK_UP) {
+				selectedItem = DecrementWrapAround(selectedItem, itemCount);
+			}
+			
+			itemHighlightAnimationValue = .0f;
+			return true;
 		
-		if (selectedItem < itemCount)
-			OnPickItem(selectedItem, &event);
-		   
-	} else if (event.vkeycode == VK_ESCAPE && event.modifiers == KM_None) {
-		shouldClose = true;
-	
-	} else {
-		const bool changed = textBox.OnKeyDown(event, command);
-		if (changed) FilterItems(textBox.GetText());
+		} else if (event.vkcode == VK_RETURN) {
+			
+			if (selectedItem < itemCount)
+				OnPickItem(selectedItem, &event);
+				
+			return true;
+			   
+		} else if (event.vkcode == VK_ESCAPE && event.kmods == KM_None) {
+			shouldClose = true;
+			return true;
+		}	
 	}
-}
-
-void SearchBar::OnChar(const char* data, u64 len) {
-	if (parameterConfigurator) {
-		parameterConfigurator->OnChar(data, len);
 	
-	} else if (textBox.OnChar(data, len)) {
-		FilterItems(textBox.GetText());
-	}
+	const auto [handled, changed] = textBox.HandleEvent(event, command);
+	if (changed) FilterItems(textBox.GetText());
+	return handled;
 }
 
 void SearchBar::OnMouseWheel(f32 distance) {
@@ -371,7 +370,7 @@ static void SearchDirectory(SearchBarFiles::ThreadData* td, DirectoryIterator& i
 		LogError("failed to search directory: '%s'. Last Error: %s", iterator.GetSearchPath().data(), StrLastErr(iterator.lastError));
 }
 
-DWORD WINAPI ThreadProc(LPVOID param) {
+static DWORD WINAPI ThreadProc(LPVOID param) {
 	auto threadData = Rc<SearchBarFiles::ThreadData>::AdoptVoidPtr(param);
 	
 	DirectoryIterator iter {"."};
@@ -434,7 +433,8 @@ void SearchBarFiles::OnUpdateItems(u64 firstVisible, u64 lastVisible) {
 	}
 }
 
-void SearchBarFiles::OnPickItem(u64 i, const KeyEvent* event) {
+void SearchBarFiles::OnPickItem(u64 i, const Event* event) {
+	ASSERT(!event || (event->type == Event::Type_KeyPress));
 	
 	const std::scoped_lock lock {threadData->mtxResults};
 	ASSERT(threadData);
@@ -442,11 +442,11 @@ void SearchBarFiles::OnPickItem(u64 i, const KeyEvent* event) {
 	
 	const Item& item = threadData->results[i];
 	
-	MainWindow::OpenBehavior openBehav = event
-		? OpenBehaviorFromModifiers(*event)
-		: MainWindow::OpenBehavior_Default;
+	App::OpenBehavior openBehav = event
+		? OpenBehaviorFromModifiers(event->kmods)
+		: App::OpenBehavior_Default;
 	
-	const bool ok = mainWindow.OpenEditor(item.fullPath, openBehav);
+	const bool ok = app.OpenEditor(item.fullPath, openBehav);
 	if (!ok) LogError("OpenEditor() failed");
 	
 	shouldClose = true;
@@ -488,7 +488,7 @@ void SearchBarTools::FilterItems(std::string_view text) {
 
 static bool CheckIfAToolIsAlreadyRunnung(SearchBarTools* self) {
 	
-	if (mainWindow.toolOutput.process && mainWindow.toolOutput.process->IsRunning()) {
+	if (app.toolOutput.process && app.toolOutput.process->IsRunning()) {
 		MessageBoxA(mainWindow.hWnd,
 			"There is already a tool running.\nCurrently only on tool at a time can be run.\nSorry!",
 			"Tool already running",
@@ -499,11 +499,11 @@ static bool CheckIfAToolIsAlreadyRunnung(SearchBarTools* self) {
 	return true;
 }
 
-void SearchBarTools::OnPickItem(u64 item, const KeyEvent* event) {
+void SearchBarTools::OnPickItem(u64 item, const Event* event) {
 	ASSERT(item < filteredTools.size());
 	
 	const Tool& tool = Tool::tools[item];
-	if (tool.forceConfiguration || (event && (event->modifiers & KM_Ctrl) != 0)) {
+	if (tool.forceConfiguration || (event && (event->kmods & KM_Ctrl) != 0)) {
 		ASSERT(!parameterConfigurator);
 		parameterConfigurator = ParameterConfigurator::Make(tool.parameters);
 		return;
@@ -512,9 +512,9 @@ void SearchBarTools::OnPickItem(u64 item, const KeyEvent* event) {
 	if (!CheckIfAToolIsAlreadyRunnung(this))
 		return;
 	
-	tool.GetDefaultValues(&mainWindow.toolOutput.toolParameterValues);
-	mainWindow.toolOutput.tool = &tool;
-	if (!mainWindow.toolOutput.StartProcess())
+	tool.GetDefaultValues(&app.toolOutput.toolParameterValues);
+	app.toolOutput.tool = &tool;
+	if (!app.toolOutput.StartProcess())
 		LogError("failed to launch tool");
 	
 	shouldClose = true;
@@ -540,9 +540,9 @@ void SearchBarTools::OnFinishedParameterConfiguration() {
 		ASSERT(selectedItem < filteredTools.size());	
 		const Tool& tool = Tool::tools[selectedItem];
 		
-		parameterConfigurator->GetParameterValues(&mainWindow.toolOutput.toolParameterValues);
-		mainWindow.toolOutput.tool = &tool;
-		if (!mainWindow.toolOutput.StartProcess())
+		parameterConfigurator->GetParameterValues(&app.toolOutput.toolParameterValues);
+		app.toolOutput.tool = &tool;
+		if (!app.toolOutput.StartProcess())
 			LogError("failed to launch tool");
 		
 		shouldClose = true;
@@ -595,21 +595,23 @@ void SearchBarCommands::FilterItems(std::string_view text) {
 	SetItemCount(filteredCommands.size());
 }
 
-void SearchBarCommands::OnPickItem(u64 itemIdx, const KeyEvent* event) {
+void SearchBarCommands::OnPickItem(u64 itemIdx, const Event* event) {
 	ASSERT(itemIdx < filteredCommands.size());
 	
 	const Item& item = filteredCommands[itemIdx];
 		
-	const CommandDefinition& command = commandDefinitions[item.commandId];
-	if (command.forceParameterConfiguration || (event && event->modifiers == KM_Ctrl)) {
+	const CommandDefinition& commandDef = commandDefinitions[item.commandId];
+	if (commandDef.forceParameterConfiguration || (event && event->kmods == KM_Ctrl)) {
 		ASSERT(!parameterConfigurator);
-		parameterConfigurator = ParameterConfigurator::Make(command.parameters);
+		parameterConfigurator = ParameterConfigurator::Make(commandDef.parameters);
 		return;
 	}
 	
 	std::vector<ParameterValue> defaultValues {};
-	ParameterDefinition::GetDefaultValues(command.parameters, &defaultValues);
-	mainWindow.OnKeyEvent(KeyEvent {VK_NONE, KM_None}, Command {item.commandId, defaultValues.data()});
+	ParameterDefinition::GetDefaultValues(commandDef.parameters, &defaultValues);
+	
+	const Command command {item.commandId, defaultValues.data()};
+	app.ExecuteCommand(command);
 	
 	shouldClose = true;
 }
@@ -637,7 +639,9 @@ void SearchBarCommands::OnFinishedParameterConfiguration() {
 		
 		std::vector<ParameterValue> parameterValues {};
 		parameterConfigurator->GetParameterValues(&parameterValues);
-		mainWindow.OnKeyEvent(KeyEvent {VK_NONE, KM_None}, Command {item.commandId, parameterValues.data()});
+		
+		const Command command {item.commandId, parameterValues.data()};
+		app.ExecuteCommand(command);
 		
 		shouldClose = true;
 		

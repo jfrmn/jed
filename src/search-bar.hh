@@ -2,13 +2,14 @@
 #include "ui/text-box.hh"
 #include "ui/scrollarea.hh"
 #include "util/rc.h"
+#include "commands.hh"
 #include "util.hh"
 
 #include <atomic>
 #include <mutex>
 #include <string_view>
 
-struct KeyEvent;
+struct Event;
 struct ParameterConfigurator;
 struct Tool;
 
@@ -68,12 +69,11 @@ public:
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) = 0;
 	
 	void OnResize();
+	bool HandleEvent(const Event& event, const Command& command);
 	void OnMouseWheel(f32 distance);
-	void OnKeyDown(KeyEvent event, Command command);
-	void OnChar(const char* data, u64 len);
 	
 	virtual void FilterItems(std::string_view text) = 0;
-	virtual void OnPickItem(u64 item, const KeyEvent* event) = 0;
+	virtual void OnPickItem(u64 item, const Event* event) = 0;
 	virtual void OnFinishedParameterConfiguration() {};
 };
 
@@ -124,7 +124,7 @@ struct SearchBarFiles : public SearchBar {
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;
 	
 	virtual void FilterItems(std::string_view text) override;
-	virtual void OnPickItem(u64 item, const KeyEvent* event) override;
+	virtual void OnPickItem(u64 item, const Event* event) override;
 	
 };
 
@@ -160,7 +160,7 @@ struct SearchBarTools : public SearchBar {
 		
 	virtual void FilterItems(std::string_view text) override;
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;	
-	virtual void OnPickItem(u64 item, const KeyEvent* event) override;
+	virtual void OnPickItem(u64 item, const Event* event) override;
 	virtual void OnFinishedParameterConfiguration() override;	
 };
 
@@ -195,7 +195,7 @@ struct SearchBarCommands : public SearchBar {
 
 	virtual void FilterItems(std::string_view text) override;
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;	
-	virtual void OnPickItem(u64 item, const KeyEvent* event) override;
+	virtual void OnPickItem(u64 item, const Event* event) override;
 	virtual void OnFinishedParameterConfiguration() override;	
 
 };

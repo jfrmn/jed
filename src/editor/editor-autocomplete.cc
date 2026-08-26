@@ -33,7 +33,7 @@ EditorAutocomplete::~EditorAutocomplete() noexcept {
 		signatureHelp->RemoveReference();
 }
 
-void EditorAutocomplete::OnUpdate() {
+void EditorAutocomplete::Update() {
 	if (DrawIncompleteState(deviceContext, "No suggestions.")) return;
 	
 	ASSERT(itemCount > 0);
@@ -131,7 +131,7 @@ void EditorAutocomplete::OnUpdate() {
 	
 	// draw signature help if active
 	if (signatureHelp)
-		signatureHelp->OnUpdate();
+		signatureHelp->Update();
 }
 
 static void InsertItem(EditorAutocomplete* self) {
@@ -201,24 +201,26 @@ void EditorAutocomplete::SortItems() {
 	});
 }
 
-bool EditorAutocomplete::OnKeyEvent(KeyEvent event) {
+bool EditorAutocomplete::HandleEvent(const Event& event, const Command& command) {
 	if (!items || itemCount == 0u) return false;
 
-	if ((event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_None) {
+	if (event.type == Event::Type_KeyPress) {
+		if ((event.vkcode == VK_DOWN || event.vkcode == VK_UP) && event.kmods == KM_None) {
 		
-		selectedItem = event.vkeycode == VK_DOWN ?
-			IncrementWrapAround(selectedItem, itemCount):
-			DecrementWrapAround(selectedItem, itemCount);
-
-		return true;
+			selectedItem = event.vkcode == VK_DOWN ?
+				IncrementWrapAround(selectedItem, itemCount):
+				DecrementWrapAround(selectedItem, itemCount);
 	
-	} else if ((event.vkeycode == VK_RETURN || event.vkeycode == VK_TAB) && event.modifiers == KM_None) {
-		InsertItem(this);
-		RemoveReference();
-		return true;
+			return true;
+	
+		} else if ((event.vkcode == VK_RETURN || event.vkcode == VK_TAB) && event.kmods == KM_None) {
+			InsertItem(this);
+			RemoveReference();
+			return true;
+		}
 	
 	} else if (signatureHelp) {
-		return signatureHelp->OnKeyEvent(event);
+		return signatureHelp->HandleEvent(event, command);
 	}
 	
 	return false;

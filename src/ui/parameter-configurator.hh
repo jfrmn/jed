@@ -44,9 +44,8 @@ struct ParameterConfigurator {
 	
 	void GetParameterValues(std::vector<ParameterValue>* initialValues) const;
 	
-	void OnUpdate();
+	void Update();
 	void OnResize();
 	
-	void OnKeyDown(KeyEvent event, Command command);
-	void OnChar(const char* data, u64 len);
+	bool HandleEvent(const Event& event, const Command& command);
 };

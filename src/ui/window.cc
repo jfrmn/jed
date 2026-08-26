@@ -7,6 +7,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <Windows.h>
 #include <d2d1_1.h>
 #include <dwmapi.h>
 
@@ -14,6 +15,8 @@ static u32 wmUserUpdate       = 0u;
 static u32 wmUserSendFuncCall = 0u;
 static u32 wmUserPostFuncCall = 0u;
 static u32 wmUserFileChanged  = 0u;
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Window mainWindow = {};
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static LRESULT WINAPI WindowProc(
@@ -29,7 +32,7 @@ bool Window::Create(const CreateParams& createParams) {
 	WNDCLASSA wndc = { sizeof(WNDCLASSA) };
 	wndc.style = CS_HREDRAW | CS_VREDRAW;
 	wndc.hInstance = hInstance;
-	wndc.hbrBackground = NULL; //(HBRUSH)GetStockObject(BLACK_BRUSH);
+	wndc.hbrBackground = NULL;
 	wndc.lpszClassName = createParams.className.data();
 	wndc.lpfnWndProc = WindowProc;
 	wndc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -46,7 +49,7 @@ bool Window::Create(const CreateParams& createParams) {
 		WS_OVERLAPPEDWINDOW,                     // style
 		CW_USEDEFAULT, CW_USEDEFAULT,            // positon
 		createParams.width, createParams.height, // size
-		createParams.hwndParent,                 // parent hwnd
+		createParams.hWndParent,                 // parent hwnd
 		NULL,                                    // menu
 		hInstance,                               // instance
 		NULL);                                   // lparam for init-message
@@ -61,14 +64,14 @@ bool Window::Create(const CreateParams& createParams) {
 	RECT clientRect;
 	GetClientRect(hWnd, &clientRect);
 
-	const long w = clientRect.right  - clientRect.left;
-	const long h = clientRect.bottom - clientRect.top;
+	const u32 w = clientRect.right  - clientRect.left;
+	const u32 h = clientRect.bottom - clientRect.top;
 
 	ID2D1HwndRenderTarget* hwndRenderTarget = nullptr;
 
 	if (HRESULT hr = d2dFactory->CreateHwndRenderTarget(
 			D2D1::RenderTargetProperties(),
-			D2D1::HwndRenderTargetProperties(hWnd, D2D1::SizeU(w, h)),
+			D2D1::HwndRenderTargetProperties(hWnd, D2D_SIZE_U {w, h}),
 			&hwndRenderTarget);
 			hr != S_OK) {
 		LogError("CreateHwndRenderTarget() failed. HRESULT: %s", StrHr(hr));
@@ -100,22 +103,35 @@ bool Window::Create(const CreateParams& createParams) {
 
 	this->hWnd = hWnd;
 	this->renderTarget = hwndRenderTarget;
-	this->width = static_cast<float>(w);
-	this->height = static_cast<float>(h);
+	this->width = static_cast<f32>(w);
+	this->height = static_cast<f32>(h);
 	
 	return true;
 }
 
-void Window::CleanUp() {
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void Window::Show() {
+	ShowWindow(hWnd, SW_SHOWDEFAULT);	
+}
 
-	if (deviceContext) {
-		deviceContext->Release();
-		deviceContext = nullptr;
-	}
+void Window::ClearEvent() {
+	event = Event {};
+}
+
+void Window::Destroy() {
+	DestroyWindow(hWnd);
+}
+
+void Window::CleanUp() {
 	
 	if (renderTarget) {
 		renderTarget->Release();
 		renderTarget = nullptr;
+	}
+	
+	if (deviceContext) {
+		deviceContext->Release();
+		deviceContext = nullptr;
 	}
 	
 	SetWindowLongPtr(hWnd, GWLP_USERDATA, 0u);
@@ -150,73 +166,70 @@ void Window::PostFileChangedEvent(FileChangedEvent* fileChangedEvent) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static float GetXFromLParam(LPARAM lParam) {
-	const int x = LOWORD(lParam);
-	return static_cast<float>(x);
+static f32 GetXFromLParam(LPARAM lParam) {
+	return static_cast<f32>(LOWORD(lParam));
 }
 
-static float GetYFromLParam(LPARAM lParam) {
-	const int y = HIWORD(lParam);
-	return static_cast<float>(y);
+static f32 GetYFromLParam(LPARAM lParam) {
+	return static_cast<f32>(HIWORD(lParam));
+}
+
+static u32 CollectKeyModifiers() {
+	return 
+		((HIWORD(GetKeyState(VK_CONTROL)) != 0) ? KM_Ctrl  : 0) |
+		((HIWORD(GetKeyState(VK_SHIFT)) != 0)   ? KM_Shift : 0) |
+		((HIWORD(GetKeyState(VK_MENU)) != 0)    ? KM_Alt   : 0);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam) {
-	Window* window = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+	Window* self = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	
-	if (!window)
+	if (!self)
 		return DefWindowProc(hWnd, nMSG, wParam, lParam);
 
 	switch (nMSG) {
 
 		case WM_MOUSEMOVE: {
-			const float x = GetXFromLParam(lParam);
-			const float y = GetYFromLParam(lParam);
-		
-			mouse.x = x;
-			mouse.y = y;
+			mouse.x = GetXFromLParam(lParam);
+			mouse.y = GetYFromLParam(lParam);
 			return 0l;
 		} break;
 		
 		case WM_LBUTTONDOWN:
 		case WM_LBUTTONUP: {
-			const float x = GetXFromLParam(lParam);
-			const float y = GetYFromLParam(lParam);
+			const f32 x = GetXFromLParam(lParam);
+			const f32 y = GetYFromLParam(lParam);
 			mouse.x = x;
 			mouse.y = y;
+			self->event.x = x;
+			self->event.y = y;
 			
 			if (nMSG == WM_LBUTTONDOWN) {
 				mouse.isDown = true;
-				mouse.event = Mouse::Event_Down;
+				self->event.type = Event::Type_MouseDown;
 			
 			} else if (nMSG == WM_LBUTTONUP) {
 				mouse.isDown = false;
-				mouse.event = Mouse::Event_Up;
+				self->event.type = Event::Type_MouseUp;
 			}
-				
+			
+			return 0l;	
 		} break;
 		
 		case WM_MOUSEWHEEL: {
 			const int wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-			const float distance = static_cast<float>(wheelDelta) / WHEEL_DELTA;
-			window->OnMouseWheel(distance);
+			const f32 distance = static_cast<f32>(wheelDelta) / WHEEL_DELTA;
+			self->event.type = Event::Type_MouseWheel;
+			self->event.wheelDistance = distance;
+			return 0l;
 		} break;
 			
-		case WM_SYSKEYUP:
 		case WM_SYSKEYDOWN:
-		case WM_KEYUP:
 		case WM_KEYDOWN: {
-			KeyEvent keyEvent {
-				.vkeycode = static_cast<u32>(wParam),
-				.modifiers = KM_None};
-				
-				if (HIWORD(GetKeyState(VK_CONTROL)) != 0) keyEvent.modifiers |= KM_Ctrl;
-				if (HIWORD(GetKeyState(VK_SHIFT))   != 0) keyEvent.modifiers |= KM_Shift;
-				if (HIWORD(GetKeyState(VK_MENU))    != 0) keyEvent.modifiers |= KM_Alt;
-			
-			if      (nMSG == WM_KEYDOWN || nMSG == WM_SYSKEYDOWN) window->OnKeyDown(keyEvent);
-			else if (nMSG == WM_KEYUP   || nMSG == WM_SYSKEYUP)   window->OnKeyUp(keyEvent);
-			else ASSERT_UNREACHABLE
+			self->event.type = Event::Type_KeyPress;
+			self->event.vkcode = wParam;
+			self->event.kmods = CollectKeyModifiers();
 			return 0L;
 		} break;
 
@@ -230,49 +243,57 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		case WM_CHAR: {
 			const wchar wch = static_cast<wchar>(wParam);
 			
-			if ((wch >= L'\0' && wch <= L'\x1f') ||               // ascii-control character block 
-				(wch == L'\x7f') ||                               // delete
-				(wch == L' ' && HIWORD(GetKeyState(VK_CONTROL)))) // Ctrl+Space is used for autocomplete. We need to supress this space
-				break;
+			// ascii-control character block 
+			if (wch >= L'\0' && wch <= L'\x1f') break;
+			
+			// delete
+			if (wch == L'\x7f') break;
+			
+			// Ctrl+Space is used for autocomplete. We need to supress this space
+			if (wch == L' ' && HIWORD(GetKeyState(VK_CONTROL))) break;
 			
 			// @FIXME we need to use the Unicode version of RegisterClass (RegisterClassW) in order to recieve utf16 chars
 			// the A-Variant just gives us characters in the current code-page
 			
-			// 6 is the theroretical maximum for utf8
-			char utf8Buffer[6] {'\0'};
-			u64  utf8Len = 0u;
-			
-			if (!ToUtf8(std::wstring_view {&wch, 1u}, utf8Buffer, &utf8Len)) {
+			if (!ToUtf8(std::wstring_view {&wch, 1u}, self->event.textData, &self->event.textLen)) {
 				LogWarning("failed to convert input to utf-8");
 				return false;
 			}
 		
-			window->OnChar(utf8Buffer, utf8Len);
+			self->event.type = Event::Type_Text;
+			return 0l;
 		} break;
 
 		case WM_SIZE: {
 			const u32 uwidth  = LOWORD(lParam);
 			const u32 uheight = HIWORD(lParam);
 			
-			const f32 width  = static_cast<float>(uwidth);
-			const f32 height = static_cast<float>(uheight);
+			const f32 width  = static_cast<f32>(uwidth);
+			const f32 height = static_cast<f32>(uheight);
 
-			window->width = width;
-			window->height = height;
-			window->renderTarget->Resize(D2D_SIZE_U {uwidth, uheight});
+			self->width = width;
+			self->height = height;
+			self->renderTarget->Resize(D2D_SIZE_U {uwidth, uheight});
 			
-			window->OnResize(window->width, window->height);
+			self->event.type = Event::Type_Resize;
+			self->event.newWidth = width;
+			self->event.newHeight = height;
+			return 0l;
 		} break;
 		
 		case WM_CLOSE: {
-			const bool shouldClose = window->OnClose();
-			if (shouldClose)
-				DestroyWindow(window->hWnd);
+			self->event.type = Event::Type_Close;
+			return 0l;
 		} break;
 		
 		case WM_DESTROY: {
-			window->destroyRecieved = true;
 			PostQuitMessage(0);
+			return 0l;
+		} break;
+		
+		case WM_QUIT: {
+			self->quitReceived = true;
+			return 0l;
 		} break;
 				
 		default: break;
@@ -295,9 +316,8 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		return 1;
 	
 	} else if (nMSG == wmUserFileChanged) {
-		auto fileChangedEvent = reinterpret_cast<FileChangedEvent*>(lParam);
-		window->OnFileChanged(fileChangedEvent);
-		free(fileChangedEvent);
+		self->event.type = Event::Type_FileChange;
+		self->event.fileChangedEvent = reinterpret_cast<FileChangedEvent*>(lParam);
 	} 
 	
 	return DefWindowProc(hWnd, nMSG, wParam, lParam);

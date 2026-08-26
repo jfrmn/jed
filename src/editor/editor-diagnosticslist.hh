@@ -3,7 +3,6 @@
 #include "editor/editor-toolwindow.hh"
 
 struct Editor;
-struct KeyEvent;
 
 struct EditorDiagnosticsList : public EditorToolWindow {
 	
@@ -21,8 +20,8 @@ struct EditorDiagnosticsList : public EditorToolWindow {
 
 	static EditorDiagnosticsList* Make(Editor* editor);
 	
-	virtual void OnUpdate() override;
-	virtual bool OnKeyEvent(KeyEvent event, Command command) override;
+	virtual void Update() override;
+	virtual bool HandleEvent(const Event& event, const Command& command) override;
 	
 	virtual bool IsDiagnosticsList() const override;
 };

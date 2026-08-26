@@ -1,4 +1,4 @@
-#include "main-window.hh"
+#include "app.hh"
 #include "basic.hh"
 #include "globals.hh"
 #include "settings.hh"
@@ -17,32 +17,19 @@
 #include <d2d1_3.h>
 #include <shlobj.h>
 
+App app {};
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Creation and Shutdown
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool MainWindow::Create() {
-	const bool ok = Window::Create(
-		Window::CreateParams {
-			.className = "MAINWND",
-			.title = "slick-edit",
-			.width = 1920,
-			.height = 1080,
-			.hwndParent = NULL});
+bool App::Init() {
+	ASSERT(mainWindow.deviceContext);
 	
-	if (ok) {
-		::deviceContext = this->deviceContext;
-		::deviceContext->AddRef();
-		return true;
-	} else {
-		LogError("creating window failed");
-		return false;
-	}
-}
+	::deviceContext = mainWindow.deviceContext;
 
-bool MainWindow::Init() {
 	if (!statusBar.Init()) {
 		LogError("init status bar failed");
 		return false;
@@ -56,19 +43,13 @@ bool MainWindow::Init() {
 	searchBarFiles.Init();
 	searchBarTools.Init();
 	searchBarCommands.Init();
-		
-	ShowWindow(hWnd, SW_SHOWDEFAULT);
 	return true;
 }
 
-void MainWindow::Shutdown() {
-	Window::CleanUp();
-		
-	for (Tab& tab : tabs)
-		delete tab.editor;
-	
-	::deviceContext->Release();
+void App::Shutdown() {
 	::deviceContext = nullptr;
+	for (Tab& tab : tabs)
+		delete tab.editor;	
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,11 +76,11 @@ static bool LoadFileInformation(std::string_view path, /*out*/ BY_HANDLE_FILE_IN
 	return true;
 }
 
-static bool FindEditor(const MainWindow* self, std::string_view path, /*out*/ u64* tabIndex, /*out*/ u64* panelIndex) {
+static bool FindEditor(const App* self, std::string_view path, /*out*/ u64* tabIndex, /*out*/ u64* panelIndex) {
 		
 	// optimistic approach: just do a string compare first
 	for (u64 i = 0u; i < self->tabs.size(); i++) {
-		const MainWindow::Tab& tab = self->tabs[i];
+		const App::Tab& tab = self->tabs[i];
 		
 		if (tab.editor->path == path) {
 			*tabIndex = i;
@@ -112,7 +93,7 @@ static bool FindEditor(const MainWindow* self, std::string_view path, /*out*/ u6
 	if (!LoadFileInformation(path, &toFindFileInfo)) return false;
 	
 	for (u64 i = 0u; i < self->tabs.size(); i++) {
-		const MainWindow::Tab& tab = self->tabs[i];
+		const App::Tab& tab = self->tabs[i];
 		if (tab.editor->path.empty()) continue;
 		
 		BY_HANDLE_FILE_INFORMATION fileInfo {};
@@ -139,13 +120,13 @@ static void LogFileResult(Editor::FileResult closeResult) {
 		LogError("failed to save file");
 }
 
-static void RelinkPanelsAndTabs(MainWindow* self) {
+static void RelinkPanelsAndTabs(App* self) {
 	for (u64 itab = 0u; itab < self->tabs.size(); itab++) {
-		MainWindow::Tab& tab = self->tabs[itab];
+		App::Tab& tab = self->tabs[itab];
 		if (!tab.editor) continue;
 		
 		for (u64 ipanel = 0; ipanel < self->panels.size(); ipanel++) {
-			MainWindow::Panel& panel = self->panels[ipanel];
+			App::Panel& panel = self->panels[ipanel];
 		
 			if (tab.editor == panel.editor) {
 				tab.panelIndex = ipanel;
@@ -167,10 +148,10 @@ static float StatusBarHeight() {
 	return settings.fontUi.lineHeight + PADDING_X2;
 }
 
-static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
-	MainWindow::Panel& panel  = self->panels[self->focusedPanelIndex];
-	MainWindow::Tab&   oldTab = self->tabs[panel.tabIndex];
-	MainWindow::Tab&   newTab = self->tabs[tabIndexToDisplay];
+static void ChangeTabOfFocusedPanel(App* self, u64 tabIndexToDisplay) {
+	App::Panel& panel  = self->panels[self->focusedPanelIndex];
+	App::Tab&   oldTab = self->tabs[panel.tabIndex];
+	App::Tab&   newTab = self->tabs[tabIndexToDisplay];
 			
 	oldTab.panelIndex = U64_MAX;
 	newTab.panelIndex = self->focusedPanelIndex;
@@ -178,13 +159,13 @@ static void ChangeTabOfFocusedPanel(MainWindow* self, u64 tabIndexToDisplay) {
 	panel.editor      = newTab.editor;
 	
 	panel.editor->OnResize(D2D_RECT_F {
-		.left   = (self->width / self->panels.size()) * self->focusedPanelIndex,
+		.left   = (mainWindow.width / self->panels.size()) * self->focusedPanelIndex,
 		.top    = TabHeight(),
-		.right  = (self->width / self->panels.size()) * (self->focusedPanelIndex + 1),
-		.bottom = self->height - StatusBarHeight()});
+		.right  = (mainWindow.width / self->panels.size()) * (self->focusedPanelIndex + 1),
+		.bottom = mainWindow.height - StatusBarHeight()});
 }
 
-static void ResizePanels(MainWindow* self) {
+static void ResizePanels(App* self) {
 	
 	const f32 tabHeight = TabHeight();
 	const f32 statusBarHeight = StatusBarHeight();
@@ -192,7 +173,7 @@ static void ResizePanels(MainWindow* self) {
 	f32 panelLeft = 0.0f;
 	
 	for (usize i = 0u; i < self->panels.size(); i++) {
-		const MainWindow::Panel& panel = self->panels[i];
+		const App::Panel& panel = self->panels[i];
 			
 		const auto panelRect = D2D1_RECT_F {
 			.left   = panelLeft,
@@ -211,7 +192,7 @@ static void ResizePanels(MainWindow* self) {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBehaviour_Default*/, bool* wasAlreadyOpen /*= nullptr*/) {
+Editor* App::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBehaviour_Default*/, bool* wasAlreadyOpen /*= nullptr*/) {
 	
 	//
 	// check if editor already open
@@ -226,7 +207,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		
 		// OpenBehavior_TabOnly indicates that the user doesn't want to see the file
 		// immediatly anyawy so there is no need to display anything
-		if (openBehavior == MainWindow::OpenBehavior_TabOnly)
+		if (openBehavior == App::OpenBehavior_TabOnly)
 			return tabs[tabIndex].editor;
 		
 		// file is already open
@@ -250,12 +231,12 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 		if (wasAlreadyOpen)
 		   *wasAlreadyOpen = false;
 		
-		if (openBehavior == MainWindow::OpenBehavior_UpdateCurrent && !panels.empty()) {
+		if (openBehavior == App::OpenBehavior_UpdateCurrent && !panels.empty()) {
 			ASSERT(focusedPanelIndex != U64_MAX);
 			ASSERT(!tabs.empty());
 			
-			MainWindow::Panel& currentPanel = panels[focusedPanelIndex];
-			MainWindow::Tab& currentTab = tabs[currentPanel.tabIndex];
+			App::Panel& currentPanel = panels[focusedPanelIndex];
+			App::Tab& currentTab = tabs[currentPanel.tabIndex];
 			
 			const auto closeResult = currentTab.editor->OpenFile(std::move(path));
 			if (closeResult != Editor::FileResult_Success) {
@@ -279,7 +260,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			if (editor->OpenFile(std::move(path)) != Editor::FileResult_Success)
 				return nullptr;
 			
-			MainWindow::Tab& newTab = tabs.emplace_back();
+			App::Tab& newTab = tabs.emplace_back();
 			
 			const std::string_view title = GetFilenameFromPath(editor->path);	
 			newTab.title.Shape(title, settings.fontUi);
@@ -289,17 +270,17 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 			
 			if (panels.empty()) {
 				ASSERT(focusedPanelIndex == U64_MAX);
-				MainWindow::Panel& panel = panels.emplace_back();
+				App::Panel& panel = panels.emplace_back();
 				panel.editor = newTab.editor;
 				panel.tabIndex = newTab.panelIndex = focusedPanelIndex = 0u;
 				ResizePanels(this);
 				
-			} else if (openBehavior == MainWindow::OpenBehavior_Default) {
+			} else if (openBehavior == App::OpenBehavior_Default) {
 				ChangeTabOfFocusedPanel(this, tabs.size() - 1);
 				
-			} else if (openBehavior == MainWindow::OpenBehavior_NewPanelLeft || openBehavior == MainWindow::OpenBehavior_NewPanelRight) {
+			} else if (openBehavior == App::OpenBehavior_NewPanelLeft || openBehavior == App::OpenBehavior_NewPanelRight) {
 				
-				const u64 newPanelIndex = openBehavior == MainWindow::OpenBehavior_NewPanelLeft
+				const u64 newPanelIndex = openBehavior == App::OpenBehavior_NewPanelLeft
 					? focusedPanelIndex
 					: focusedPanelIndex + 1;
 						
@@ -312,7 +293,7 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 				RelinkPanelsAndTabs(this);
 				ResizePanels(this);
 			
-			} else if (openBehavior == MainWindow::OpenBehavior_TabOnly) {
+			} else if (openBehavior == App::OpenBehavior_TabOnly) {
 				newTab.panelIndex = U64_MAX;
 			
 			} else if (panels.empty()) {
@@ -338,8 +319,8 @@ Editor* MainWindow::OpenEditor(std::string path, OpenBehavior openBehavior /*= O
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void OnActivateTab(void* ud, u64 i) {
-	auto self = static_cast<MainWindow*>(ud);
-	MainWindow::Tab& hitTab = self->tabs[i];
+	auto self = static_cast<App*>(ud);
+	App::Tab& hitTab = self->tabs[i];
 			
 	// if there is already a panel for the hit tab then this panel gets focused
 	// otherwise the currently focused panel becomes the hit tab item
@@ -351,9 +332,9 @@ static void OnActivateTab(void* ud, u64 i) {
 }
 
 static void OnCloseTab(void* ud, u64 i) {
-	auto self = static_cast<MainWindow*>(ud);
+	auto self = static_cast<App*>(ud);
 	
-	MainWindow::Tab& tabToClose = self->tabs[i];
+	App::Tab& tabToClose = self->tabs[i];
 	
 	//
 	// close editor
@@ -371,7 +352,7 @@ static void OnCloseTab(void* ud, u64 i) {
 	if (tabToClose.panelIndex != U64_MAX) {
 	
 		// update panel indicies
-		for (MainWindow::Tab& tab : self->tabs) {
+		for (App::Tab& tab : self->tabs) {
 			if (tab.panelIndex == U64_MAX) continue;
 			if (tab.panelIndex > tabToClose.panelIndex) tab.panelIndex -= 1;
 		}
@@ -389,7 +370,7 @@ static void OnCloseTab(void* ud, u64 i) {
 	self->tabs.erase(self->tabs.begin() + i);
 	
 	// update tab indicies
-	for (MainWindow::Panel& panel : self->panels) {
+	for (App::Panel& panel : self->panels) {
 		if (panel.tabIndex > i)
 			panel.tabIndex -= 1;
 	}
@@ -397,7 +378,7 @@ static void OnCloseTab(void* ud, u64 i) {
 }
 
 static void OnClickStartPage(void* ud, u64 btn) {
-	auto self = static_cast<MainWindow*>(ud);
+	auto self = static_cast<App*>(ud);
 	if (btn == 0) { // search file
 		if (self->searchBar) return;
 		self->searchBar = &self->searchBarFiles;
@@ -420,7 +401,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
 		DWORD flags = 0;
 		fileDialog->GetOptions(&flags);
 		fileDialog->SetOptions(flags | FOS_FORCEFILESYSTEM);
-		hr = fileDialog->Show(self->hWnd);
+		hr = fileDialog->Show(mainWindow.hWnd);
 		if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
 			LogInfo("User cancelled open file dialog.");
 			return;
@@ -463,30 +444,29 @@ static void OnClickStartPage(void* ud, u64 btn) {
 	}
 }
 
-static void FinishDrawing(MainWindow* self) {
+static void FinishDrawing(App* self) {
 	const HRESULT hr = deviceContext->EndDraw();
 	if (hr == S_OK) return;
 	
 	const std::string errorString = FormatString("Rendering failed. HRESULT: %s", StrHr(hr));
 	LogError("%s", errorString.c_str());
 	
-	HDC hDC = GetDC(self->hWnd);
+	HDC hDC = GetDC(mainWindow.hWnd);
 	
 	SIZE textExtend {};
 	GetTextExtentPointA(hDC, errorString.data(), static_cast<int>(errorString.size()), &textExtend);
 	SetBkColor(hDC, RGB(0, 0, 0));
 	SetTextColor(hDC, RGB(255, 0, 0));
 	TextOut(hDC,
-		static_cast<int>((self->width / 2.0f) - (textExtend.cx / 2.0f)),
-		static_cast<int>((self->height / 2.0f) - (textExtend.cy / 2.0f)),
+		static_cast<int>((mainWindow.width / 2.0f) - (textExtend.cx / 2.0f)),
+		static_cast<int>((mainWindow.height / 2.0f) - (textExtend.cy / 2.0f)),
 		errorString.data(),
 		static_cast<int>(errorString.size()));
-	ReleaseDC(self->hWnd, hDC);		
-	ValidateRect(self->hWnd, NULL);
+	ReleaseDC(mainWindow.hWnd, hDC);		
+	ValidateRect(mainWindow.hWnd, NULL);
 }
 
-void MainWindow::OnUpdate() {
-		
+void App::Update() {
 	deviceContext->BeginDraw();
 	deviceContext->Clear(D2D1::ColorF(D2D1::ColorF::Black));
 	DEFER(FinishDrawing(this));
@@ -500,15 +480,15 @@ void MainWindow::OnUpdate() {
 		D2D_RECT_F {
 			.left = 0.0f,
 			.top = tabHeight,
-			.right = width,
-			.bottom = height - tabHeight},
+			.right = mainWindow.width,
+			.bottom = mainWindow.height - tabHeight},
 		settings.GetBrushEditorBackground());
 	
 	//
 	// draw panels
 	//
 	for (const Panel& panel : panels) {
-		panel.editor->OnUpdate();
+		panel.editor->Update();
 	}
 	
 	//
@@ -529,7 +509,7 @@ void MainWindow::OnUpdate() {
 			if (i == focusedPanelIndex) {
 				deviceContext->DrawRectangle(borderRect, settings.GetBrushDropShadow(), 2.0f);
 			} else if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
-				if (mouse.event == Mouse::Event_Up) focusedPanelIndex = i;
+				if (mainWindow.event.type == Event::Type_MouseDown) focusedPanelIndex = i;
 			}
 		}
 	}
@@ -711,10 +691,10 @@ void MainWindow::OnUpdate() {
 		for (u64 i = 0u; i < BUTTON_COUNT; i++) {
 			
 			const D2D_RECT_F buttonRect {
-				.left   = (width  / 2.0f) - (buttonWidth / 2.0f),
-				.top    = (height / 2.0f) - (totalHeight / 2.0f) + offsetY,
-				.right  = (width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
-				.bottom = (height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
+				.left   = (mainWindow.width  / 2.0f) - (buttonWidth / 2.0f),
+				.top    = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY,
+				.right  = (mainWindow.width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
+				.bottom = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
 			
 			deviceContext->DrawRoundedRectangle(ToRounded(buttonRect), settings.GetBrushUiBackground());
 			
@@ -736,16 +716,16 @@ void MainWindow::OnUpdate() {
 	statusBar.OnUpdate();
 	
 	//
-	// draw console
+	 // draw console
 	//
 	if (toolOutput.isOpen)
-		toolOutput.OnUpdate();
+		toolOutput.Update();
 	
 	//
 	// draw explorer
 	//
 	if (explorer)
-		explorer->OnUpdate();
+		explorer->Update();
 	
 	//
 	// draw search bar
@@ -758,7 +738,7 @@ void MainWindow::OnUpdate() {
 	}
 }
 
-Editor* MainWindow::GetFocusedEditor() {
+Editor* App::GetFocusedEditor() {
 	if (focusedPanelIndex != U64_MAX) {
 		ASSERT(focusedPanelIndex < panels.size());
 		return panels[focusedPanelIndex].editor;
@@ -768,18 +748,18 @@ Editor* MainWindow::GetFocusedEditor() {
 	}
 }
 
-const Editor* MainWindow::GetFocusedEditor() const {
-	return const_cast<MainWindow*>(this)->GetFocusedEditor();
+const Editor* App::GetFocusedEditor() const {
+	return const_cast<App*>(this)->GetFocusedEditor();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Commands
+// Input
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void CommandChangeFocusedTab(MainWindow* self, bool next) {
-	MainWindow::Panel& panel = self->panels[self->focusedPanelIndex];
+static void CommandChangeFocusedTab(App* self, bool next) {
+	App::Panel& panel = self->panels[self->focusedPanelIndex];
 	const u64 startIndex = panel.tabIndex;
 	
 	u64 i = next
@@ -787,7 +767,7 @@ static void CommandChangeFocusedTab(MainWindow* self, bool next) {
 		: DecrementWrapAround(startIndex, self->tabs.size());
 	
 	while (i != startIndex) {
-		MainWindow::Tab& tab = self->tabs[i];
+		App::Tab& tab = self->tabs[i];
 		if (tab.panelIndex == U64_MAX) {
 			ChangeTabOfFocusedPanel(self, i);
 			break;
@@ -799,13 +779,13 @@ static void CommandChangeFocusedTab(MainWindow* self, bool next) {
 	}	
 }
 
-static void CommandAddPanel(MainWindow* self, bool beforeCurrent) {
+static void CommandAddPanel(App* self, bool beforeCurrent) {
 	
-	MainWindow::Panel newPanel {};
+	App::Panel newPanel {};
 	
 	// find tab to display	
 	for (u64 i = 0; i < self->tabs.size(); i++) {
-		MainWindow::Tab& tab = self->tabs[i];
+		App::Tab& tab = self->tabs[i];
 		
 		if (tab.panelIndex == U64_MAX) {
 			newPanel.editor = tab.editor;
@@ -833,7 +813,7 @@ found_tab:
 	ResizePanels(self);
 }
 
-static void ActionSwapPanels(MainWindow* self) {
+static void ActionSwapPanels(App* self) {
 
 	const u64 panelIndexToSwapWith = IncrementWrapAround(self->focusedPanelIndex, self->panels.size());
 	
@@ -852,7 +832,7 @@ static void ActionSwapPanels(MainWindow* self) {
 	ResizePanels(self);
 }
 
-static void ActionClosePanel(MainWindow* self) {
+static void ActionClosePanel(App* self) {
 	if (self->panels.size() <= 1u) return;
 	
 	self->panels.erase(self->panels.begin() + self->focusedPanelIndex);
@@ -865,14 +845,14 @@ static void ActionClosePanel(MainWindow* self) {
 	ResizePanels(self);
 }
 
-static void CommandCloseTab(MainWindow* self) {
+static void CommandCloseTab(App* self) {
 	//if (self->tabs.size() <= 1u) return;
 	
-	MainWindow::Panel& panel = self->panels[self->focusedPanelIndex];
+	App::Panel& panel = self->panels[self->focusedPanelIndex];
 	
 	// close old tab
 	{
-		MainWindow::Tab& oldTab = self->tabs[panel.tabIndex];
+		App::Tab& oldTab = self->tabs[panel.tabIndex];
 		
 		const auto closeResult = oldTab.editor->CloseFile();
 		if (closeResult != Editor::FileResult_Success) {
@@ -889,7 +869,7 @@ static void CommandCloseTab(MainWindow* self) {
 	// find a new tab to display
 	{
 		for (u64 i = 0u; i < self->tabs.size(); i++) {
-			MainWindow::Tab& tab = self->tabs[i];
+			App::Tab& tab = self->tabs[i];
 			if (tab.panelIndex == U64_MAX) {
 				panel.editor = tab.editor;
 				goto found_new_tab;
@@ -911,14 +891,14 @@ found_new_tab:
 	ResizePanels(self);
 }
 
-static void ActionCloseTabAndPanel(MainWindow* self) {
+static void ActionCloseTabAndPanel(App* self) {
 	if (self->tabs.size() <= 1u) return;
 	
-	MainWindow::Panel& panel = self->panels[self->focusedPanelIndex];
+	App::Panel& panel = self->panels[self->focusedPanelIndex];
 	
 	// close old tab
 	{
-		MainWindow::Tab& oldTab = self->tabs[panel.tabIndex];
+		App::Tab& oldTab = self->tabs[panel.tabIndex];
 		
 		const auto closeResult = oldTab.editor->CloseFile();
 		if (closeResult != Editor::FileResult_Success) {
@@ -945,18 +925,18 @@ static void ActionCloseTabAndPanel(MainWindow* self) {
 	ResizePanels(self);
 }
 
-static void CommandNewFile(MainWindow* self) {
+static void CommandNewFile(App* self) {
 	// @TODO
 }
 
-static void CommandCloseMultipleTabs(MainWindow* self, int tabsToClose) {
+static void CommandCloseMultipleTabs(App* self, int tabsToClose) {
 	if (self->focusedPanelIndex == U64_MAX) return;
 	const u64 focusedTab = self->panels[self->focusedPanelIndex].tabIndex;
 	
 	 // close tabs to the left
 	if (tabsToClose < 0) {
 		for (u64 i = 0; i < focusedTab; i++) {
-			MainWindow::Tab& tab = self->tabs[i];
+			App::Tab& tab = self->tabs[i];
 					const auto closeResult = tab.editor->CloseFile();
 			if (closeResult != Editor::FileResult_Success) {
 				LogFileResult(closeResult);
@@ -974,7 +954,7 @@ static void CommandCloseMultipleTabs(MainWindow* self, int tabsToClose) {
 		for (u64 i = 0; i < self->tabs.size(); i++) {
 			if (i == focusedTab) continue;
 			
-			MainWindow::Tab& tab = self->tabs[i];
+			App::Tab& tab = self->tabs[i];
 					const auto closeResult = tab.editor->CloseFile();
 			if (closeResult != Editor::FileResult_Success) {
 				LogFileResult(closeResult);
@@ -991,7 +971,7 @@ static void CommandCloseMultipleTabs(MainWindow* self, int tabsToClose) {
 	// close tabs to the right
 	} else if (tabsToClose > 0) {
 		for (u64 i = focusedTab + 1u; i < self->tabs.size(); i++) {
-			MainWindow::Tab& tab = self->tabs[i];
+			App::Tab& tab = self->tabs[i];
 					const auto closeResult = tab.editor->CloseFile();
 			if (closeResult != Editor::FileResult_Success) {
 				LogFileResult(closeResult);
@@ -1009,25 +989,19 @@ static void CommandCloseMultipleTabs(MainWindow* self, int tabsToClose) {
 	ResizePanels(self);
 }
 
-static void CommandSaveAll(MainWindow* self) {
+static void CommandSaveAll(App* self) {
 	for (u64 i = 0u; i < self->tabs.size(); i++) {
 		self->tabs[i].editor->SaveFile();
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Input
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
+static void OnFileChanged(App* self, FileChangedEvent* fileChangedEvent) {
 	
 	char buffer[_MAX_PATH] {0};
 	memcpy(buffer, fileChangedEvent->directory, fileChangedEvent->directoryLength);
 	buffer[fileChangedEvent->directoryLength] = '\\';
 	
-	Tab* renamedTab = nullptr;
+	App::Tab* renamedTab = nullptr;
 	for (u64 i = 0u; i < fileChangedEvent->recordCount; i++) {
 		const FileChangeRecord& record = fileChangedEvent->records[i];
 		
@@ -1038,7 +1012,7 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 		const std::string_view recordFilepath {buffer, fileChangedEvent->directoryLength + 1u + record.filenameLength};
 		
 		if (record.action == FileChangeRecord::Action_RenamedOld) {
-			for (MainWindow::Tab& tab : tabs) {
+			for (App::Tab& tab : self->tabs) {
 				if (tab.editor->path == recordFilepath) {
 					renamedTab = &tab;
 					break;
@@ -1046,7 +1020,7 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 		 	}
 		 	
 		} else if (record.action == FileChangeRecord::Action_RenamedNew && renamedTab) {
-			renamedTab->editor->OnFileChanged(&record);
+			renamedTab->editor->OnFileChange(&record);
 			
 			const std::string_view newTitle = GetFilenameFromPath(recordFilepath);
 			renamedTab->title.Shape(newTitle, settings.fontUi);
@@ -1054,9 +1028,9 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 			renamedTab = nullptr;
 		
 		} else {
-			for (MainWindow::Tab& tab : tabs) {
+			for (App::Tab& tab : self->tabs) {
 				if (tab.editor->path == recordFilepath) {
-					tab.editor->OnFileChanged(&record);
+					tab.editor->OnFileChange(&record);
 					break;
 			 	}
 			}
@@ -1064,151 +1038,134 @@ void MainWindow::OnFileChanged(FileChangedEvent* fileChangedEvent) {
 	}
 }
 
-void MainWindow::OnResize(f32 newWidth, f32 newHeight) {
-	ResizePanels(this);
+static void HandleEventInternal(App* self, const Event& event, const Command& command) {
 	
-	toolOutput.OnResize(newWidth, newHeight);
-	
-	//if (explorer)
-	//	explorer->OnResize();
-	
-	if (searchBar)
-		searchBar->OnResize();
-}
-
-bool MainWindow::OnMouseWheel(f32 distance) {
-	
-	if (toolOutput.isOpen && RectContains(toolOutput.area, mouse.x, mouse.y)) {
-		toolOutput.OnMouseWheel(distance);
-		return true;
-	}
-	
-	if (searchBar && RectContains(searchBar->area, mouse.x, mouse.y)) {
-		searchBar->OnMouseWheel(distance);
-		return true;
-	}
-	
-	for (const Panel& panel : panels) {
-		if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
-			panel.editor->OnMouseWheel(distance);
-			return true;
+	if (self->searchBar && self->searchBar->HandleEvent(event, command)) {
+		if (self->searchBar->shouldClose) {
+			self->searchBar->shouldClose = false;
+			self->searchBar = nullptr;
 		}
-	}
+	} else if (self->explorer && self->explorer->HandleEvent(event, command)) {
+		if (self->explorer->shouldClose) {
+			delete self->explorer;
+			self->explorer = nullptr;
+		}
+	
+	} else if (self->toolOutput.isOpen && self->toolOutput.HandleEvent(event, command)) {
+		return;
+	
+	} else if (Editor* editor = self->GetFocusedEditor(); editor && editor->HandleEvent(event, command)) {
+		return;
 		
-	return false;	
-}
-
-void MainWindow::OnKeyEvent(KeyEvent event, Command command) {
-
-	if (command.id == Command::Id_OpenFileSearch) {
-		searchBar = &searchBarFiles;
-		searchBar->shouldClose = false;
+	} else if (event.type == Event::Type_MouseWheel) {
+		
+		if (self->searchBar && RectContains(self->searchBar->area, mouse.x, mouse.y)) {
+			self->searchBar->OnMouseWheel(event.wheelDistance);
+			return;
+		}
+		
+		if (self->toolOutput.isOpen && RectContains(self->toolOutput.area, mouse.x, mouse.y)) {
+			self->toolOutput.OnMouseWheel(event.wheelDistance);
+			return;
+		}
+		
+		for (const App::Panel& panel : self->panels) {
+			if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
+				panel.editor->OnMouseWheel(event.wheelDistance);
+			}
+		}
+	
+	
+	} else if (event.type == Event::Type_Close) {
+		for (const App::Tab& tab : self->tabs) {
+			ASSERT_SOFT(tab.editor);
+			
+			if (tab.editor->isDirty) {
+				auto const saveResult = tab.editor->SaveFile();
+				if (saveResult == Editor::FileResult_Failure)
+					return; // don't close
+			}
+			
+			mainWindow.Destroy();
+		}
+	
+	} else if (event.type == Event::Type_Resize) {
+		ResizePanels(self);
+	
+		self->toolOutput.OnResize(event.newWidth, event.newHeight);
+		self->searchBarFiles.OnResize();
+		self->searchBarTools.OnResize();
+		self->searchBarCommands.OnResize();
+			
+	} else if (event.type == Event::Type_FileChange) {
+		OnFileChanged(self, event.fileChangedEvent);
+		
+	} else if (command.id == Command::Id_OpenFileSearch) {
+		self->searchBar = &self->searchBarFiles;
+		self->searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_OpenToolSearch) {
-		searchBar = &searchBarTools;
-		searchBar->shouldClose = false;
+		self->searchBar = &self->searchBarTools;
+		self->searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_OpenCommandSearch) {
-		searchBar = &searchBarCommands;
-		searchBar->shouldClose = false;
+		self->searchBar = &self->searchBarCommands;
+		self->searchBar->shouldClose = false;
 	} else if (command.id == Command::Id_ToggleToolOutput) {
-		toolOutput.isOpen = !toolOutput.isOpen;
+		self->toolOutput.isOpen = !self->toolOutput.isOpen;
 	} else if (command.id == Command::Id_ToggleExplorer) {
-		if (explorer) {
-			delete explorer;
-			explorer = nullptr;
+		if (self->explorer) {
+			delete self->explorer;
+			self->explorer = nullptr;
 		} else {
-			explorer = Explorer::Make();
+			self->explorer = Explorer::Make();
 		}
 	} else if (command.id == Command::Id_FocusNextTab) {
-		CommandChangeFocusedTab(this, true);
+		CommandChangeFocusedTab(self, true);
 	} else if (command.id == Command::Id_FocusPrevTab) {
-		CommandChangeFocusedTab(this, false);
+		CommandChangeFocusedTab(self, false);
 	} else if (command.id == Command::Id_FocusNextPanel) {
-		focusedPanelIndex = IncrementWrapAround(focusedPanelIndex, panels.size());
+		self->focusedPanelIndex = IncrementWrapAround(self->focusedPanelIndex, self->panels.size());
 	} else if (command.id == Command::Id_FocusPrevPanel) {
-		focusedPanelIndex = DecrementWrapAround(focusedPanelIndex, panels.size());
+		self->focusedPanelIndex = DecrementWrapAround(self->focusedPanelIndex, self->panels.size());
 	} else if (command.id == Command::Id_SwapPanels) {
-		ActionSwapPanels(this);
+		ActionSwapPanels(self);
 	} else if (command.id == Command::Id_ClosePanel) {
-		ActionClosePanel(this);
+		ActionClosePanel(self);
 	} else if (command.id == Command::Id_AddPanelAfter) {
-		CommandAddPanel(this, false);
+		CommandAddPanel(self, false);
 	} else if (command.id == Command::Id_AddPanelBefore) {
-		CommandAddPanel(this, true);
+		CommandAddPanel(self, true);
 	} else if (command.id == Command::Id_NewFile) {
-		CommandNewFile(this);
+		CommandNewFile(self);
 	} else if (command.id == Command::Id_CloseFile) {
-		CommandCloseTab(this);
+		CommandCloseTab(self);
 	} else if (command.id == Command::Id_CloseFilesToTheRight) {
-		CommandCloseMultipleTabs(this, -1);
+		CommandCloseMultipleTabs(self, -1);
 	} else if (command.id == Command::Id_CloseFilesToTheLeft) {
-		CommandCloseMultipleTabs(this, 1);
+		CommandCloseMultipleTabs(self, 1);
 	} else if (command.id == Command::Id_CloseOtherFiles) {
-		CommandCloseMultipleTabs(this, 0);
+		CommandCloseMultipleTabs(self, 0);
 	} else if (command.id == Command::Id_ClosePanelAndFile) {
-		ActionCloseTabAndPanel(this);
+		ActionCloseTabAndPanel(self);
 	} else if (command.id == Command::Id_SaveAll) {
-		CommandSaveAll(this);
-		
-	} else if (explorer) {
-		explorer->OnKeyDown(event, command);
-		
-		if (explorer->shouldClose) {
-			delete explorer;
-			explorer = nullptr;
-		}
-				
-	} else if (searchBar) {
-		searchBar->OnKeyDown(event, command);
-		
-		if (searchBar->shouldClose)
-			searchBar = nullptr;
-	
-	} else if (toolOutput.isOpen) {
-		toolOutput.OnKeyDown(event, command);
-
-	} else if (event.vkeycode == VK_ESCAPE && searchBar) {
-		searchBar = nullptr;
-		
-	} else if (event.vkeycode == VK_ESCAPE && explorer) {
-		delete explorer;
-		explorer = nullptr;
-	
-	} else if (Editor* focusedEditor = GetFocusedEditor()) {
-		focusedEditor->OnKeyEvent(event, command);
+		CommandSaveAll(self);
 	}
 }
 
-void MainWindow::OnKeyDown(KeyEvent event) {	
-	const Command keyBind = settings.LookupKeyBind(event);
-	OnKeyEvent(event, keyBind);
+void App::ExecuteCommand(const Command& command) {
+	HandleEventInternal(this, Event {.type = Event::Type_DirectCommand}, command);
 }
 
-void MainWindow::OnChar(const char* data, u64 len) {
-		
-	if (searchBar) {
-		searchBar->OnChar(data, len);
-
-	} else if (explorer) {
-		explorer->OnChar(data, len);
-		
-	} else if (Editor* focusedEditor = GetFocusedEditor()) {
-		focusedEditor->OnChar(data, len);
-	}
-}
-
-bool MainWindow::OnClose() {	
-	bool shouldClose = true;
-	for (const Tab& tab : tabs)
-		shouldClose = shouldClose && tab.editor->OnClose();
-		
-	return shouldClose;
+void App::HandleEvent() {
+	const Event& event = mainWindow.event;
+	const Command& command = settings.LookupKeyBind(event);
+	HandleEventInternal(this, event, command);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-MainWindow::OpenBehavior OpenBehaviorFromModifiers(KeyEvent event) {
-	if      (event.modifiers == KM_Ctrl)             return MainWindow::OpenBehavior_UpdateCurrent;
-	else if (event.modifiers == KM_Shift)            return MainWindow::OpenBehavior_NewPanelRight;
-	else if (event.modifiers == (KM_Shift | KM_Alt)) return MainWindow::OpenBehavior_NewPanelLeft;
-	return MainWindow::OpenBehavior::OpenBehavior_Default;
+App::OpenBehavior OpenBehaviorFromModifiers(u32 kmods) {
+	if      (kmods == KM_Ctrl)             return App::OpenBehavior_UpdateCurrent;
+	else if (kmods == KM_Shift)            return App::OpenBehavior_NewPanelRight;
+	else if (kmods == (KM_Shift | KM_Alt)) return App::OpenBehavior_NewPanelLeft;
+	return App::OpenBehavior::OpenBehavior_Default;
 }

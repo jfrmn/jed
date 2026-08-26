@@ -12,16 +12,6 @@ struct ID2D1DeviceContext;
 struct ID2D1SolidColorBrush;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-namespace std {
-	template<> struct hash<KeyEvent> {
-		std::size_t operator()(KeyEvent event) const {
-			std::hash<u32> u32Hash;
-			return u32Hash(event.vkeycode) ^ u32Hash(event.modifiers);
-		}
-	};
-};
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct Settings {
 
 	//-----------------------------------------------------
@@ -138,7 +128,7 @@ struct Settings {
 		Color colorArray[NUM_COLORS];
 	};
 	
-	std::unordered_map<KeyEvent, KeyBind> keyBinds = {};
+	std::unordered_map<u64, KeyBind> keyBinds = {};
 		
 	Font fontUi = {};
 	Font fontEditor = {};
@@ -156,7 +146,7 @@ struct Settings {
 	bool Init(ID2D1DeviceContext* deviceContext);
 	~Settings() noexcept;
 	
-	Command LookupKeyBind(KeyEvent ev);
+	Command LookupKeyBind(const Event& event);
 	
 	ID2D1SolidColorBrush* GetBrushDropShadow();
 	ID2D1SolidColorBrush* GetBrushSelection(bool active = true);

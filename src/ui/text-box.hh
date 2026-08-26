@@ -9,13 +9,23 @@
 #define NOMINMAX
 #include <d2d1_1.h>
 
-struct ID2D1RenderTarget;
-struct KeyEvent;
+struct Event;
+struct Command;
 
 struct TextBox {
 
 	//-------------------------------------------
+	// types
+	//-------------------------------------------
+
+	struct HandleEventResult {
+		bool handled = false;
+		bool changed = false;
+	};
+
+	//-------------------------------------------
 	// data
+	//-------------------------------------------
 
 	Font* font = nullptr;
 
@@ -32,6 +42,7 @@ struct TextBox {
 	
 	//-------------------------------------------
 	// functions
+	//-------------------------------------------
 
 	bool Init(Font* fontToUse, std::string_view placeholderText = {}, std::string initalText = {});
 
@@ -42,11 +53,8 @@ struct TextBox {
 	D2D_RECT_F GetArea() const;
 	float Height() const;
 
-	void OnUpdate();
+	void Update();
 	
 	// returns whether the text changed or not
-	bool OnKeyDown(KeyEvent event, Command command);
-	
-	// returns whether the text changed or not
-	bool OnChar(const char* data, u64 len);
+	HandleEventResult HandleEvent(const Event& event, const Command& command);
 };

@@ -20,7 +20,7 @@ EditorSignatureHelp* EditorSignatureHelp::Make(Editor* owner) {
 	return self;
 }
 
-void EditorSignatureHelp::OnUpdate() {
+void EditorSignatureHelp::Update() {
 	if (DrawIncompleteState(deviceContext, "No signatures.")) return;
 		
 	ASSERT(activeSignature >= 0u && activeSignature < signatureCount);
@@ -108,11 +108,16 @@ void EditorSignatureHelp::OnUpdate() {
 	}
 }
 
-bool EditorSignatureHelp::OnKeyEvent(KeyEvent event) {
+bool EditorSignatureHelp::HandleEvent(const Event& event, const Command& command) {
 	if (state != State_Completed) return false;
 	
-	if (signatureCount > 1u && (event.vkeycode == VK_DOWN || event.vkeycode == VK_UP) && event.modifiers == KM_Alt) {
-		activeSignature = event.vkeycode == VK_DOWN
+	const bool handleEvent = signatureCount > 1
+						  && event.type == Event::Type_KeyPress
+						  && (event.vkcode == VK_DOWN || event.vkcode == VK_UP)
+						  && event.kmods == KM_Alt;
+	
+	if (handleEvent) {
+		activeSignature = event.vkcode == VK_DOWN
 			? IncrementWrapAround(activeSignature, signatureCount)
 			: DecrementWrapAround(activeSignature, signatureCount);
 		return true;

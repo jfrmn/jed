@@ -1,11 +1,9 @@
 #pragma once
-#include "basic.hh"
 #include "editor/editor-toolwindow.hh"
 #include "ui/text-box.hh"
 
 struct Editor;
-struct KeyEvent;
-struct ID2D1DeviceContext;
+struct Event;
 
 struct EditorGotoLine : public EditorToolWindow {
 
@@ -24,9 +22,8 @@ struct EditorGotoLine : public EditorToolWindow {
 
 	static EditorGotoLine* Make(Editor *editor);
 
-	virtual void OnUpdate() override;
-	virtual bool OnKeyEvent(KeyEvent event, Command command) override;
-	virtual void OnChar(const char* data, u64 len) override;
+	virtual void Update() override;
+	virtual bool HandleEvent(const Event& event, const Command& command) override;
 	
 	virtual bool IsGotoLine() const override;
 };

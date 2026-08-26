@@ -1,10 +1,12 @@
 [Font]
 editor = {
-	name = "Geist Mono",
+	#name = "Geist Mono",
+	name = "Fira Code",
 	size = 12}
 	
 ui = {
-	name = "Geist",
+	#name = "Geist",
+	name = "Fira Sans",
 	size = 12}
 	
 

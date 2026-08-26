@@ -1,6 +1,5 @@
 #include "tool-output.hh"
 #include "globals.hh"
-#include "main-window.hh"
 #include "settings.hh"
 #include "util.hh"
 #include "logging.hh"
@@ -8,6 +7,7 @@
 
 #include "util/diagnostics.hh"
 #include "ui/constants.h"
+#include "ui/window.hh"
 #include "graphics/effects.hh"
 
 #include <charconv>
@@ -498,7 +498,7 @@ static void RenderOutput(ToolOutput* self) {
 			const GlyphRun& hitRun = self->glyphRunCache[hitLine];
 			const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
 			
-			if (mouse.event == Mouse::Event_Down) {
+			if (mainWindow.event.type == Event::Type_MouseDown) {				
 				
 				// check if we hit a matched diagnostic record
 				for (u64 i = 0u; i < self->diagnosticsRecords.size(); i++) {
@@ -598,7 +598,7 @@ static void RenderToolDiagnostics(ToolOutput* self) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void ToolOutput::OnUpdate() {
+void ToolOutput::Update() {
 		
 	//
 	// draw backgound
@@ -686,7 +686,7 @@ void ToolOutput::OnUpdate() {
 			{
 				std::string_view label = progressText;
 				std::string_view hoverLabel;
-				Mouse::OnClickFunction onClickFunc;
+				MouseState::Callback onClickFunc;
 				Color labelColor, hoverLabelColor;
 				
 				char exitCodeBuffer[32] {'\0'};
@@ -694,24 +694,24 @@ void ToolOutput::OnUpdate() {
 				
 				if (!process) {
 					onClickFunc = OnRerunProcess;
- 					label = "Error";
- 					hoverLabel = "Retry";
- 					labelColor = Color::FromKnown(D2D1::ColorF::Red);
- 					hoverLabelColor = settings.colors.uiText;
+					label = "Error";
+					hoverLabel = "Retry";
+					labelColor = Color::FromKnown(D2D1::ColorF::Red);
+					hoverLabelColor = settings.colors.uiText;
 				
 				} else if (exitCode == STILL_ACTIVE) {
 					onClickFunc = OnClickedKillProcess;
- 					labelColor = settings.colors.uiText;
- 					hoverLabel = "Terminate";
- 					hoverLabelColor = Color::FromKnown(D2D1::ColorF::Crimson);
+					labelColor = settings.colors.uiText;
+					hoverLabel = "Terminate";
+					hoverLabelColor = Color::FromKnown(D2D1::ColorF::Crimson);
 				
 				} else {
 					onClickFunc = OnRerunProcess;
- 					labelColor = (exitCode == 0)
-	 					? settings.colors.uiText
-	 					: Color::FromKnown(D2D1::ColorF::Crimson);
- 					hoverLabel = "Restart";
- 					hoverLabelColor = settings.colors.uiText;
+					labelColor = (exitCode == 0)
+						? settings.colors.uiText
+						: Color::FromKnown(D2D1::ColorF::Crimson);
+					hoverLabel = "Restart";
+					hoverLabelColor = settings.colors.uiText;
 				}
 				
 				if (mouse.Hittest(progressArea, this, onClickFunc)) {
@@ -812,13 +812,6 @@ void ToolOutput::OnUpdate() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Commands
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Input
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -844,7 +837,7 @@ void ToolOutput::OnMouseWheel(f32 distance) {
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
-void ToolOutput::OnKeyDown(KeyEvent event, Command command) {
+bool ToolOutput::HandleEvent(const Event& event, const Command& command) {
 	
 	if (command.id == Command::Id_GotoNextDiagnosticRecord) {
 		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
@@ -858,7 +851,7 @@ void ToolOutput::OnKeyDown(KeyEvent event, Command command) {
 		if (process) process->Terminate();
 	
 	} else if (command.id == Command::Id_Clipboard_Copy) {
-		if (selectionStart == selectionEnd) return;
+		if (selectionStart == selectionEnd) return false; // we could consume the command or not. Up for debate...
 		
 		const std::string& startLine = lines[selectionStart.line];
 		const std::string& endLine   = lines[selectionEnd.line];
@@ -891,7 +884,12 @@ void ToolOutput::OnKeyDown(KeyEvent event, Command command) {
 		
 		GlobalUnlock(hGlobal);
 		SetClipboardData(CF_TEXT, hGlobal);
-	}	
+	
+	} else {
+		return false;
+	}
+	
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

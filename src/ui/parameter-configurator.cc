@@ -1,12 +1,12 @@
 #include "parameter-configurator.hh"
 #include "globals.hh"
 #include "events.hh"
-#include "main-window.hh"
 #include "settings.hh"
 
 #include "logging.hh"
 #include "util.hh"
 #include "ui/constants.h"
+#include "ui/window.hh"
 #include "graphics/effects.hh"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,7 +78,7 @@ static bool CheckParameters(const ParameterConfigurator* self) {
 	return true;
 }
 
-void ParameterConfigurator::OnUpdate() {
+void ParameterConfigurator::Update() {
 	
 	//
 	// draw background
@@ -157,7 +157,7 @@ void ParameterConfigurator::OnUpdate() {
 		// draw textbox
 		if (item.HasTextBox()) {
 			item.textBox.inactive = !isSelected;
-			item.textBox.OnUpdate();
+			item.textBox.Update();
 			
 			// draw plus and minus button next to the textbox
  			if (item.parameter->type == Parameter::Type_Number) {
@@ -344,70 +344,93 @@ void ParameterConfigurator::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void ParameterConfigurator::OnKeyDown(KeyEvent event, Command command) {
+bool ParameterConfigurator::HandleEvent(const Event& event, const Command& command) {
 	
 	ASSERT(selectedItem <= itemCount);
 	Item* item = selectedItem == itemCount ? nullptr : &items[selectedItem];	
 	
-	if (event.vkeycode == VK_TAB && (event.modifiers & KM_Ctrl) != 0 && (event.modifiers & KM_Alt) != 0) {
-		selectedItem = (event.modifiers & KM_Shift) != 0
-			? DecrementWrapAround(selectedItem, itemCount+1)
-			: IncrementWrapAround(selectedItem, itemCount+1);
-		isDropDownOpen = true;
-	
-	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
-		
-		// step through enum values
-		if (item && item->parameter->type == Parameter::Type_Enum && isDropDownOpen) {
-			ASSERT(!item->parameter->enumValues.empty())
-			
-			item->selectedEnumIndex = event.vkeycode == VK_UP
-				? DecrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size())
-				: IncrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size());
-		
-		// step through parameters
-		} else {
-			selectedItem = event.vkeycode == VK_UP
+	if (event.type == Event::Type_KeyPress) {
+		if (event.vkcode == VK_TAB && (event.kmods & (KM_Ctrl | KM_Alt)) == 0) {
+			selectedItem = (event.kmods & KM_Shift) != 0
 				? DecrementWrapAround(selectedItem, itemCount+1)
 				: IncrementWrapAround(selectedItem, itemCount+1);
-			isDropDownOpen = false;	
-		}
-	
-	} else if ((event.vkeycode == VK_LEFT || event.vkeycode == VK_RIGHT) && event.modifiers == KM_None) {
+			isDropDownOpen = true;
+			return true;
 		
-		// increment or decrement numbers
-		if (item && item->parameter->type == Parameter::Type_Number && !item->textBox.invalid) {
+		} else if ((event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
 			
-			s64 number = 0;
-			const std::string_view text = item->textBox.GetText();
-			const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
+			// step through enum values
+			if (item && item->parameter->type == Parameter::Type_Enum && isDropDownOpen) {
+				ASSERT(!item->parameter->enumValues.empty())
+				
+				item->selectedEnumIndex = event.vkcode == VK_UP
+					? DecrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size())
+					: IncrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size());
 			
-			if (result.ec != std::errc()) return;
-			
-			number = (event.vkeycode == VK_LEFT)
-				? std::max(number - 1, item->parameter->minValue)
-			    : std::min(number + 1, item->parameter->maxValue);
-			
-			item->textBox.SetText(std::to_string(number));
+			// step through parameters
+			} else {
+				selectedItem = event.vkcode == VK_UP
+					? DecrementWrapAround(selectedItem, itemCount+1)
+					: IncrementWrapAround(selectedItem, itemCount+1);
+				isDropDownOpen = false;	
+			}
+			return true;
 		
-		// switch between run and cancel
-		} else if (!item) {
-			isCancelButtonSelected = (event.vkeycode == VK_LEFT);
+		} else if ((event.vkcode == VK_LEFT || event.vkcode == VK_RIGHT) && event.kmods == KM_None) {
+			
+			// increment or decrement numbers
+			if (item && item->parameter->type == Parameter::Type_Number && !item->textBox.invalid) {
+				
+				s64 number = 0;
+				const std::string_view text = item->textBox.GetText();
+				const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
+				
+				if (result.ec == std::errc()) {
+					item->textBox.invalid = true;
+					return true;
+				}
+				
+				number = (event.vkcode == VK_LEFT)
+					? std::max(number - 1, item->parameter->minValue)
+			    	: std::min(number + 1, item->parameter->maxValue);
+				
+				item->textBox.SetText(std::to_string(number));
+			
+			// switch between run and cancel
+			} else if (!item) {
+				isCancelButtonSelected = (event.vkcode == VK_LEFT);
+			}
+			return true;
+		
+		} else if (event.vkcode == VK_RETURN) {
+			if (isCancelButtonSelected)     result = Result_Cancel;
+			else if (CheckParameters(this)) result = Result_Run;
+			else                            result = Result_Unfinished;
+			return true;
 		}
-	
-	} else if (event.vkeycode == VK_RETURN) {
-		if (isCancelButtonSelected)     result = Result_Cancel;
-		else if (CheckParameters(this)) result = Result_Run;
-		else                            result = Result_Unfinished;
+			
+	} else if (event.type == Event::Type_Text) {
+		if (!item) return true;
+		
+		const bool isSpace = event.textLen == 1u && event.textData[0] == ' ';
+		if (!isSpace) return true;
+		
+		if (item->parameter->type == Parameter::Type_Bool) {
+			item->isChecked = !item->isChecked;
+		
+		} else if (item->parameter->type == Parameter::Type_Enum) {
+			isDropDownOpen = !isDropDownOpen;
+		}
+		return true;
+	}
 	
 	// pass through to textbox
- 	} else if (item && item->HasTextBox()) {
-		bool changed = item->textBox.OnKeyDown(event, command);
-		if (changed) {
-			const std::string_view text = item->textBox.GetText();		
+	if (item && item->HasTextBox()) {
+		const auto [handled, changed] = item->textBox.HandleEvent(event, command);
+		if (changed) {			
+			const std::string_view text = item->textBox.GetText();
 			
 			if (item->parameter->type == Parameter::Type_Number) {
-				
 				s64 number = 0;
 				const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
 				
@@ -417,44 +440,11 @@ void ParameterConfigurator::OnKeyDown(KeyEvent event, Command command) {
 					number > item->parameter->maxValue;
 			
 			} else if (item->parameter->type == Parameter::Type_String) {
-				item->textBox.invalid = item->parameter->allowEmpty || !text.empty();
+				item->textBox.invalid = item->parameter->allowEmpty || !item->textBox.GetText().empty();
 			}
 		}
+		return handled;
 	}
+	
+	return false;
 }
-
-void ParameterConfigurator::OnChar(const char* data, u64 len) {
-	ASSERT(selectedItem <= itemCount);
-	
-	if (selectedItem == itemCount) return;
-	Item& item = items[selectedItem];	
-	
-	const bool isSpace = *data == ' ' && len == 1u;
-	if (item.parameter->type == Parameter::Type_Bool && isSpace) {
-		item.isChecked = !item.isChecked;
-	
-	} else if (item.parameter->type == Parameter::Type_Enum && isSpace) {
-		isDropDownOpen = !isDropDownOpen;
-	
-	} else if (item.parameter->type == Parameter::Type_Number) {
-			
-		if (item.textBox.OnChar(data, len)) {
-			s64 number = 0;
-			const std::string_view text = item.textBox.GetText();
-			const std::from_chars_result result = std::from_chars(text.data(), text.data() + text.length(), number);
-			
-			item.textBox.invalid = (result.ec != std::errc()) && !text.empty();
-		}
-	
-	} else if (item.parameter->type == Parameter::Type_String) {
-		item.textBox.OnChar(data, len);
-	}
-}
-
-
-
-
-
-
-
-

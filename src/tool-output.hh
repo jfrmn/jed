@@ -3,7 +3,6 @@
 #include "text/text-position.hh"
 #include "graphics/glyph-run.hh"
 #include "util/parameter.hh"
-#include "commands.hh"
 
 #include "ui/scrollarea.hh"
 #include "ui/file-preview.hh"
@@ -19,7 +18,8 @@
 
 struct GlyphRun;
 struct Tool;
-struct KeyEvent;
+struct Event;
+struct Command;
 
 struct ToolOutput : public Process::Observer {
 	
@@ -107,10 +107,10 @@ struct ToolOutput : public Process::Observer {
 	bool Init();
 	
 	bool StartProcess();
-	void OnUpdate();
+	void Update();
 		
 	void OnResize(f32 newWidth, f32 newHeight);
-	void OnKeyDown(KeyEvent event, Command command);
+	bool HandleEvent(const Event& event, const Command& command);
 	void OnMouseWheel(f32 distance);
 	
 	virtual void OnStderr(std::string_view data) override;

@@ -2,8 +2,9 @@
 #include "events.hh"
 #include "globals.hh"
 #include "editor.hh"
-#include "main-window.hh"
 #include "settings.hh"
+#include "events.hh"
+#include "app.hh"
 
 #include "ui/constants.h"
 
@@ -28,7 +29,7 @@ EditorTextLocationList* EditorTextLocationList::Make(Editor* owner) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void EditorTextLocationList::OnUpdate() {
+void EditorTextLocationList::Update() {
 	if (DrawIncompleteState(deviceContext, "No locations found.")) return;
 	
 	auto glyphRuns = new std::pair<GlyphRun, GlyphRun>[itemCount];
@@ -133,9 +134,9 @@ void EditorTextLocationList::UpdateFilePreview() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorTextLocationList::OnKeyEvent(KeyEvent event) {
+bool EditorTextLocationList::HandleEvent(const Event& event, const Command& command) {
 	
-	if (event.vkeycode == VK_RETURN) {
+	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
 		if (selectedItem < U64_MAX) {
 			ASSERT(state == State_Completed);
 			ASSERT(selectedItem < itemCount)
@@ -148,8 +149,8 @@ bool EditorTextLocationList::OnKeyEvent(KeyEvent event) {
 			const Item& item = items[selectedItem];
 			
 			bool wasOpen = false;
-			const auto openBehav = OpenBehaviorFromModifiers(event);
-			Editor* openedEditor = mainWindow.OpenEditor(item.targetPath, openBehav, &wasOpen);
+			const auto openBehav = OpenBehaviorFromModifiers(event.kmods);
+			Editor* openedEditor = app.OpenEditor(item.targetPath, openBehav, &wasOpen);
 			if (!openedEditor) {
 				error = "Failed to open file";
 				state = State_Errored;
@@ -173,8 +174,8 @@ bool EditorTextLocationList::OnKeyEvent(KeyEvent event) {
 		
 		return true;
 				
-	} else if ((event.vkeycode == VK_UP || event.vkeycode == VK_DOWN) && event.modifiers == KM_None) {
-		selectedItem = (event.vkeycode == VK_UP)
+	} else if (event.type == Event::Type_KeyPress && (event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
+		selectedItem = (event.vkcode == VK_UP)
 			? IncrementWrapAround(selectedItem, itemCount)
 			: DecrementWrapAround(selectedItem, itemCount);
 		

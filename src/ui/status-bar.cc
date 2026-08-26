@@ -1,6 +1,5 @@
 #include "status-bar.hh"
 #include "globals.hh"
-#include "main-window.hh"
 #include "settings.hh"
 
 #include "editor/editor.hh"
@@ -8,9 +7,12 @@
 #include "editor/editor-diagnosticslist.hh"
 
 #include "ui/constants.h"
+#include "ui/window.hh"
+
 #include "util.hh"
 #include "language/language.hh"
 #include "graphics/effects.hh"
+#include "app.hh"
 #include "tools.hh"
 
 #define WIN32_LEAN_AND_MEAN
@@ -98,7 +100,7 @@ static f32 UpdateExplorerButton(StatusBar* self, f32 posX, u64 i) {
 	const D2D_RECT_F area = GetArea(posX, width, l2r);
 		
 	deviceContext->DrawBitmap(
-		mainWindow.explorer
+		app.explorer
 			? settings.icons.explorerFolderOpen
 			: settings.icons.explorerFolderClosed,
 		D2D_RECT_F {
@@ -126,29 +128,29 @@ static f32 UpdateConsoleButton(StatusBar* self, f32 posX, u64 i) {
 // Console Progress
 
 static bool IsVisibleConsoleProgress() {
-	if (!mainWindow.toolOutput.tool) return false;
-	if (mainWindow.toolOutput.tool->progress.hideFromStatusBar) return false;
-	if (!mainWindow.toolOutput.tool->progress.regex.isOk) return false;
+	if (!app.toolOutput.tool) return false;
+	if (app.toolOutput.tool->progress.hideFromStatusBar) return false;
+	if (!app.toolOutput.tool->progress.regex.isOk) return false;
 	return true;
 }
 
 static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
-	if (!mainWindow.toolOutput.tool) return posX;
-	if (mainWindow.toolOutput.tool->progress.hideFromStatusBar) return posX;
-	if (!mainWindow.toolOutput.tool->progress.regex.isOk) return posX;
+	if (!app.toolOutput.tool) return posX;
+	if (app.toolOutput.tool->progress.hideFromStatusBar) return posX;
+	if (!app.toolOutput.tool->progress.regex.isOk) return posX;
 	
 	constexpr f32 PROGRESS_BAR_WIDTH = 100.0f;
 
 	const bool l2r = IsL2R(self, i);	
 	const D2D_RECT_F area = GetArea(posX, PROGRESS_BAR_WIDTH, l2r);
 	
-	const std::scoped_lock lock {mainWindow.toolOutput.mtx};
+	const std::scoped_lock lock {app.toolOutput.mtx};
 	
 	deviceContext->FillRoundedRectangle(ToRounded(
 		MakeRect(
 			area.left,
 			area.top + PADDING,
-			PROGRESS_BAR_WIDTH * mainWindow.toolOutput.progressValue,
+			PROGRESS_BAR_WIDTH * app.toolOutput.progressValue,
 			settings.fontUi.lineHeight)),
 		GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
 	
@@ -161,7 +163,7 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 		settings.GetBrushUiText());
 	
 	GlyphRun run;
-	run.Shape(mainWindow.toolOutput.progressText, settings.fontUi);
+	run.Shape(app.toolOutput.progressText, settings.fontUi);
 	run.DrawCenter(deviceContext,
 		area.left,
 		area.top + PADDING,
@@ -187,7 +189,7 @@ static void OnClickLanguagePopup(void*) {
 
 static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 		
-	const Editor* focusedEditor = mainWindow.GetFocusedEditor();
+	const Editor* focusedEditor = app.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	GlyphRun currentLanguageName {};
@@ -349,7 +351,7 @@ static void OnClickDiagnostics(void* ud, u64) {
 }
 
 static bool IsVisibleDiagnosticRecords() {
-	Editor* editor = mainWindow.GetFocusedEditor();
+	Editor* editor = app.GetFocusedEditor();
 	if (!editor) return false;
 	
 	std::scoped_lock lock {editor->editorDiagnostics.mutex};
@@ -358,7 +360,7 @@ static bool IsVisibleDiagnosticRecords() {
 
 static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 	
-	Editor* focusedEditor = mainWindow.GetFocusedEditor();
+	Editor* focusedEditor = app.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	//
@@ -580,7 +582,7 @@ static void GetCaretInfoTextMultiCarets(StatusBar* self, const TextController& c
 
 static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 	
-	const Editor* focusedEditor = mainWindow.GetFocusedEditor();
+	const Editor* focusedEditor = app.GetFocusedEditor();
 	if (!focusedEditor) return posX;
 	
 	CaretInfoText caretInfoText {};

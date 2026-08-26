@@ -8,9 +8,13 @@ set (CMAKE_CXX_FLAGS "/DWIN32 /D_WINDOWS /Zi /W3 /Zc:preprocessor")
 set (CMAKE_CXX_FLAGS_DEBUG   "/MDd /Ob0 /Od /DDEBUG /EHsc /RTC1")
 set (CMAKE_CXX_FLAGS_RELEASE "/MD  /Ob2 /O2 /DRELEASE")
 
+add_executable (slick-edit)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# dependencies
+
 set (BUILD_SHARED_LIBS OFF)
 
-add_executable (slick-edit)
 #
 # toml++
 #
@@ -38,7 +42,9 @@ add_subdirectory ("deps/tree-sitter")
 target_link_libraries (slick-edit tree-sitter)
 target_include_directories (slick-edit PRIVATE "deps/tree-sitter/lib/include")
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# cJSON
+#
 set (CJSON_BUILD_SHARED_LIBS OFF)
 
 add_subdirectory ("deps/cJSON")
@@ -49,9 +55,12 @@ target_include_directories (slick-edit PRIVATE "deps/cJSON")
 # main executable
 
 set(WINDOWS_DEPENDENCIES d2d1.lib dwrite.lib dwmapi.lib shell32.lib)
+if (CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
+	list(APPEND WINDOWS_DEPENDENCIES dbghelp.lib)
+endif()
 
 target_link_libraries(slick-edit ${WINDOWS_DEPENDENCIES})
-set_target_properties(slick-edit PROPERTIES CXX_STANDARD 23)
+set_target_properties(slick-edit PROPERTIES CXX_STANDARD 20)
 
 target_include_directories (slick-edit PRIVATE "src")
 
@@ -72,7 +81,7 @@ target_include_directories (slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edi
 
 target_link_libraries(slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edit,LINK_LIBRARIES>)
 # set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD $<TARGET_PROPERTY:slick-edit,CXX_STANDARD>)
-set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD 23)
+set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD 20)
 
 file (GLOB_RECURSE TEST_SOURCES "src/*" "test/*")
 list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")

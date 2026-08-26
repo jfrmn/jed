@@ -36,7 +36,7 @@ EditorGotoLine* EditorGotoLine::Make(Editor* editor) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void EditorGotoLine::OnUpdate() {
+void EditorGotoLine::Update() {
 
 	//
 	// calc size
@@ -93,7 +93,7 @@ void EditorGotoLine::OnUpdate() {
 	//
 	// draw textbox
 	//
-	textbox.OnUpdate();
+	textbox.Update();
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,9 +118,9 @@ static void ValidateLineNumber(EditorGotoLine *self) {
 	self->textbox.invalid = (lineNumber < 1 || lineNumber > self->owner->GetBuffer().LineCount());
 }
 
-bool EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
+bool EditorGotoLine::HandleEvent(const Event& event, const Command& command) {
 	
-	if (event.vkeycode == VK_RETURN) {
+	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
 		if (textbox.invalid) return true;
 
 		const u64 lineNumber = GetCurrentLineNumber(this) - 1; // adjust to 0-based
@@ -136,28 +136,22 @@ bool EditorGotoLine::OnKeyEvent(KeyEvent event, Command command) {
 
 		const TextBuffer::Line& line = owner->GetBuffer().GetLineAt(lineNumber);
 		
-		usize lineStart = line.GetText().find_first_not_of(" \t\v");
+		u64 lineStart = line.GetText().find_first_not_of(" \t\v");
 		if (lineStart == std::string_view::npos)
 			lineStart = 0u;
 
 		owner->textController.SetCaretPosition(TextPosition {lineNumber, lineStart});
 		owner->ScrollToLine(lineNumber);
 		return true;
-	
-	} else {
-		const bool changed = textbox.OnKeyDown(event, command);
-		if (changed) ValidateLineNumber(this);
-		return true;
-	}
-}
-
-void EditorGotoLine::OnChar(const char* data, u64 len) {
 		
-	if (len == 1 && (data[0] < '0' || data[0] > '9')) return;
-	if (textbox.GetText().size() >= MAX_DIGITS) return;
+	} else if (event.type == Event::Type_Text) {
+		if (event.textLen == 1u && (event.textData[0] < '0' || event.textData[0] > '9')) return true;
+		if (textbox.GetText().size() >= MAX_DIGITS) return true;
+	}
 	
-	const bool changed = textbox.OnChar(data, len);
-	if (changed) ValidateLineNumber(this);	
+	const auto [handled, changed] = textbox.HandleEvent(event, command);
+	if (changed) ValidateLineNumber(this);
+	return handled;
 }
 
 bool EditorGotoLine::IsGotoLine() const {
