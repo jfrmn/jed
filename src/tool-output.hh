@@ -19,7 +19,7 @@
 struct GlyphRun;
 struct Tool;
 struct Event;
-struct Command;
+
 
 struct ToolOutput : public Process::Observer {
 	
@@ -110,7 +110,7 @@ struct ToolOutput : public Process::Observer {
 	void Update();
 		
 	void OnResize(f32 newWidth, f32 newHeight);
-	bool HandleEvent(const Event& event, const Command& command);
+	bool HandleEvent(const Event& event);
 	void OnMouseWheel(f32 distance);
 	
 	virtual void OnStderr(std::string_view data) override;

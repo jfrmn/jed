@@ -1038,38 +1038,21 @@ static void OnFileChanged(App* self, FileChangedEvent* fileChangedEvent) {
 	}
 }
 
-static void HandleEventInternal(App* self, const Event& event, const Command& command) {
+void App::HandleEvent(const Event& event) {
 	
-	if (self->searchBar && self->searchBar->HandleEvent(event, command)) {
-		if (self->searchBar->shouldClose) {
-			self->searchBar->shouldClose = false;
-			self->searchBar = nullptr;
-		}
-	} else if (self->explorer && self->explorer->HandleEvent(event, command)) {
-		if (self->explorer->shouldClose) {
-			delete self->explorer;
-			self->explorer = nullptr;
-		}
-	
-	} else if (self->toolOutput.isOpen && self->toolOutput.HandleEvent(event, command)) {
-		return;
-	
-	} else if (Editor* editor = self->GetFocusedEditor(); editor && editor->HandleEvent(event, command)) {
-		return;
+	if (event.type == Event::Type_MouseWheel) {
 		
-	} else if (event.type == Event::Type_MouseWheel) {
-		
-		if (self->searchBar && RectContains(self->searchBar->area, mouse.x, mouse.y)) {
-			self->searchBar->OnMouseWheel(event.wheelDistance);
+		if (searchBar && RectContains(searchBar->area, mouse.x, mouse.y)) {
+			searchBar->OnMouseWheel(event.wheelDistance);
 			return;
 		}
 		
-		if (self->toolOutput.isOpen && RectContains(self->toolOutput.area, mouse.x, mouse.y)) {
-			self->toolOutput.OnMouseWheel(event.wheelDistance);
+		if (toolOutput.isOpen && RectContains(toolOutput.area, mouse.x, mouse.y)) {
+			toolOutput.OnMouseWheel(event.wheelDistance);
 			return;
 		}
 		
-		for (const App::Panel& panel : self->panels) {
+		for (const App::Panel& panel : panels) {
 			if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
 				panel.editor->OnMouseWheel(event.wheelDistance);
 			}
@@ -1077,7 +1060,7 @@ static void HandleEventInternal(App* self, const Event& event, const Command& co
 	
 	
 	} else if (event.type == Event::Type_Close) {
-		for (const App::Tab& tab : self->tabs) {
+		for (const App::Tab& tab : tabs) {
 			ASSERT_SOFT(tab.editor);
 			
 			if (tab.editor->isDirty) {
@@ -1090,75 +1073,98 @@ static void HandleEventInternal(App* self, const Event& event, const Command& co
 		}
 	
 	} else if (event.type == Event::Type_Resize) {
-		ResizePanels(self);
+		ResizePanels(this);
 	
-		self->toolOutput.OnResize(event.newWidth, event.newHeight);
-		self->searchBarFiles.OnResize();
-		self->searchBarTools.OnResize();
-		self->searchBarCommands.OnResize();
+		toolOutput.OnResize(event.newSize.w, event.newSize.h);
+		searchBarFiles.OnResize();
+		searchBarTools.OnResize();
+		searchBarCommands.OnResize();
 			
 	} else if (event.type == Event::Type_FileChange) {
-		OnFileChanged(self, event.fileChangedEvent);
-		
-	} else if (command.id == Command::Id_OpenFileSearch) {
-		self->searchBar = &self->searchBarFiles;
-		self->searchBar->shouldClose = false;
-	} else if (command.id == Command::Id_OpenToolSearch) {
-		self->searchBar = &self->searchBarTools;
-		self->searchBar->shouldClose = false;
-	} else if (command.id == Command::Id_OpenCommandSearch) {
-		self->searchBar = &self->searchBarCommands;
-		self->searchBar->shouldClose = false;
-	} else if (command.id == Command::Id_ToggleToolOutput) {
-		self->toolOutput.isOpen = !self->toolOutput.isOpen;
-	} else if (command.id == Command::Id_ToggleExplorer) {
-		if (self->explorer) {
-			delete self->explorer;
-			self->explorer = nullptr;
-		} else {
-			self->explorer = Explorer::Make();
+		OnFileChanged(this, event.fileChangedEvent);
+			
+	} else if (searchBar && searchBar->HandleEvent(event)) {
+		if (searchBar->shouldClose) {
+			searchBar->shouldClose = false;
+			searchBar = nullptr;
 		}
-	} else if (command.id == Command::Id_FocusNextTab) {
-		CommandChangeFocusedTab(self, true);
-	} else if (command.id == Command::Id_FocusPrevTab) {
-		CommandChangeFocusedTab(self, false);
-	} else if (command.id == Command::Id_FocusNextPanel) {
-		self->focusedPanelIndex = IncrementWrapAround(self->focusedPanelIndex, self->panels.size());
-	} else if (command.id == Command::Id_FocusPrevPanel) {
-		self->focusedPanelIndex = DecrementWrapAround(self->focusedPanelIndex, self->panels.size());
-	} else if (command.id == Command::Id_SwapPanels) {
-		ActionSwapPanels(self);
-	} else if (command.id == Command::Id_ClosePanel) {
-		ActionClosePanel(self);
-	} else if (command.id == Command::Id_AddPanelAfter) {
-		CommandAddPanel(self, false);
-	} else if (command.id == Command::Id_AddPanelBefore) {
-		CommandAddPanel(self, true);
-	} else if (command.id == Command::Id_NewFile) {
-		CommandNewFile(self);
-	} else if (command.id == Command::Id_CloseFile) {
-		CommandCloseTab(self);
-	} else if (command.id == Command::Id_CloseFilesToTheRight) {
-		CommandCloseMultipleTabs(self, -1);
-	} else if (command.id == Command::Id_CloseFilesToTheLeft) {
-		CommandCloseMultipleTabs(self, 1);
-	} else if (command.id == Command::Id_CloseOtherFiles) {
-		CommandCloseMultipleTabs(self, 0);
-	} else if (command.id == Command::Id_ClosePanelAndFile) {
-		ActionCloseTabAndPanel(self);
-	} else if (command.id == Command::Id_SaveAll) {
-		CommandSaveAll(self);
+	
+	} else if (explorer && explorer->HandleEvent(event)) {
+		if (explorer->shouldClose) {
+			delete explorer;
+			explorer = nullptr;
+		}
+	
+	} else if (toolOutput.isOpen && toolOutput.HandleEvent(event)) {
+		return;
+	
+	} else if (Editor* editor = GetFocusedEditor(); editor && editor->HandleEvent(event)) {
+		return;
+	
+	} else if (event.type == Event::Type_Command) {
+	
+		if (event.cmd.id == Command::Id_OpenFileSearch) {
+			searchBar = &searchBarFiles;
+			searchBar->shouldClose = false;
+		} else if (event.cmd.id == Command::Id_OpenToolSearch) {
+			searchBar = &searchBarTools;
+			searchBar->shouldClose = false;
+		} else if (event.cmd.id == Command::Id_OpenCommandSearch) {
+			searchBar = &searchBarCommands;
+			searchBar->shouldClose = false;
+		} else if (event.cmd.id == Command::Id_ToggleToolOutput) {
+			toolOutput.isOpen = !toolOutput.isOpen;
+		} else if (event.cmd.id == Command::Id_ToggleExplorer) {
+			if (explorer) {
+				delete explorer;
+				explorer = nullptr;
+			} else {
+				explorer = Explorer::Make();
+			}
+		} else if (event.cmd.id == Command::Id_FocusNextTab) {
+			CommandChangeFocusedTab(this, true);
+		} else if (event.cmd.id == Command::Id_FocusPrevTab) {
+			CommandChangeFocusedTab(this, false);
+		} else if (event.cmd.id == Command::Id_FocusNextPanel) {
+			focusedPanelIndex = IncrementWrapAround(focusedPanelIndex, panels.size());
+		} else if (event.cmd.id == Command::Id_FocusPrevPanel) {
+			focusedPanelIndex = DecrementWrapAround(focusedPanelIndex, panels.size());
+		} else if (event.cmd.id == Command::Id_SwapPanels) {
+			ActionSwapPanels(this);
+		} else if (event.cmd.id == Command::Id_ClosePanel) {
+			ActionClosePanel(this);
+		} else if (event.cmd.id == Command::Id_AddPanelAfter) {
+			CommandAddPanel(this, false);
+		} else if (event.cmd.id == Command::Id_AddPanelBefore) {
+			CommandAddPanel(this, true);
+		} else if (event.cmd.id == Command::Id_NewFile) {
+			CommandNewFile(this);
+		} else if (event.cmd.id == Command::Id_CloseFile) {
+			CommandCloseTab(this);
+		} else if (event.cmd.id == Command::Id_CloseFilesToTheRight) {
+			CommandCloseMultipleTabs(this, -1);
+		} else if (event.cmd.id == Command::Id_CloseFilesToTheLeft) {
+			CommandCloseMultipleTabs(this, 1);
+		} else if (event.cmd.id == Command::Id_CloseOtherFiles) {
+			CommandCloseMultipleTabs(this, 0);
+		} else if (event.cmd.id == Command::Id_ClosePanelAndFile) {
+			ActionCloseTabAndPanel(this);
+		} else if (event.cmd.id == Command::Id_SaveAll) {
+			CommandSaveAll(this);
+		}
 	}
 }
 
-void App::ExecuteCommand(const Command& command) {
-	HandleEventInternal(this, Event {.type = Event::Type_DirectCommand}, command);
-}
 
-void App::HandleEvent() {
+void App::PullEvent() {
 	const Event& event = mainWindow.event;
-	const Command& command = settings.LookupKeyBind(event);
-	HandleEventInternal(this, event, command);
+	if (Command command; settings.LookupKeyBind(event, &command)) {
+		HandleEvent(Event {
+			.type = Event::Type_Command,
+			.cmd = command});
+	} else {
+		HandleEvent(event);
+	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

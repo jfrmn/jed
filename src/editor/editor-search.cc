@@ -581,83 +581,96 @@ static void ActionSetCaretToEveryResult(EditorSearch* self, bool select) {
 	}
 }
 
-bool EditorSearch::HandleEvent(const Event& event, const Command& command) {
+bool EditorSearch::HandleEvent(const Event& event) {
 	
-	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
-	
-		if (!threadData || searchIsDirty) {
-
+	if (event.type == Event::Type_KeyPress) {
+		if (event.keypress.vkc == VK_RETURN) {
+		
+			if (!threadData || searchIsDirty) {
+				
+				CancelSearch(this);
+				
+				const std::string_view searchTerm = textboxSearch.GetText();
+				StartNewSearch(this, searchTerm);
+				
+				searchIsDirty = false;
+				
+			} else if (IsSearchComplete()) {
+				const bool ctrl = (event.keypress.mods & KM_Ctrl) != 0;
+				const bool shift = (event.keypress.mods & KM_Shift) != 0;
+				const bool alt = (event.keypress.mods & KM_Alt) != 0;
+				
+				if (!ctrl && !alt) {
+					if (focusedTextbox == &textboxReplace)
+						ActionReplaceNext(this, shift);
+					else if (focusedTextbox == &textboxSearch)
+						ActionGotoNextSearchResult(this, shift);
+					else
+						ASSERT_UNREACHABLE;
+				
+				} else if (ctrl && !alt) {
+				
+					if (focusedTextbox == &textboxReplace)
+						ActionGotoNextSearchResult(this, shift);
+					else if (isReplaceTextboxVisible)
+						ActionReplaceNext(this, shift);
+				
+				} else if (ctrl && alt) {
+					ActionReplaceAll(this);
+				}
+			}
+			
+			return true;
+			
+		} else if (event.keypress.vkc == VK_INSERT && (event.keypress.mods & KM_Ctrl)) {
+			ActionSetCaretToEveryResult(this, event.keypress.mods & KM_Shift);
+			return true;
+					
+		} else if (event.keypress.vkc == VK_PAUSE && event.keypress.mods == KM_Ctrl) {
 			CancelSearch(this);
-
-			const std::string_view searchTerm = textboxSearch.GetText();
-			StartNewSearch(this, searchTerm);
-
-			searchIsDirty = false;
-			
-		} else if (IsSearchComplete()) {
-			const bool ctrl = (event.kmods & KM_Ctrl) != 0;
-			const bool shift = (event.kmods & KM_Shift) != 0;
-			const bool alt = (event.kmods & KM_Alt) != 0;
- 			
-			if (!ctrl && !alt) {
-				if (focusedTextbox == &textboxReplace)
-					ActionReplaceNext(this, shift);
-				else if (focusedTextbox == &textboxSearch)
-					ActionGotoNextSearchResult(this, shift);
-				else
-					ASSERT_UNREACHABLE;
-			
-			} else if (ctrl && !alt) {
-			
-				if (focusedTextbox == &textboxReplace)
-					ActionGotoNextSearchResult(this, shift);
-				else if (isReplaceTextboxVisible)
-					ActionReplaceNext(this, shift);
-			
-			} else if (ctrl && alt) {
-				ActionReplaceAll(this);
+			return true;
+		
+		} else if (event.keypress.vkc == VK_TAB && event.keypress.mods == KM_Ctrl) {
+	
+			if (isReplaceTextboxVisible) {
+				textboxSearch.inactive  = !textboxSearch.inactive;
+				textboxReplace.inactive = !textboxReplace.inactive;
+				focusedTextbox = (focusedTextbox == &textboxSearch)
+					? &textboxReplace
+					: &textboxSearch;
+				
+				ASSERT(textboxSearch.inactive ^ textboxReplace.inactive);
+				
+				return true;
 			}
 		}
 		
-	} else if (event.vkcode == VK_INSERT && (event.kmods & KM_Ctrl)) {
-		ActionSetCaretToEveryResult(this, event.kmods & KM_Shift);
-				
-	} else if (event.vkcode == VK_PAUSE && event.kmods == KM_Ctrl) {
-		CancelSearch(this);
-
-	} else if (event.vkcode == VK_TAB && event.kmods == KM_Ctrl) {
-
-		if (isReplaceTextboxVisible) {
-			textboxSearch.inactive  = !textboxSearch.inactive;
-			textboxReplace.inactive = !textboxReplace.inactive;
-			focusedTextbox = (focusedTextbox == &textboxSearch)
-				? &textboxReplace
-				: &textboxSearch;
-
-			ASSERT(textboxSearch.inactive ^ textboxReplace.inactive);
-		}
-
-	} else if (command.id == Command::Id_Editor_OpenSearch) {
-		if (command.parameters->boolValue) {
-			isReplaceTextboxVisible = true;
-			textboxSearch.inactive = true;
-			textboxReplace.inactive = false;
-			focusedTextbox = &textboxReplace;
-		} else {
-			isReplaceTextboxVisible = false;
-			textboxSearch.inactive = false;
-			textboxReplace.inactive = true;
-			focusedTextbox = &textboxSearch;
+	} else if (event.type == Event::Type_Command) {
+		if (event.cmd.id == Command::Id_Editor_OpenSearch) {
+			
+			if (event.cmd.parameters.front().boolValue) {
+				isReplaceTextboxVisible = true;
+				textboxSearch.inactive = true;
+				textboxReplace.inactive = false;
+				focusedTextbox = &textboxReplace;
+			} else {
+				isReplaceTextboxVisible = false;
+				textboxSearch.inactive = false;
+				textboxReplace.inactive = true;
+				focusedTextbox = &textboxSearch;
+			}
+			
+			return true;
 		}
 		
 	} else {
 		ASSERT(focusedTextbox);
-		const auto [handled, changed] = focusedTextbox->HandleEvent(event, command);
+		const auto [handled, changed] = focusedTextbox->HandleEvent(event);
 		searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
 		return handled;
 	}
 	
-	return true;
+	return false;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

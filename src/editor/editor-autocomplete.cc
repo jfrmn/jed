@@ -201,26 +201,26 @@ void EditorAutocomplete::SortItems() {
 	});
 }
 
-bool EditorAutocomplete::HandleEvent(const Event& event, const Command& command) {
+bool EditorAutocomplete::HandleEvent(const Event& event) {
 	if (!items || itemCount == 0u) return false;
 
 	if (event.type == Event::Type_KeyPress) {
-		if ((event.vkcode == VK_DOWN || event.vkcode == VK_UP) && event.kmods == KM_None) {
+		if ((event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP) && event.keypress.mods == KM_None) {
 		
-			selectedItem = event.vkcode == VK_DOWN ?
+			selectedItem = event.keypress.vkc == VK_DOWN ?
 				IncrementWrapAround(selectedItem, itemCount):
 				DecrementWrapAround(selectedItem, itemCount);
 	
 			return true;
 	
-		} else if ((event.vkcode == VK_RETURN || event.vkcode == VK_TAB) && event.kmods == KM_None) {
+		} else if ((event.keypress.vkc == VK_RETURN || event.keypress.vkc == VK_TAB) && event.keypress.mods == KM_None) {
 			InsertItem(this);
 			RemoveReference();
 			return true;
 		}
 	
 	} else if (signatureHelp) {
-		return signatureHelp->HandleEvent(event, command);
+		return signatureHelp->HandleEvent(event);
 	}
 	
 	return false;

@@ -222,43 +222,43 @@ void SearchBar::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool SearchBar::HandleEvent(const Event& event, const Command& command) {
+bool SearchBar::HandleEvent(const Event& event) {
 	if (parameterConfigurator) {
-		const bool handled = parameterConfigurator->HandleEvent(event, command);
+		const bool handled = parameterConfigurator->HandleEvent(event);
 		if (parameterConfigurator->result != ParameterConfigurator::Result_Unfinished)
 			OnFinishedParameterConfiguration();
 		return handled;
 	}
 	
 	if (event.type == Event::Type_KeyPress) {
-		if ((event.vkcode == VK_DOWN || event.vkcode == VK_UP)) {
+		if ((event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP)) {
 			if (itemCount == 0u) {
 				selectedItem = U64_MAX;
 			
-			} else if (event.vkcode == VK_DOWN) {
+			} else if (event.keypress.vkc == VK_DOWN) {
 				selectedItem = IncrementWrapAround(selectedItem, itemCount);
 	
-			} else if (event.vkcode == VK_UP) {
+			} else if (event.keypress.vkc == VK_UP) {
 				selectedItem = DecrementWrapAround(selectedItem, itemCount);
 			}
 			
 			itemHighlightAnimationValue = .0f;
 			return true;
 		
-		} else if (event.vkcode == VK_RETURN) {
+		} else if (event.keypress.vkc == VK_RETURN) {
 			
 			if (selectedItem < itemCount)
 				OnPickItem(selectedItem, &event);
 				
 			return true;
 			   
-		} else if (event.vkcode == VK_ESCAPE && event.kmods == KM_None) {
+		} else if (event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_None) {
 			shouldClose = true;
 			return true;
 		}	
 	}
 	
-	const auto [handled, changed] = textBox.HandleEvent(event, command);
+	const auto [handled, changed] = textBox.HandleEvent(event);
 	if (changed) FilterItems(textBox.GetText());
 	return handled;
 }
@@ -443,7 +443,7 @@ void SearchBarFiles::OnPickItem(u64 i, const Event* event) {
 	const Item& item = threadData->results[i];
 	
 	App::OpenBehavior openBehav = event
-		? OpenBehaviorFromModifiers(event->kmods)
+		? OpenBehaviorFromModifiers(event->keypress.mods)
 		: App::OpenBehavior_Default;
 	
 	const bool ok = app.OpenEditor(item.fullPath, openBehav);
@@ -461,8 +461,7 @@ void SearchBarFiles::OnPickItem(u64 i, const Event* event) {
 void SearchBarTools::Init() {
 	__super::Init("run tool...");
 	filteredTools.reserve(Tool::tools.size());
-	for (const auto& t : Tool::tools)
-		filteredTools.emplace_back(&t, FuzzyMatchResult {});
+	FilterItems({});
 }
 	
 void SearchBarTools::FilterItems(std::string_view text) {
@@ -503,7 +502,7 @@ void SearchBarTools::OnPickItem(u64 item, const Event* event) {
 	ASSERT(item < filteredTools.size());
 	
 	const Tool& tool = Tool::tools[item];
-	if (tool.forceConfiguration || (event && (event->kmods & KM_Ctrl) != 0)) {
+	if (tool.forceConfiguration || (event && (event->keypress.mods & KM_Ctrl) != 0)) {
 		ASSERT(!parameterConfigurator);
 		parameterConfigurator = ParameterConfigurator::Make(tool.parameters);
 		return;
@@ -563,8 +562,7 @@ void SearchBarTools::OnFinishedParameterConfiguration() {
 void SearchBarCommands::Init() {
 	__super::Init("run command...");
 	filteredCommands.reserve(Command::COUNT);
-	for (u64 i = 0u; i < Command::COUNT; i++)
-		filteredCommands.emplace_back(static_cast<Command::Id>(i), FuzzyMatchResult {});
+	FilterItems({});
 }
 	
 void SearchBarCommands::FilterItems(std::string_view text) {
@@ -601,7 +599,7 @@ void SearchBarCommands::OnPickItem(u64 itemIdx, const Event* event) {
 	const Item& item = filteredCommands[itemIdx];
 		
 	const CommandDefinition& commandDef = commandDefinitions[item.commandId];
-	if (commandDef.forceParameterConfiguration || (event && event->kmods == KM_Ctrl)) {
+	if (commandDef.forceParameterConfiguration || (event && event->keypress.mods == KM_Ctrl)) {
 		ASSERT(!parameterConfigurator);
 		parameterConfigurator = ParameterConfigurator::Make(commandDef.parameters);
 		return;
@@ -610,8 +608,11 @@ void SearchBarCommands::OnPickItem(u64 itemIdx, const Event* event) {
 	std::vector<ParameterValue> defaultValues {};
 	ParameterDefinition::GetDefaultValues(commandDef.parameters, &defaultValues);
 	
-	const Command command {item.commandId, defaultValues.data()};
-	app.ExecuteCommand(command);
+	app.HandleEvent(Event {
+			.type = Event::Type_Command,
+			.cmd = Command {
+				.id = item.commandId,
+				.parameters = defaultValues}});
 	
 	shouldClose = true;
 }
@@ -640,8 +641,11 @@ void SearchBarCommands::OnFinishedParameterConfiguration() {
 		std::vector<ParameterValue> parameterValues {};
 		parameterConfigurator->GetParameterValues(&parameterValues);
 		
-		const Command command {item.commandId, parameterValues.data()};
-		app.ExecuteCommand(command);
+		app.HandleEvent(Event {
+			.type = Event::Type_Command,
+			.cmd = Command {
+				.id = item.commandId,
+				.parameters = parameterValues}});
 		
 		shouldClose = true;
 		

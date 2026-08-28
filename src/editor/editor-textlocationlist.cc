@@ -134,9 +134,9 @@ void EditorTextLocationList::UpdateFilePreview() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorTextLocationList::HandleEvent(const Event& event, const Command& command) {
+bool EditorTextLocationList::HandleEvent(const Event& event) {
 	
-	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
+	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_RETURN) {
 		if (selectedItem < U64_MAX) {
 			ASSERT(state == State_Completed);
 			ASSERT(selectedItem < itemCount)
@@ -149,7 +149,7 @@ bool EditorTextLocationList::HandleEvent(const Event& event, const Command& comm
 			const Item& item = items[selectedItem];
 			
 			bool wasOpen = false;
-			const auto openBehav = OpenBehaviorFromModifiers(event.kmods);
+			const auto openBehav = OpenBehaviorFromModifiers(event.keypress.mods);
 			Editor* openedEditor = app.OpenEditor(item.targetPath, openBehav, &wasOpen);
 			if (!openedEditor) {
 				error = "Failed to open file";
@@ -174,8 +174,8 @@ bool EditorTextLocationList::HandleEvent(const Event& event, const Command& comm
 		
 		return true;
 				
-	} else if (event.type == Event::Type_KeyPress && (event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
-		selectedItem = (event.vkcode == VK_UP)
+	} else if (event.type == Event::Type_KeyPress && (event.keypress.vkc == VK_UP || event.keypress.vkc == VK_DOWN) && event.keypress.mods == KM_None) {
+		selectedItem = (event.keypress.vkc == VK_UP)
 			? IncrementWrapAround(selectedItem, itemCount)
 			: DecrementWrapAround(selectedItem, itemCount);
 		

@@ -10,7 +10,7 @@
 #include <d2d1_1.h>
 
 struct Event;
-struct Command;
+
 
 struct TextBox {
 
@@ -56,5 +56,5 @@ struct TextBox {
 	void Update();
 	
 	// returns whether the text changed or not
-	HandleEventResult HandleEvent(const Event& event, const Command& command);
+	HandleEventResult HandleEvent(const Event& event);
 };

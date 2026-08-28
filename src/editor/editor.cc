@@ -1164,15 +1164,15 @@ void Editor::OnFileChange(const FileChangeRecord* fileChangeRecord) {
 	}
 }
 
-bool Editor::HandleEvent(const Event& event, const Command& command) {
+bool Editor::HandleEvent(const Event& event) {
 
-	if (toolWindow && toolWindow->HandleEvent(event, command))
+	if (toolWindow && toolWindow->HandleEvent(event))
 		return true;
 	
-	if (editorCaretAttached && editorCaretAttached->HandleEvent(event, command))
+	if (editorCaretAttached && editorCaretAttached->HandleEvent(event))
 		return true;
 	
-	if (event.type == Event::Type_KeyPress && event.vkcode == VK_ESCAPE && event.kmods == KM_None) {
+	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_None) {
 		if (toolWindow) {
 			delete toolWindow;
 			toolWindow = nullptr;
@@ -1187,119 +1187,133 @@ bool Editor::HandleEvent(const Event& event, const Command& command) {
 	 	return false;
 	}
 			
-	if (command.id == Command::Id_Editor_OpenSearch) {		
-		const bool showReplace = command.parameters->boolValue;
-		
-		if (auto search = dynamic_cast<EditorSearch*>(toolWindow)) {
-			search->ToggleReplaceTextbox(showReplace);
-
-		} else {
-			delete toolWindow;
+	if (event.type == Event::Type_Command) {
+		if (event.cmd.id == Command::Id_Editor_OpenSearch) {		
+			const bool showReplace = event.cmd.parameters.front().boolValue;
 			
-			toolWindow = EditorSearch::Make(this, showReplace);
-			if (!toolWindow)
-				LogError("EditorSearch::Make() failed");
-		}
+			if (auto search = dynamic_cast<EditorSearch*>(toolWindow)) {
+				search->ToggleReplaceTextbox(showReplace);
+	
+			} else {
+				delete toolWindow;
+				
+				toolWindow = EditorSearch::Make(this, showReplace);
+				if (!toolWindow)
+					LogError("EditorSearch::Make() failed");
+			}
 			
-	} else if (command.id == Command::Id_Editor_OpenGotoLine) {
-		
-		if (toolWindow && toolWindow->IsGotoLine()) {
-			delete toolWindow;
-			toolWindow = nullptr;
-		
-		} else {
-			delete toolWindow;
+			return true;
+				
+		} else if (event.cmd.id == Command::Id_Editor_OpenGotoLine) {
 			
-			toolWindow = EditorGotoLine::Make(this);
-			if (!toolWindow)
-				LogError("EditorGotoLine::Make() failed");
-		}
-	
-	} else if (command.id == Command::Id_Editor_OpenDiagnosticsList) {
-		
-		if (toolWindow && toolWindow->IsDiagnosticsList()) {
-			delete toolWindow;
-			toolWindow = nullptr;
-		
-		} else {
-			delete toolWindow;
+			if (toolWindow && toolWindow->IsGotoLine()) {
+				delete toolWindow;
+				toolWindow = nullptr;
 			
-			toolWindow = EditorDiagnosticsList::Make(this);
-			if (!toolWindow)
-				LogError("EditorDiagnosticsList::Make() failed");
-		}
-	
-	} else if (command.id == Command::Id_Editor_ShowGotoLocation) {
-		if (!language) return true;
+			} else {
+				delete toolWindow;
+				
+				toolWindow = EditorGotoLine::Make(this);
+				if (!toolWindow)
+					LogError("EditorGotoLine::Make() failed");
+			}
 			
-		if (editorCaretAttached) {
-			editorCaretAttached->RemoveReference();
-			editorCaretAttached = nullptr;
-		}
+			return true;
 		
-    	editorCaretAttached = EditorSelectGotoType::Make(this);
-	
-	} else if (command.id == Command::Id_Editor_ShowSignatureHelp) {
-		if (!language) return true;
-		
-		if (editorCaretAttached) {
-			editorCaretAttached->RemoveReference();
-			editorCaretAttached = nullptr;
-		}
-		
-    	editorCaretAttached = language->GetSignatureHelp(this);
-    	
-	} else if (command.id == Command::Id_Editor_ShowAutocomplete) {
-		if (!language) return true;
-		
-		EditorSignatureHelp* signatureHelp = dynamic_cast<EditorSignatureHelp*>(editorCaretAttached);
-		if (signatureHelp) signatureHelp->AddReference();
-		DEFER(if (signatureHelp) signatureHelp->RemoveReference());
-		
-		if (editorCaretAttached) {
-			editorCaretAttached->RemoveReference();
-			editorCaretAttached = nullptr;
-		}
-		
-		EditorAutocomplete* autocomplete = language->GetAutoComplete(this);
-		if (autocomplete && signatureHelp) {
-			autocomplete->signatureHelp = signatureHelp;
-			signatureHelp->AddReference();
-			signatureHelp->autocompleteIsActive = true;
+		} else if (event.cmd.id == Command::Id_Editor_OpenDiagnosticsList) {
 			
-		}
+			if (toolWindow && toolWindow->IsDiagnosticsList()) {
+				delete toolWindow;
+				toolWindow = nullptr;
+			
+			} else {
+				delete toolWindow;
+				
+				toolWindow = EditorDiagnosticsList::Make(this);
+				if (!toolWindow)
+					LogError("EditorDiagnosticsList::Make() failed");
+			}
+			
+			return true;
 		
-		editorCaretAttached = autocomplete;
-	
-	} else if (command.id == Command::Id_Editor_SaveFile) {
-		SaveFile();
-	
-	} else if (command.id == Command::Id_Editor_ScrollUp) {
-		scrollarea.vpY -= (settings.fontEditor.lineHeight * 2);
-		if (scrollarea.vpY < 0.0f)
-			scrollarea.vpY = 0.0f;
-	
-	} else if (command.id == Command::Id_Editor_ScrollDown) {
-		scrollarea.vpY += (settings.fontEditor.lineHeight * 2);
-		if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
-			scrollarea.vpY  = scrollarea.GetMaxPositionY();
-	
-	} else if (TextChange* change = nullptr; textController.HandleEvent(event, command, &change)) {
+		} else if (event.cmd.id == Command::Id_Editor_ShowGotoLocation) {
+			if (!language) return true;
+				
+			if (editorCaretAttached) {
+				editorCaretAttached->RemoveReference();
+				editorCaretAttached = nullptr;
+			}
+			
+    		editorCaretAttached = EditorSelectGotoType::Make(this);
+    		return true;
+		
+		} else if (event.cmd.id == Command::Id_Editor_ShowSignatureHelp) {
+			if (!language) return true;
+			
+			if (editorCaretAttached) {
+				editorCaretAttached->RemoveReference();
+				editorCaretAttached = nullptr;
+			}
+			
+    		editorCaretAttached = language->GetSignatureHelp(this);
+    		return true;
+	    	
+		} else if (event.cmd.id == Command::Id_Editor_ShowAutocomplete) {
+			if (!language) return true;
+			
+			EditorSignatureHelp* signatureHelp = dynamic_cast<EditorSignatureHelp*>(editorCaretAttached);
+			if (signatureHelp) signatureHelp->AddReference();
+			DEFER(if (signatureHelp) signatureHelp->RemoveReference());
+			
+			if (editorCaretAttached) {
+				editorCaretAttached->RemoveReference();
+				editorCaretAttached = nullptr;
+			}
+			
+			EditorAutocomplete* autocomplete = language->GetAutoComplete(this);
+			if (autocomplete && signatureHelp) {
+				autocomplete->signatureHelp = signatureHelp;
+				signatureHelp->AddReference();
+				signatureHelp->autocompleteIsActive = true;
+				
+			}
+			
+			editorCaretAttached = autocomplete;
+			return true;
+		
+		} else if (event.cmd.id == Command::Id_Editor_SaveFile) {
+			SaveFile();
+			return true;
+		
+		} else if (event.cmd.id == Command::Id_Editor_ScrollUp) {
+			scrollarea.vpY -= (settings.fontEditor.lineHeight * 2);
+			if (scrollarea.vpY < 0.0f)
+				scrollarea.vpY = 0.0f;
+			return true;
+		
+		} else if (event.cmd.id == Command::Id_Editor_ScrollDown) {
+			scrollarea.vpY += (settings.fontEditor.lineHeight * 2);
+			if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
+				scrollarea.vpY  = scrollarea.GetMaxPositionY();
+			return true;
+		}
+	}	
+		
+	if (TextChange* change = nullptr; textController.HandleEvent(event, &change)) {
 		if (change) {
 	
 			ProcessTextChange(change);
 		
- 			if (editorCaretAttached)
+				if (editorCaretAttached)
 				editorCaretAttached->OnInput();
 			
 			cursorBlinkValue = 0u;
 		}
-	
-	} else {
-		return false;
+		
+		return true;
 	}
 	
-	return true;
+	return false;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

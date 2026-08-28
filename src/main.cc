@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
 		}
 		
 		needsUpdate = false;		
-		app.HandleEvent();
+		app.PullEvent();
 		app.Update();
 		mouse.NextFrame(mainWindow.event);
 		mainWindow.ClearEvent();

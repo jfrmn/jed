@@ -1,6 +1,6 @@
 #pragma once
 #include "basic.hh"
-#include <string_view>
+#include "commands.hh"
 
 struct D2D_RECT_F;
 struct D2D_POINT_2F;
@@ -72,7 +72,7 @@ struct Event {
 		 Type_Resize,
 		 Type_Close,
 		 Type_FileChange,
-		 Type_DirectCommand  // when user picks a command from the command search bar
+		 Type_Command
 	};
 	
 	Type type = Type_None;
@@ -81,30 +81,41 @@ struct Event {
 	// but msvc can't handle multiple anonymus structs inside a union (internal compiler error)
 	// we could use named structs but member access is nicer this way
 	// and but we don't allocate this struct often
+	
+	union {		
+		// KeyPress
+		struct {
+			u32 vkc;
+			u32 mods;
+		} keypress;
 		
-	// KeyPress
-	u32 vkcode = VK_NONE;
-	u32 kmods = KM_None;
+		// Text
+		struct {
+			char data[6]; // 6 is the theroretical maximum for utf8
+			u64 len = 0u;
+		} text;
+		
+		// MouseDown, MouseUp
+		struct {
+			f32 x;
+			f32 y;
+		} mouse;
+		
+		// MouseWheel
+		f32 wheelDistance;
+		
+		// Resize
+		struct {
+			f32 w;
+			f32 h;
+		} newSize;
 	
-	// Text
-	char textData[6]; // 6 is the theroretical maximum for utf8
-	u64 textLen = 0u; 
-	
-	// MouseDown, MouseUp
-	f32 x = 0.0f;
-	f32 y = 0.0f;
-	
-	// MouseWheel
-	f32 wheelDistance = 0.0f;
-	
-	// Resize
-	f32 newWidth = 0.0f;
-	f32 newHeight = 0.0f;
-
-	// FileChangedEvent
-	FileChangedEvent* fileChangedEvent = nullptr;
-	
-	std::string_view GetText() const;
+		// FileChangedEvent
+		FileChangedEvent* fileChangedEvent = nullptr;
+		
+		// Command
+		Command cmd;
+	};
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

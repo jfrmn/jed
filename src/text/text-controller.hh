@@ -8,7 +8,7 @@
 
 struct Editor;
 struct Event;
-struct Command;
+
 
 struct TextController {
 	
@@ -82,5 +82,5 @@ struct TextController {
 	
 	TextChange* NewTextChange();
 	
-	bool HandleEvent(const Event& event, const Command& command, /*out*/ TextChange** change);
+	bool HandleEvent(const Event& event, /*out*/ TextChange** change);
 };

@@ -69,7 +69,7 @@ public:
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) = 0;
 	
 	void OnResize();
-	bool HandleEvent(const Event& event, const Command& command);
+	bool HandleEvent(const Event& event);
 	void OnMouseWheel(f32 distance);
 	
 	virtual void FilterItems(std::string_view text) = 0;

@@ -146,7 +146,7 @@ struct Settings {
 	bool Init(ID2D1DeviceContext* deviceContext);
 	~Settings() noexcept;
 	
-	Command LookupKeyBind(const Event& event);
+	bool LookupKeyBind(const Event& event, /*out*/ Command* command);
 	
 	ID2D1SolidColorBrush* GetBrushDropShadow();
 	ID2D1SolidColorBrush* GetBrushSelection(bool active = true);

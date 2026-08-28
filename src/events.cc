@@ -3,10 +3,6 @@
 
 MouseState mouse {};
 
-std::string_view Event::GetText() const {
-	return std::string_view {textData, textLen};
-}
-
 bool MouseState::Hittest(const D2D_RECT_F& area, void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
 	if (isDragging) return false;
 	

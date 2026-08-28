@@ -65,5 +65,5 @@ struct EditorSearch : public EditorToolWindow {
 
 	virtual void Update() override;
 	
-	virtual bool HandleEvent(const Event& event, const Command& command) override;
+	virtual bool HandleEvent(const Event& event) override;
 };

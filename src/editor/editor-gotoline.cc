@@ -118,9 +118,9 @@ static void ValidateLineNumber(EditorGotoLine *self) {
 	self->textbox.invalid = (lineNumber < 1 || lineNumber > self->owner->GetBuffer().LineCount());
 }
 
-bool EditorGotoLine::HandleEvent(const Event& event, const Command& command) {
+bool EditorGotoLine::HandleEvent(const Event& event) {
 	
-	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN) {
+	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_RETURN) {
 		if (textbox.invalid) return true;
 
 		const u64 lineNumber = GetCurrentLineNumber(this) - 1; // adjust to 0-based
@@ -145,11 +145,11 @@ bool EditorGotoLine::HandleEvent(const Event& event, const Command& command) {
 		return true;
 		
 	} else if (event.type == Event::Type_Text) {
-		if (event.textLen == 1u && (event.textData[0] < '0' || event.textData[0] > '9')) return true;
+		if (event.text.len == 1u && (event.text.data[0] < '0' || event.text.data[0] > '9')) return true;
 		if (textbox.GetText().size() >= MAX_DIGITS) return true;
 	}
 	
-	const auto [handled, changed] = textbox.HandleEvent(event, command);
+	const auto [handled, changed] = textbox.HandleEvent(event);
 	if (changed) ValidateLineNumber(this);
 	return handled;
 }

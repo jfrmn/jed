@@ -837,20 +837,24 @@ void ToolOutput::OnMouseWheel(f32 distance) {
 	disableAutoScroll = (scrollarea.vpY != scrollarea.GetMaxPositionY());	
 }
 
-bool ToolOutput::HandleEvent(const Event& event, const Command& command) {
+bool ToolOutput::HandleEvent(const Event& event) {
+	if (event.type != Event::Type_Command) return false;
 	
-	if (command.id == Command::Id_GotoNextDiagnosticRecord) {
+	if (event.cmd.id == Command::Id_GotoNextDiagnosticRecord) {
 		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
+		return true;
 		
-	} else if (command.id == Command::Id_GotoPrevDiagnosticRecord) {
+	} else if (event.cmd.id == Command::Id_GotoPrevDiagnosticRecord) {
 		selectedDiagnosticsRecord = DecrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
 		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
+		return true;
 	
-	} else if (command.id == Command::Id_ToolOutput_TerminateProcess) {
+	} else if (event.cmd.id == Command::Id_ToolOutput_TerminateProcess) {
 		if (process) process->Terminate();
+		return true;
 	
-	} else if (command.id == Command::Id_Clipboard_Copy) {
+	} else if (event.cmd.id == Command::Id_Clipboard_Copy) {
 		if (selectionStart == selectionEnd) return false; // we could consume the command or not. Up for debate...
 		
 		const std::string& startLine = lines[selectionStart.line];
@@ -884,12 +888,10 @@ bool ToolOutput::HandleEvent(const Event& event, const Command& command) {
 		
 		GlobalUnlock(hGlobal);
 		SetClipboardData(CF_TEXT, hGlobal);
-	
-	} else {
-		return false;
+		return true;
 	}
 	
-	return true;
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

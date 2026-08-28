@@ -1005,33 +1005,32 @@ void Explorer::Update() {
 	}
 }
 
-bool Explorer::HandleEvent(const Event& event, const Command& command) {
+bool Explorer::HandleEvent(const Event& event) {
 	
 	if (event.type == Event::Type_KeyPress) {
-		if (newItemDialog) {
-			if (event.vkcode == VK_ESCAPE || event.vkcode == VK_RIGHT) {
-				delete newItemDialog;
-				newItemDialog = nullptr;
+		if (event.keypress.vkc == VK_ESCAPE || event.keypress.vkc == VK_RIGHT) {
+			delete newItemDialog;
+			newItemDialog = nullptr;
+			return true;
 			
-			} else if (event.vkcode == VK_RETURN) {
+		} else if (event.keypress.vkc == VK_RETURN) {
+			if (newItemDialog) {
 				ActionConfirmTextboxPanel(this);
-			
-			} else {
-				return newItemDialog->textbox.HandleEvent(event, command).handled;
+				return true;
 			}
-				
-		} else if (event.vkcode == VK_DOWN || event.vkcode == VK_UP) {
-						
+		
+		} else if (event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP) {
+			
 			Item* oldActiveItem = activePanel->activeItem;
-	
+			
 			const u64 oldActiveItemIndex = activePanel->activeItem - activePanel->items.data();
-			const u64 newActiveItemIndex = event.vkcode == VK_DOWN ?
+			const u64 newActiveItemIndex = event.keypress.vkc == VK_DOWN ?
 				IncrementWrapAround(oldActiveItemIndex, activePanel->items.size()):
 				DecrementWrapAround(oldActiveItemIndex, activePanel->items.size());
 				
 			activePanel->activeItem = &activePanel->items[newActiveItemIndex];
 				
-			if ((event.kmods & KM_Shift) != 0) {				
+			if ((event.keypress.mods & KM_Shift) != 0) {				
 				if (activePanel->activeItem->isSelected)
 					activePanel->activeItem->isSelected = false;
 				else
@@ -1044,66 +1043,65 @@ bool Explorer::HandleEvent(const Event& event, const Command& command) {
 			}
 			
 			activeItemAnimationValue = 0.0f;
+			return true;
 				
-		} else if (event.vkcode == VK_RIGHT) {
-			if (activePanel->activeItem->type == Explorer::Item::Type_Directory) {
+		} else if (event.keypress.vkc == VK_RIGHT) {
+			if (activePanel->activeItem->type == Explorer::Item::Type_Directory)
 				ActionOpenDirectory(this);
-			}
+			return true;
 			
-		} else if (event.vkcode == VK_LEFT) {
+		} else if (event.keypress.vkc == VK_LEFT) {
 			
 			Panel* closingPanel = activePanel;
 			activePanel = closingPanel->parent;
 			delete closingPanel;
 			
-			if (!activePanel) {
+			if (!activePanel)
 				shouldClose = true;
-			}
 				
 			activeItemAnimationValue = 0.0f;
+			return true;
+		
+		} else if (event.keypress.vkc == VK_DELETE) {
+			ActionDelete(this);
+			return true;
+			
+		} else if (event.keypress.vkc == VK_RETURN) {
+			ActionOpenItem(this, OpenBehaviorFromModifiers(event.keypress.mods));
+			return true;
+	
+		} else if (event.keypress.vkc == VK_ESCAPE) {
+			shouldClose = true;
+			return true;
 		}
-		
+			
+	} else if (event.type == Event::Type_Command) {
+	
+		if (event.cmd.id == Command::Id_Clipboard_Copy)
+			CommandCopyOrCut(this, false);
+		else if (event.cmd.id == Command::Id_Clipboard_Cut)
+			CommandCopyOrCut(this, true);
+		else if (event.cmd.id == Command::Id_Clipboard_Paste)
+			CommandPaste(this);
+		else if (event.cmd.id == Command::Id_Explorer_ShellExecute)
+			CommandShellExecute(this);
+		else if (event.cmd.id == Command::Id_OpenInWindowsExplorer)
+			CommandRevealInExplorer(this);
+		else if (event.cmd.id == Command::Id_NewFile)
+			CommandNewItem(this, Item::Type_File);
+		else if (event.cmd.id == Command::Id_Explorer_NewDirectory)
+			CommandNewItem(this, Item::Type_Directory);
+		else if (event.cmd.id == Command::Id_Explorer_Rename)
+			CommandRenameItem(this);
+		else return false;
+	
 		return true;
-	}
-		
-	if (event.vkcode == VK_DELETE) {
-		ActionDelete(this);
-				
-	} else if (event.vkcode == VK_RETURN) {
-		ActionOpenItem(this, OpenBehaviorFromModifiers(event.kmods));
 	
-	} else if (event.vkcode == VK_ESCAPE) {
-		shouldClose = true;
-	
-	} else if (command.id == Command::Id_Clipboard_Copy) {
-		CommandCopyOrCut(this, false);
-	
-	} else if (command.id == Command::Id_Clipboard_Cut) {
-		CommandCopyOrCut(this, true);
-		
-	} else if (command.id == Command::Id_Clipboard_Paste) {
-		CommandPaste(this);
-		
-	} else if (command.id == Command::Id_Explorer_ShellExecute) {
-		CommandShellExecute(this);
-		
-	} else if (command.id == Command::Id_OpenInWindowsExplorer) {
-		CommandRevealInExplorer(this);
-	
-	} else if (command.id == Command::Id_NewFile) {
-		CommandNewItem(this, Item::Type_File);
-	
-	} else if (command.id == Command::Id_Explorer_NewDirectory) {
-		CommandNewItem(this, Item::Type_Directory);
-	
-	} else if (command.id == Command::Id_Explorer_Rename) {
-		CommandRenameItem(this);
-	
-	} else {
-		return false;
+	} else if (newItemDialog) {
+		return newItemDialog->textbox.HandleEvent(event).handled;
 	}
 	
-	return true;	
+	return false;	
 }
 
 Explorer::~Explorer() noexcept {}

@@ -108,16 +108,16 @@ void EditorSignatureHelp::Update() {
 	}
 }
 
-bool EditorSignatureHelp::HandleEvent(const Event& event, const Command& command) {
+bool EditorSignatureHelp::HandleEvent(const Event& event) {
 	if (state != State_Completed) return false;
 	
 	const bool handleEvent = signatureCount > 1
 						  && event.type == Event::Type_KeyPress
-						  && (event.vkcode == VK_DOWN || event.vkcode == VK_UP)
-						  && event.kmods == KM_Alt;
+						  && (event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP)
+						  && event.keypress.mods == KM_Alt;
 	
 	if (handleEvent) {
-		activeSignature = event.vkcode == VK_DOWN
+		activeSignature = event.keypress.vkc == VK_DOWN
 			? IncrementWrapAround(activeSignature, signatureCount)
 			: DecrementWrapAround(activeSignature, signatureCount);
 		return true;

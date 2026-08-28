@@ -52,7 +52,7 @@ struct EditorSignatureHelp : public EditorCaretAttached {
 	static EditorSignatureHelp* Make(Editor* owner);
 	
 	virtual void Update() override;
-	virtual bool HandleEvent(const Event& event, const Command& command) override;
+	virtual bool HandleEvent(const Event& event) override;
 	virtual void OnInput() override;
 		
 	virtual ~EditorSignatureHelp() noexcept;

@@ -1,6 +1,5 @@
 #pragma once
 
-struct Command;
 struct Event;
 
 // The Toolwindow is on the top right corner of the editor
@@ -13,5 +12,5 @@ struct EditorToolWindow {
 	virtual bool IsDiagnosticsList() const;
 	
 	virtual void Update() = 0;
-	virtual bool HandleEvent(const Event& event, const Command& command);
+	virtual bool HandleEvent(const Event& event);
 };

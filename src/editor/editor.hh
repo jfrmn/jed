@@ -12,7 +12,7 @@
 #include <string>
 
 struct Event;
-struct Command;
+
 
 struct Language;
 struct TextChange;
@@ -109,5 +109,5 @@ struct Editor {
 	void OnResize(const D2D_RECT_F& newArea);
 	void OnMouseWheel(f32 distance);
 	void OnFileChange(const FileChangeRecord* fileChangeRecord);
-	bool HandleEvent(const Event& event, const Command& command);	
+	bool HandleEvent(const Event& event);	
 };

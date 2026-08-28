@@ -77,8 +77,8 @@ struct App {
 	const Editor* GetFocusedEditor() const;
 	
 	void Update();
-	void HandleEvent();
-	void ExecuteCommand(const Command& command);
+	void HandleEvent(const Event& event);
+	void PullEvent();
 };
 
 // Helper function to make open behavior consisten across different feature (explore, file-picker, etc.)

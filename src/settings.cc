@@ -394,18 +394,17 @@ Settings settings {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-Command Settings::LookupKeyBind(const Event& ev) {
-	if (ev.type == Event::Type_KeyPress) {
-		const u64 key = MakeKey(ev.vkcode, ev.kmods);
-		auto it = keyBinds.find(key);
-		if (it != keyBinds.end()) {
-			return Command {
-				.id = it->second.commandId,
-				.parameters = it->second.parameters.data()};
-		}
-	}
+bool Settings::LookupKeyBind(const Event& ev, /*out*/ Command* command) {
+	if (ev.type != Event::Type_KeyPress) return false;
 	
-	return Command {Command::Id_None, nullptr};
+	const u64 key = MakeKey(ev.keypress.vkc, ev.keypress.mods);
+	auto it = keyBinds.find(key);
+	if (it == keyBinds.end()) return false;
+	
+	*command = Command {
+		.id = it->second.commandId,
+		.parameters = it->second.parameters};
+	return true;
 }
 
 ID2D1SolidColorBrush* Settings::GetBrushDropShadow() {

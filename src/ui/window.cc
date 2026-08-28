@@ -202,8 +202,8 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			const f32 y = GetYFromLParam(lParam);
 			mouse.x = x;
 			mouse.y = y;
-			self->event.x = x;
-			self->event.y = y;
+			self->event.mouse.x = x;
+			self->event.mouse.y = y;
 			
 			if (nMSG == WM_LBUTTONDOWN) {
 				mouse.isDown = true;
@@ -228,8 +228,8 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN: {
 			self->event.type = Event::Type_KeyPress;
-			self->event.vkcode = wParam;
-			self->event.kmods = CollectKeyModifiers();
+			self->event.keypress.vkc = wParam;
+			self->event.keypress.mods = CollectKeyModifiers();
 			return 0L;
 		} break;
 
@@ -255,7 +255,7 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			// @FIXME we need to use the Unicode version of RegisterClass (RegisterClassW) in order to recieve utf16 chars
 			// the A-Variant just gives us characters in the current code-page
 			
-			if (!ToUtf8(std::wstring_view {&wch, 1u}, self->event.textData, &self->event.textLen)) {
+			if (!ToUtf8(std::wstring_view {&wch, 1u}, self->event.text.data, &self->event.text.len)) {
 				LogWarning("failed to convert input to utf-8");
 				return false;
 			}
@@ -276,8 +276,8 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			self->renderTarget->Resize(D2D_SIZE_U {uwidth, uheight});
 			
 			self->event.type = Event::Type_Resize;
-			self->event.newWidth = width;
-			self->event.newHeight = height;
+			self->event.newSize.w = width;
+			self->event.newSize.h = height;
 			return 0l;
 		} break;
 		

@@ -2,7 +2,6 @@
 #include "util/parameter.hh"
 
 #include <string_view>
-#include <span>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct Command {
@@ -92,7 +91,7 @@ struct Command {
 	};
 
 	Id id = Id_None;
-	ParameterValue* parameters = nullptr;
+	std::span<ParameterValue> parameters = {};
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

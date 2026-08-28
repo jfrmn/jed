@@ -344,39 +344,39 @@ void ParameterConfigurator::OnResize() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool ParameterConfigurator::HandleEvent(const Event& event, const Command& command) {
+bool ParameterConfigurator::HandleEvent(const Event& event) {
 	
 	ASSERT(selectedItem <= itemCount);
 	Item* item = selectedItem == itemCount ? nullptr : &items[selectedItem];	
 	
 	if (event.type == Event::Type_KeyPress) {
-		if (event.vkcode == VK_TAB && (event.kmods & (KM_Ctrl | KM_Alt)) == 0) {
-			selectedItem = (event.kmods & KM_Shift) != 0
+		if (event.keypress.vkc == VK_TAB && (event.keypress.mods & (KM_Ctrl | KM_Alt)) == 0) {
+			selectedItem = (event.keypress.mods & KM_Shift) != 0
 				? DecrementWrapAround(selectedItem, itemCount+1)
 				: IncrementWrapAround(selectedItem, itemCount+1);
 			isDropDownOpen = true;
 			return true;
 		
-		} else if ((event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
+		} else if ((event.keypress.vkc == VK_UP || event.keypress.vkc == VK_DOWN) && event.keypress.mods == KM_None) {
 			
 			// step through enum values
 			if (item && item->parameter->type == Parameter::Type_Enum && isDropDownOpen) {
 				ASSERT(!item->parameter->enumValues.empty())
 				
-				item->selectedEnumIndex = event.vkcode == VK_UP
+				item->selectedEnumIndex = event.keypress.vkc == VK_UP
 					? DecrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size())
 					: IncrementWrapAround(item->selectedEnumIndex, item->parameter->enumValues.size());
 			
 			// step through parameters
 			} else {
-				selectedItem = event.vkcode == VK_UP
+				selectedItem = event.keypress.vkc == VK_UP
 					? DecrementWrapAround(selectedItem, itemCount+1)
 					: IncrementWrapAround(selectedItem, itemCount+1);
 				isDropDownOpen = false;	
 			}
 			return true;
 		
-		} else if ((event.vkcode == VK_LEFT || event.vkcode == VK_RIGHT) && event.kmods == KM_None) {
+		} else if ((event.keypress.vkc == VK_LEFT || event.keypress.vkc == VK_RIGHT) && event.keypress.mods == KM_None) {
 			
 			// increment or decrement numbers
 			if (item && item->parameter->type == Parameter::Type_Number && !item->textBox.invalid) {
@@ -390,7 +390,7 @@ bool ParameterConfigurator::HandleEvent(const Event& event, const Command& comma
 					return true;
 				}
 				
-				number = (event.vkcode == VK_LEFT)
+				number = (event.keypress.vkc == VK_LEFT)
 					? std::max(number - 1, item->parameter->minValue)
 			    	: std::min(number + 1, item->parameter->maxValue);
 				
@@ -398,11 +398,11 @@ bool ParameterConfigurator::HandleEvent(const Event& event, const Command& comma
 			
 			// switch between run and cancel
 			} else if (!item) {
-				isCancelButtonSelected = (event.vkcode == VK_LEFT);
+				isCancelButtonSelected = (event.keypress.vkc == VK_LEFT);
 			}
 			return true;
 		
-		} else if (event.vkcode == VK_RETURN) {
+		} else if (event.keypress.vkc == VK_RETURN) {
 			if (isCancelButtonSelected)     result = Result_Cancel;
 			else if (CheckParameters(this)) result = Result_Run;
 			else                            result = Result_Unfinished;
@@ -412,7 +412,7 @@ bool ParameterConfigurator::HandleEvent(const Event& event, const Command& comma
 	} else if (event.type == Event::Type_Text) {
 		if (!item) return true;
 		
-		const bool isSpace = event.textLen == 1u && event.textData[0] == ' ';
+		const bool isSpace = event.text.len == 1u && event.text.data[0] == ' ';
 		if (!isSpace) return true;
 		
 		if (item->parameter->type == Parameter::Type_Bool) {
@@ -426,7 +426,7 @@ bool ParameterConfigurator::HandleEvent(const Event& event, const Command& comma
 	
 	// pass through to textbox
 	if (item && item->HasTextBox()) {
-		const auto [handled, changed] = item->textBox.HandleEvent(event, command);
+		const auto [handled, changed] = item->textBox.HandleEvent(event);
 		if (changed) {			
 			const std::string_view text = item->textBox.GetText();
 			

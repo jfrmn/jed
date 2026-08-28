@@ -21,7 +21,7 @@ struct EditorDiagnosticsList : public EditorToolWindow {
 	static EditorDiagnosticsList* Make(Editor* editor);
 	
 	virtual void Update() override;
-	virtual bool HandleEvent(const Event& event, const Command& command) override;
+	virtual bool HandleEvent(const Event& event) override;
 	
 	virtual bool IsDiagnosticsList() const override;
 };

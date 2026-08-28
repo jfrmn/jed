@@ -657,10 +657,10 @@ found_position:
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Basic
 
-static void CommandMoveCaret(TextController* self, ParameterValue* parameters) {
+static void CommandMoveCaret(TextController* self, std::span<ParameterValue> params) {
 	const TextPosition target {
-		.line = static_cast<u64>(parameters[0].numberValue),
-		.column = static_cast<u64>(parameters[1].numberValue)};
+		.line = static_cast<u64>(params[0].numberValue),
+		.column = static_cast<u64>(params[1].numberValue)};
 	
 	if (self->isEditCaretsMode) {
 		self->editCaretsPosition = target;
@@ -671,18 +671,18 @@ static void CommandMoveCaret(TextController* self, ParameterValue* parameters) {
 	}
 }
 
-static void CommandInsertText(TextController* self, ParameterValue* parameters, TextChange** outChange) {
-	InsertText(self, parameters->stringValue, outChange);
+static void CommandInsertText(TextController* self, std::span<ParameterValue> params, TextChange** outChange) {
+	InsertText(self, params.front().stringValue, outChange);
 	// @FIXME works only with text that does not contain any linebreaks
 }
 
-static void CommandDeleteRange(TextController* self, ParameterValue* parameters, TextChange** outChange) {
+static void CommandDeleteRange(TextController* self, std::span<ParameterValue> params, TextChange** outChange) {
 	const TextPosition from {
-		.line = static_cast<u64>(parameters[0].numberValue),
-		.column = static_cast<u64>(parameters[1].numberValue)};
+		.line = static_cast<u64>(params[0].numberValue),
+		.column = static_cast<u64>(params[1].numberValue)};
 	const TextPosition to {
-		.line = static_cast<u64>(parameters[2].numberValue),
-		.column = static_cast<u64>(parameters[3].numberValue)};
+		.line = static_cast<u64>(params[2].numberValue),
+		.column = static_cast<u64>(params[3].numberValue)};
 	
 	TextChange* change = *outChange = self->NewTextChange();
 	self->buffer.Remove(from, to, change->NewOperation());
@@ -761,9 +761,9 @@ static void CommandSelectWord(TextController* self) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Modification
 
-static void CommandRepeatText(TextController* self, ParameterValue* parameters, TextChange** change) {
-	const std::string_view textToRepeat = parameters[0].stringValue;
-	const u64 repeatCount = static_cast<u64>(parameters[1].numberValue);
+static void CommandRepeatText(TextController* self, std::span<ParameterValue> params, TextChange** change) {
+	const std::string_view textToRepeat = params[0].stringValue;
+	const u64 repeatCount = static_cast<u64>(params[1].numberValue);
 	
 	std::string textToInsert {};
 	textToInsert.reserve(repeatCount * textToRepeat.size());
@@ -773,10 +773,10 @@ static void CommandRepeatText(TextController* self, ParameterValue* parameters, 
 	InsertText(self, textToInsert, change);		
 }
 
-static void CommandTransformCase(TextController* self, ParameterValue* parameters, TextChange** change) {
+static void CommandTransformCase(TextController* self, std::span<ParameterValue> params, TextChange** change) {
 	
-	const s64 targetCase = parameters[0].numberValue;
-	const bool capitalizeFirstLetter = parameters[1].numberValue;
+	const s64 targetCase = params[0].numberValue;
+	const bool capitalizeFirstLetter = params[1].numberValue;
 	
 	for (TextController::Caret& caret : self->carets) {
 		TextPosition from, to;
@@ -1692,133 +1692,139 @@ static void CommandGotoNextCaret(TextController* self) {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool HandleEventEditMutiCursor(TextController* self, const Event& event, const Command& command, /*out*/ TextChange** change) {
+static bool HandleEventEditMutiCursor(TextController* self, const Event& event, /*out*/ TextChange** change) {
 	
 	if (event.type == Event::Type_Text) {
-		if (event.textLen == 1u && event.textData[0] == ' ') {
+		if (event.text.len == 1u && event.text.data[0] == ' ') {
 			self->ToggleCaret();
 		} else {
 			LeaveEditMultiCaretMode(self);
-			InsertText(self, event.GetText(), change);
+			InsertText(self, std::string_view {event.text.data, event.text.len}, change);
 		}
+		return true;
 	
 	} else if (event.type == Event::Type_KeyPress) {
-		if      (event.vkcode == VK_UP     && event.kmods == KM_None) MoveLineUp(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_None) MoveNextChar(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_DOWN   && event.kmods == KM_None) MoveLineDown(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_None) MovePrevChar(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_ESCAPE && event.kmods == KM_None) LeaveEditMultiCaretMode(self);
-		else if (event.vkcode == VK_RETURN && event.kmods == KM_None) self->ToggleCaret();
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_Ctrl) MoveToPrevWord(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_Ctrl) MoveToNextWord(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_None) MoveToLineStart(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_END    && event.kmods == KM_None) MoveToLineEnd(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_Ctrl) MoveToBufferStart(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Ctrl) MoveToBufferEnd(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_PRIOR  && event.kmods == KM_None) MovePageUp(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_NEXT   && event.kmods == KM_None) MovePageDown(self, &self->editCaretsPosition);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_Shift) ShiftCaret(self, MoveNextChar);
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_Shift) ShiftCaret(self, MovePrevChar);
-		else if (event.vkcode == VK_UP     && event.kmods == KM_Shift) ShiftCaret(self, MoveLineUp);
-		else if (event.vkcode == VK_DOWN   && event.kmods == KM_Shift) ShiftCaret(self, MoveLineDown);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToNextWord);
-		else if (event.vkcode == VK_LEFT   && event.kmods == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToPrevWord);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_Shift) ShiftCaret(self, MoveToLineStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Shift) ShiftCaret(self, MoveToLineEnd);
-		else if (event.vkcode == VK_HOME   && event.kmods == (KM_Shift | KM_Ctrl)) ShiftCaret(self, MoveToBufferStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Shift) ShiftCaret(self, MoveToBufferEnd);
-		else if (event.vkcode == VK_PRIOR  && event.kmods == KM_Shift) ShiftCaret(self, MovePageUp);
-		else if (event.vkcode == VK_NEXT   && event.kmods == KM_Shift) ShiftCaret(self, MovePageDown);
-	
-	} else {
-		if      (command.id == Command::Id_Text_MoveCaret)            CommandMoveCaret(self, command.parameters);
-		else if (command.id == Command::Id_MultiCaret_AddCaretAbove)  CommandGotoPrevCaret(self);
-		else if (command.id == Command::Id_MultiCaret_AddCaretBelow)  CommandGotoNextCaret(self);
-		else if (command.id == Command::Id_MultiCaret_ToggleEditMode) LeaveEditMultiCaretMode(self);
+		if      (event.keypress.vkc == VK_UP     && event.keypress.mods == KM_None) MoveLineUp(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_None) MoveNextChar(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_DOWN   && event.keypress.mods == KM_None) MoveLineDown(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_None) MovePrevChar(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_None) LeaveEditMultiCaretMode(self);
+		else if (event.keypress.vkc == VK_RETURN && event.keypress.mods == KM_None) self->ToggleCaret();
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_Ctrl) MoveToPrevWord(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_Ctrl) MoveToNextWord(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_None) MoveToLineStart(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_None) MoveToLineEnd(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_Ctrl) MoveToBufferStart(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Ctrl) MoveToBufferEnd(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_PRIOR  && event.keypress.mods == KM_None) MovePageUp(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_NEXT   && event.keypress.mods == KM_None) MovePageDown(self, &self->editCaretsPosition);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveNextChar);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_Shift) ShiftCaret(self, MovePrevChar);
+		else if (event.keypress.vkc == VK_UP     && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveLineUp);
+		else if (event.keypress.vkc == VK_DOWN   && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveLineDown);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToNextWord);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == (KM_Ctrl | KM_Shift)) ShiftCaret(self, MoveToPrevWord);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveToLineStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveToLineEnd);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == (KM_Shift | KM_Ctrl)) ShiftCaret(self, MoveToBufferStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) ShiftCaret(self, MoveToBufferEnd);
+		else if (event.keypress.vkc == VK_PRIOR  && event.keypress.mods == KM_Shift) ShiftCaret(self, MovePageUp);
+		else if (event.keypress.vkc == VK_NEXT   && event.keypress.mods == KM_Shift) ShiftCaret(self, MovePageDown);
 		else return false;
+		return true;
+	
+	} else if (event.type == Event::Type_Command) {
+		if      (event.cmd.id == Command::Id_Text_MoveCaret)            CommandMoveCaret(self, event.cmd.parameters);
+		else if (event.cmd.id == Command::Id_MultiCaret_AddCaretAbove)  CommandGotoPrevCaret(self);
+		else if (event.cmd.id == Command::Id_MultiCaret_AddCaretBelow)  CommandGotoNextCaret(self);
+		else if (event.cmd.id == Command::Id_MultiCaret_ToggleEditMode) LeaveEditMultiCaretMode(self);
+		else return false;
+		return true;
 	}
-	return true;
+	return false;
 }
 
-bool TextController::HandleEvent(const Event& event, const Command& command, /*out*/ TextChange** change) {
+bool TextController::HandleEvent(const Event& event, /*out*/ TextChange** change) {
 	ASSERT(!carets.empty());
 	
 	if (isEditCaretsMode) {
-		return HandleEventEditMutiCursor(this, event, command, change);
+		return HandleEventEditMutiCursor(this, event, change);
 
 	} else if (event.type == Event::Type_Text) {
-		InsertText(this, event.GetText(), change);
-		// always consume text events
+		InsertText(this, std::string_view {event.text.data, event.text.len}, change);
+		return true;
 	
 	} else if (event.type == Event::Type_KeyPress) {
-		if      (event.vkcode == VK_UP     && event.kmods == KM_None)  MoveCaret(this, MoveLineUp);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_None)  MoveCaret(this, MoveNextChar);
-		else if (event.vkcode == VK_DOWN   && event.kmods == KM_None)  MoveCaret(this, MoveLineDown);
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_None)  MoveCaret(this, MovePrevChar);
-		else if (event.vkcode == VK_RETURN && event.kmods == KM_None)  InsertNewLine(this, change);
-		else if (event.vkcode == VK_ESCAPE && event.kmods == KM_None)  ClearMultiCarets(this, true);
-		else if (event.vkcode == VK_ESCAPE && event.kmods == KM_Ctrl)  ClearMultiCarets(this, false);
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_Ctrl)  MoveCaret(this, MoveToPrevWord);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_Ctrl)  MoveCaret(this, MoveToNextWord);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_None)  MoveCaret(this, MoveToLineStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_None)  MoveCaret(this, MoveToLineEnd);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_Ctrl)  MoveCaret(this, MoveToBufferStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Ctrl)  MoveCaret(this, MoveToBufferEnd);
-		else if (event.vkcode == VK_PRIOR  && event.kmods == KM_None)  MoveCaret(this, MovePageUp);
-		else if (event.vkcode == VK_NEXT   && event.kmods == KM_None)  MoveCaret(this, MovePageDown);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == KM_Shift) Select(this, MoveNextChar);
-		else if (event.vkcode == VK_LEFT   && event.kmods == KM_Shift) Select(this, MovePrevChar);
-		else if (event.vkcode == VK_UP     && event.kmods == KM_Shift) Select(this, MoveLineUp);
-		else if (event.vkcode == VK_DOWN   && event.kmods == KM_Shift) Select(this, MoveLineDown);
-		else if (event.vkcode == VK_RIGHT  && event.kmods == (KM_Ctrl | KM_Shift)) Select(this, MoveToNextWord);
-		else if (event.vkcode == VK_LEFT   && event.kmods == (KM_Ctrl | KM_Shift)) Select(this, MoveToPrevWord);
-		else if (event.vkcode == VK_HOME   && event.kmods == KM_Shift) Select(this, MoveToLineStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Shift) Select(this, MoveToLineEnd);
-		else if (event.vkcode == VK_HOME   && event.kmods == (KM_Shift | KM_Ctrl)) Select(this, MoveToBufferStart);
-		else if (event.vkcode == VK_END    && event.kmods == KM_Shift) Select(this, MoveToBufferEnd);
-		else if (event.vkcode == VK_PRIOR  && event.kmods == KM_Shift) Select(this, MovePageUp);
-		else if (event.vkcode == VK_NEXT   && event.kmods == KM_Shift) Select(this, MovePageDown);
-		else if (event.vkcode == VK_BACK   && event.kmods == KM_None)  Delete(this, change, MovePrevChar);
-		else if (event.vkcode == VK_DELETE && event.kmods == KM_None)  Delete(this, change, MoveNextChar);
-		else if (event.vkcode == VK_BACK   && event.kmods == KM_Ctrl)  Delete(this, change, MoveToPrevWord);
-		else if (event.vkcode == VK_DELETE && event.kmods == KM_Ctrl)  Delete(this, change, MoveToNextWord);
-		// always consume keypresses
-	
-	} else {
-		if      (command.id == Command::Id_Text_MoveCaret)        CommandMoveCaret(this, command.parameters);
-		else if (command.id == Command::Id_Text_InsertText)       CommandInsertText(this, command.parameters, change);
-		else if (command.id == Command::Id_Text_DeleteRange)      CommandDeleteRange(this, command.parameters, change);
-		
-		else if (command.id == Command::Id_Text_SelectAll)        CommandSelectAll(this);
-		else if (command.id == Command::Id_Text_SelectLine)       CommandSelectLine(this);
-		else if (command.id == Command::Id_Text_SelectInBrackets) CommandSelectInBrackets(this);
-		else if (command.id == Command::Id_Text_SelectWord)       CommandSelectWord(this);
-		
-		else if (command.id == Command::Id_Text_RepeatText)       CommandRepeatText(this, command.parameters, change);
-		else if (command.id == Command::Id_Text_TransformCase)    CommandTransformCase(this, command.parameters, change);
-		else if (command.id == Command::Id_Text_ToUpperCase)      CommandToUpperOrLowerCase(this, change, std::toupper);
-		else if (command.id == Command::Id_Text_ToLowerCase)      CommandToUpperOrLowerCase(this, change, std::tolower);
-		
-		else if (command.id == Command::Id_Text_DeleteLine)       CommandDeleteLine(this, change);
-		else if (command.id == Command::Id_Text_IndentLine)       CommandIndentLine(this, change);
-		else if (command.id == Command::Id_Text_UnIndentLine)     CommandUnindentLine(this, change);
-		else if (command.id == Command::Id_Text_CommentLine)      return true; // @TODO
-		else if (command.id == Command::Id_Text_SwapLines)        CommandSwapLines(this, change);
-		else if (command.id == Command::Id_Text_DuplicateLine)    CommandDuplicateLine(this, change);
-		else if (command.id == Command::Id_Text_TrimTrailingWhitespace) CommandTrimTrailingWhitespace(this, change);
-		
-		else if (command.id == Command::Id_Text_Undo)             CommandUndo(this, change);
-		else if (command.id == Command::Id_Text_Redo)             CommandRedo(this, change);
-		
-		else if (command.id == Command::Id_Clipboard_Cut)         CommandCut(this, change);
-		else if (command.id == Command::Id_Clipboard_Copy)        CommandCopy(this, change);
-		else if (command.id == Command::Id_Clipboard_Paste)       CommandPaste(this, change);
-		else if (command.id == Command::Id_Clipboard_CutLines)    CommandCutLines(this, change);
-		
-		else if (command.id == Command::Id_MultiCaret_AddCaretAbove)  CommandAddCaretAbove(this);
-		else if (command.id == Command::Id_MultiCaret_AddCaretBelow)  CommandAddCaretBelow(this);
-		else if (command.id == Command::Id_MultiCaret_ToggleEditMode) EnterEditMultiCaretMode(this, true);
+		if      (event.keypress.vkc == VK_UP     && event.keypress.mods == KM_None)  MoveCaret(this, MoveLineUp);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_None)  MoveCaret(this, MoveNextChar);
+		else if (event.keypress.vkc == VK_DOWN   && event.keypress.mods == KM_None)  MoveCaret(this, MoveLineDown);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_None)  MoveCaret(this, MovePrevChar);
+		else if (event.keypress.vkc == VK_RETURN && event.keypress.mods == KM_None)  InsertNewLine(this, change);
+		else if (event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_None)  ClearMultiCarets(this, true);
+		else if (event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_Ctrl)  ClearMultiCarets(this, false);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_Ctrl)  MoveCaret(this, MoveToPrevWord);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_Ctrl)  MoveCaret(this, MoveToNextWord);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_None)  MoveCaret(this, MoveToLineStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_None)  MoveCaret(this, MoveToLineEnd);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_Ctrl)  MoveCaret(this, MoveToBufferStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Ctrl)  MoveCaret(this, MoveToBufferEnd);
+		else if (event.keypress.vkc == VK_PRIOR  && event.keypress.mods == KM_None)  MoveCaret(this, MovePageUp);
+		else if (event.keypress.vkc == VK_NEXT   && event.keypress.mods == KM_None)  MoveCaret(this, MovePageDown);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == KM_Shift) Select(this, MoveNextChar);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == KM_Shift) Select(this, MovePrevChar);
+		else if (event.keypress.vkc == VK_UP     && event.keypress.mods == KM_Shift) Select(this, MoveLineUp);
+		else if (event.keypress.vkc == VK_DOWN   && event.keypress.mods == KM_Shift) Select(this, MoveLineDown);
+		else if (event.keypress.vkc == VK_RIGHT  && event.keypress.mods == (KM_Ctrl | KM_Shift)) Select(this, MoveToNextWord);
+		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == (KM_Ctrl | KM_Shift)) Select(this, MoveToPrevWord);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_Shift) Select(this, MoveToLineStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) Select(this, MoveToLineEnd);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == (KM_Shift | KM_Ctrl)) Select(this, MoveToBufferStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) Select(this, MoveToBufferEnd);
+		else if (event.keypress.vkc == VK_PRIOR  && event.keypress.mods == KM_Shift) Select(this, MovePageUp);
+		else if (event.keypress.vkc == VK_NEXT   && event.keypress.mods == KM_Shift) Select(this, MovePageDown);
+		else if (event.keypress.vkc == VK_BACK   && event.keypress.mods == KM_None)  Delete(this, change, MovePrevChar);
+		else if (event.keypress.vkc == VK_DELETE && event.keypress.mods == KM_None)  Delete(this, change, MoveNextChar);
+		else if (event.keypress.vkc == VK_BACK   && event.keypress.mods == KM_Ctrl)  Delete(this, change, MoveToPrevWord);
+		else if (event.keypress.vkc == VK_DELETE && event.keypress.mods == KM_Ctrl)  Delete(this, change, MoveToNextWord);
 		else return false;
+		return true;
+	
+	} else if (event.type == Event::Type_Command) {
+		if      (event.cmd.id == Command::Id_Text_MoveCaret)        CommandMoveCaret(this, event.cmd.parameters);
+		else if (event.cmd.id == Command::Id_Text_InsertText)       CommandInsertText(this, event.cmd.parameters, change);
+		else if (event.cmd.id == Command::Id_Text_DeleteRange)      CommandDeleteRange(this, event.cmd.parameters, change);
+		
+		else if (event.cmd.id == Command::Id_Text_SelectAll)        CommandSelectAll(this);
+		else if (event.cmd.id == Command::Id_Text_SelectLine)       CommandSelectLine(this);
+		else if (event.cmd.id == Command::Id_Text_SelectInBrackets) CommandSelectInBrackets(this);
+		else if (event.cmd.id == Command::Id_Text_SelectWord)       CommandSelectWord(this);
+		
+		else if (event.cmd.id == Command::Id_Text_RepeatText)       CommandRepeatText(this, event.cmd.parameters, change);
+		else if (event.cmd.id == Command::Id_Text_TransformCase)    CommandTransformCase(this, event.cmd.parameters, change);
+		else if (event.cmd.id == Command::Id_Text_ToUpperCase)      CommandToUpperOrLowerCase(this, change, std::toupper);
+		else if (event.cmd.id == Command::Id_Text_ToLowerCase)      CommandToUpperOrLowerCase(this, change, std::tolower);
+		
+		else if (event.cmd.id == Command::Id_Text_DeleteLine)       CommandDeleteLine(this, change);
+		else if (event.cmd.id == Command::Id_Text_IndentLine)       CommandIndentLine(this, change);
+		else if (event.cmd.id == Command::Id_Text_UnIndentLine)     CommandUnindentLine(this, change);
+		else if (event.cmd.id == Command::Id_Text_CommentLine)      return true; // @TODO
+		else if (event.cmd.id == Command::Id_Text_SwapLines)        CommandSwapLines(this, change);
+		else if (event.cmd.id == Command::Id_Text_DuplicateLine)    CommandDuplicateLine(this, change);
+		else if (event.cmd.id == Command::Id_Text_TrimTrailingWhitespace) CommandTrimTrailingWhitespace(this, change);
+		
+		else if (event.cmd.id == Command::Id_Text_Undo)             CommandUndo(this, change);
+		else if (event.cmd.id == Command::Id_Text_Redo)             CommandRedo(this, change);
+		
+		else if (event.cmd.id == Command::Id_Clipboard_Cut)         CommandCut(this, change);
+		else if (event.cmd.id == Command::Id_Clipboard_Copy)        CommandCopy(this, change);
+		else if (event.cmd.id == Command::Id_Clipboard_Paste)       CommandPaste(this, change);
+		else if (event.cmd.id == Command::Id_Clipboard_CutLines)    CommandCutLines(this, change);
+		
+		else if (event.cmd.id == Command::Id_MultiCaret_AddCaretAbove)  CommandAddCaretAbove(this);
+		else if (event.cmd.id == Command::Id_MultiCaret_AddCaretBelow)  CommandAddCaretBelow(this);
+		else if (event.cmd.id == Command::Id_MultiCaret_ToggleEditMode) EnterEditMultiCaretMode(this, true);
+		else return false;
+		return true;
 	}
-	return true;
+	return false;
 }

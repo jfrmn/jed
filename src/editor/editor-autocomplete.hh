@@ -79,7 +79,7 @@ struct EditorAutocomplete : public EditorCaretAttached  {
 	
 	virtual void Update() override;
 	virtual void OnInput() override;
-	virtual bool HandleEvent(const Event& event, const Command& command) override;
+	virtual bool HandleEvent(const Event& event) override;
 	
 	virtual ~EditorAutocomplete() noexcept;
 };

@@ -88,17 +88,17 @@ void EditorSelectGotoType::Update() {
 	}			
 }
 
-bool EditorSelectGotoType::HandleEvent(const Event& event, const Command& command) {
+bool EditorSelectGotoType::HandleEvent(const Event& event) {
 
-	if (event.type == Event::Type_KeyPress && (event.vkcode == VK_DOWN || event.vkcode == VK_UP) && event.kmods == KM_None) {
+	if (event.type == Event::Type_KeyPress && (event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP) && event.keypress.mods == KM_None) {
 		
-		selectedItem = event.vkcode == VK_DOWN ?
+		selectedItem = event.keypress.vkc == VK_DOWN ?
 			IncrementWrapAround(selectedItem, static_cast<u64>(ITEM_COUNT)):
 			DecrementWrapAround(selectedItem, static_cast<u64>(ITEM_COUNT));
 		
 		return true;
 	
-	} else if ((event.vkcode == VK_RETURN) && event.kmods == KM_None) {
+	} else if ((event.keypress.vkc == VK_RETURN) && event.keypress.mods == KM_None) {
 		if (!owner->language) return true;
 		
 		ASSERT(selectedItem >= 0u && selectedItem < ITEM_COUNT);

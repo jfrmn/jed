@@ -4,7 +4,7 @@
 #include <string>
 
 struct Event;
-struct Command;
+
 struct Editor;
 struct D2D_POINT_2F;
 struct ID2D1DeviceContext;
@@ -48,7 +48,7 @@ struct EditorCaretAttached {
 	
 	virtual void Update() = 0;
 	virtual void OnInput() = 0;
-	virtual bool HandleEvent(const Event& event, const Command& command) = 0;
+	virtual bool HandleEvent(const Event& event) = 0;
 		
 	virtual ~EditorCaretAttached() noexcept {} 
 };

@@ -47,5 +47,5 @@ struct ParameterConfigurator {
 	void Update();
 	void OnResize();
 	
-	bool HandleEvent(const Event& event, const Command& command);
+	bool HandleEvent(const Event& event);
 };

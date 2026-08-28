@@ -217,21 +217,19 @@ void EditorDiagnosticsList::Update() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool EditorDiagnosticsList::HandleEvent(const Event& event, const Command& command) {
-	if (event.type == Event::Type_KeyPress && (event.vkcode == VK_UP || event.vkcode == VK_DOWN) && event.kmods == KM_None) {
-		
-		selectedItem = event.vkcode == VK_DOWN
-			? IncrementWrapAround(selectedItem, itemCount)
-			: DecrementWrapAround(selectedItem, itemCount);
-			
-		return true;
+bool EditorDiagnosticsList::HandleEvent(const Event& event) {
+	if (event.type == Event::Type_KeyPress) {
+		if ((event.keypress.vkc == VK_UP || event.keypress.vkc == VK_DOWN) && event.keypress.mods == KM_None) {
+			selectedItem = event.keypress.vkc == VK_DOWN
+				? IncrementWrapAround(selectedItem, itemCount)
+				: DecrementWrapAround(selectedItem, itemCount);
+				
+			return true;
 	
-	} else if (event.vkcode == VK_RETURN) {
-		ActionGotoItem(this, selectedItem, (event.kmods & KM_Ctrl) != 0);
-		return true;
-	
-	} else if (command.Id_Editor_OpenDiagnosticsList) {
-		
+		} else if (event.keypress.vkc == VK_RETURN) {
+			ActionGotoItem(this, selectedItem, (event.keypress.mods & KM_Ctrl) != 0);
+			return true;
+		}
 	}
 	
 	return false;	

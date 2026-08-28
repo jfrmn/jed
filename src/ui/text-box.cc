@@ -124,12 +124,12 @@ void TextBox::ClearText() {
 	textController.Reset();
 }
 
-TextBox::HandleEventResult TextBox::HandleEvent(const Event& event, const Command& command) {
+TextBox::HandleEventResult TextBox::HandleEvent(const Event& event) {
 	
-	if (event.type == Event::Type_KeyPress && event.vkcode == VK_RETURN)
+	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_RETURN)
 		return HandleEventResult {.handled = true, .changed = false};
 	
 	TextChange* change = nullptr;
-	const bool handled = textController.HandleEvent(event, command, &change);
+	const bool handled = textController.HandleEvent(event, &change);
 	return HandleEventResult {.handled = handled, .changed = change != nullptr};
 }
