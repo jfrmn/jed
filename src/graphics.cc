@@ -26,22 +26,22 @@ bool InitFactories() {
 	options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 	
 	if (auto hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, options, &d2dFactory); hr != S_OK) {
-		LogError("D2D1CreateFactory() failed. HRESULT: %", StrHr(hr));
+		LogError("D2D1CreateFactory() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&dwFactory); hr != S_OK) {
-		LogError("DWriteCreateFactory() failed. HRESULT: %", StrHr(hr));
+		LogError("DWriteCreateFactory() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = CoInitialize(NULL); hr != S_OK) {
-		LogError("CoInitialize() failed. HRESULT: %", StrHr(hr));
+		LogError("CoInitialize() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
 	if (auto hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wicFactory)); hr != S_OK) {
-		LogError("Failed to create wicFactory! HRESULT: %", StrHr(hr));
+		LogError("Failed to create wicFactory! HRESULT: %s", StrHr(hr));
 		return false;
 	}
 

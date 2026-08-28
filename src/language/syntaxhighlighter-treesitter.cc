@@ -158,7 +158,7 @@ void SyntaxHighlighterTreeSitter::OnCloseFile(Editor* editor) {
 static TSPoint ToTsPoint(TextPosition pt) {
 	return TSPoint {
 		.row    = static_cast<u32>(pt.line),
-		.column = static_cast<u32>(pt.column)};
+		.column = static_cast<u32>(pt.character)};
 }
 
 static const char* Str(const TSInputEdit& input) {
@@ -192,7 +192,7 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 			const TextBuffer::Line& line = buffer.GetLineAt(i);
 			startLineByte += line.LengthWithLinebreak();
 		}
-		const u64 startByte = startLineByte + operation.start.column;
+		const u64 startByte = startLineByte + operation.start.character;
 		
 		if (!operation.insertedText.empty()) {
 			

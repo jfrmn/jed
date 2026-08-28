@@ -608,7 +608,7 @@ void App::Update() {
 						
 						// draw caret
 						{
-							const f32 offsetX = PADDING + tab.editor->glyphRuns[caret.line].MeasureOffset(caret.column);
+							const f32 offsetX = PADDING + tab.editor->glyphRuns[caret.line].MeasureOffset(caret.character);
 							const f32 offsetY = GetYOffsetForLine(caret.line);
 							
 							deviceContext->DrawRectangle(

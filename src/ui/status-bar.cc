@@ -509,13 +509,13 @@ static void GetCaretInfoTextNormal(StatusBar* self, const TextController& contro
 		u64 selectedLines = 0u;
 		
 		if (from.line == to.line) {
-			selectedBytes = (to.column - from.column);
+			selectedBytes = (to.character - from.character);
 			selectedLines = 1u;
 		} else {
-			selectedBytes = controller.buffer.GetLineAt(from.line).LengthWithLinebreak() - from.column;
+			selectedBytes = controller.buffer.GetLineAt(from.line).LengthWithLinebreak() - from.character;
 			for (u64 ln = from.line + 1u; ln < to.line; ln++)
 				selectedBytes += controller.buffer.GetLineAt(ln).LengthWithLinebreak();
-			selectedBytes += to.column;
+			selectedBytes += to.character;
 			
 			selectedLines = (to.line - from.line) + 1;
 		}
@@ -539,7 +539,7 @@ static void GetCaretInfoTextNormal(StatusBar* self, const TextController& contro
 	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
 	
 	AppendWithColor(info, " Char ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.column);
+	AppendNumber(numberBuffer, info, controller.carets.front().position.character);
 	
 }
 
@@ -569,7 +569,7 @@ static void GetCaretInfoTextEditCarets(StatusBar* self, const TextController& co
 	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
 	
 	AppendWithColor(info, " Char ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.column);
+	AppendNumber(numberBuffer, info, controller.carets.front().position.character);
 }
 
 

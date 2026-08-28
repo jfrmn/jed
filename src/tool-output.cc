@@ -1120,7 +1120,7 @@ static void ParseChunk(ToolOutput* self, std::string_view data) {
 				
 				styleChange.position = TextPosition {
 					.line = self->lines.size() - 1u,
-					.column = line->size()};
+					.character = line->size()};
 				
 				self->styleChanges.push_back(styleChange);
 				i = endOfEscSequence;

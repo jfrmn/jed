@@ -62,7 +62,7 @@ bool TextController::InitForTextbox(std::string initialText) {
 	carets.push_back(Caret {
 		.position = TextPosition { 
 			.line = 0u,
-			.column = initialText.size()},
+			.character = initialText.size()},
 		.selection = TextPosition {},
 		.hasSelection = false});
 
@@ -193,7 +193,7 @@ static u64 GetVisualColumn(TextController* self, const TextPosition* point) {
 	u64 visualColumn = 0u;
 	
 	const TextBuffer::Line& line = self->buffer.GetLineAt(point->line);
-	for (u64 i = 0u; i < point->column; i++) {
+	for (u64 i = 0u; i < point->character; i++) {
 		
 		const char ch = line.data[i];
 		
@@ -238,7 +238,7 @@ static void MoveToVisualColumn(TextController* self, TextPosition* point, u64 ta
 	}
 
 	ASSERT(i <= line.length);
-	point->column = i;
+	point->character = i;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -265,7 +265,7 @@ static void AdjustFollowingCarets(TextController* self, u64 currentCaretIndex, c
 static void MovePrevChar(TextController* self, TextPosition* position) {
 
 	// wrap around line start
-	if (position->column == 0u) {
+	if (position->character == 0u) {
 
 		// respect buffer start
 		if (position->line == 0u) {
@@ -274,46 +274,46 @@ static void MovePrevChar(TextController* self, TextPosition* position) {
 
 		// set codepoint to line end
 		position->line--;
-		position->column = self->buffer.GetLineAt(position->line).length;
+		position->character = self->buffer.GetLineAt(position->line).length;
 
 	} else {
 
 		const TextBuffer::Line& line = self->buffer.GetLineAt(position->line);
-		position->column--;
+		position->character--;
 
-		while (IsMultibyteCodepointMember(line.data[position->column]))
-			position->column--;
+		while (IsMultibyteCodepointMember(line.data[position->character]))
+			position->character--;
 	}
 }
 
 static void MoveNextChar(TextController* self, TextPosition* position) {
 
 	// wrap around line ending
-	if (position->column == self->buffer.GetLineAt(position->line).length) {
+	if (position->character == self->buffer.GetLineAt(position->line).length) {
 		
 		// respect buffer end
 		if (position->line  == self->buffer.GetMaxLine()) {
-			position->column = self->buffer.lines.back().length;
+			position->character = self->buffer.lines.back().length;
 			return;
 		}
 
 		position->line++;
-		position->column = 0;
+		position->character = 0;
 	
 	} else {
 	
 		const TextBuffer::Line &line = self->buffer.GetLineAt(position->line);
-		position->column++;
+		position->character++;
 
-		while (IsMultibyteCodepointMember(line.data[position->column]))
-			position->column++;
+		while (IsMultibyteCodepointMember(line.data[position->character]))
+			position->character++;
 	}
 }
 
 static void MoveLineUp(TextController* self, TextPosition* position) {
 	
 	if (position->line == 0u) {
-		position->column = 0u;
+		position->character = 0u;
 		return;
 	}
 	const u64 visualColumn = GetVisualColumn(self, position);
@@ -324,7 +324,7 @@ static void MoveLineUp(TextController* self, TextPosition* position) {
 static void MoveLineDown(TextController* self, TextPosition* position) {
 
 	if (position->line == self->buffer.GetMaxLine()) {
-		position->column = self->buffer.GetLineAt(position->line).length;
+		position->character = self->buffer.GetLineAt(position->line).length;
 		return;
 	}
 
@@ -337,19 +337,19 @@ static void MoveToNextWord(TextController* self, TextPosition* position) {
 
 	const TextBuffer::Line& line = self->buffer.GetLineAt(position->line);
 
-	if (position->column == line.length) {
+	if (position->character == line.length) {
 		
 		if (position->line != self->buffer.GetMaxLine()) {
 			position->line++;	
-			position->column = 0u;	
+			position->character = 0u;	
 		} else {
-			position->column = line.length;
+			position->character = line.length;
 		}
 
 		return;
 	}
 
-	char currentChar = line.data[position->column];
+	char currentChar = line.data[position->character];
 	const int wasAlphaNumeric = std::isalnum(currentChar);
 
 	// @FIXME does not respect multibyte-codepoints
@@ -357,23 +357,23 @@ static void MoveToNextWord(TextController* self, TextPosition* position) {
 	while (std::isalnum(currentChar) == wasAlphaNumeric
 		|| IsMultibyteCodepointMember(currentChar)) {
 
-		position->column++;
-		if (position->column == line.length)
+		position->character++;
+		if (position->character == line.length)
 			return;
 
-		currentChar = line.data[position->column];
+		currentChar = line.data[position->character];
 	}
 }
 
 static void MoveToPrevWord(TextController* self, TextPosition* position) {
 
-	if (position->column == 0u) {
+	if (position->character == 0u) {
 		
 		if (position->line != 0u) {
 			position->line--;
-			position->column = self->buffer.GetLineAt(position->line).length;
+			position->character = self->buffer.GetLineAt(position->line).length;
 		} else {
-			position->column = 0u;
+			position->character = 0u;
 		}
 
 		return;
@@ -381,7 +381,7 @@ static void MoveToPrevWord(TextController* self, TextPosition* position) {
 
 	const TextBuffer::Line &line = self->buffer.GetLineAt(position->line);
 
-	u64 prevColumn = position->column - 1;
+	u64 prevColumn = position->character - 1;
 	char prevChar = line.data[prevColumn];
 
 	const int wasAlphaNumeric = std::isalnum(prevChar);
@@ -390,12 +390,12 @@ static void MoveToPrevWord(TextController* self, TextPosition* position) {
 		|| IsMultibyteCodepointMember(prevChar)) {
 		
 		if (prevColumn == 0u) {
-			position->column = 0u;
+			position->character = 0u;
 			return;
 		}
 
-		position->column = prevColumn;
-		prevColumn = position->column - 1;
+		position->character = prevColumn;
+		prevColumn = position->character - 1;
 		prevChar = line.data[prevColumn];
 	}
 }
@@ -403,13 +403,13 @@ static void MoveToPrevWord(TextController* self, TextPosition* position) {
 static void MoveToLineStart(TextController* self, TextPosition* position) {
 
 	const u64 col = GetIndentationEnd(self, position->line);
-	position->column = col;
+	position->character = col;
 }
 
 static void MoveToLineEnd(TextController* self, TextPosition* position) {
 
 	const TextBuffer::Line &line = self->buffer.GetLineAt(position->line);
-	position->column = line.length;
+	position->character = line.length;
 }
 
 static void MoveToBufferStart(TextController* self, TextPosition* position) {
@@ -443,7 +443,7 @@ static void MovePageUp(TextController* self, TextPosition* position) {
 		
 		*position = TextPosition {
 			.line = firstVisibleLine,
-			.column = GetIndentationEnd(self, firstVisibleLine) };
+			.character = GetIndentationEnd(self, firstVisibleLine) };
 			
 		self->ownerEditor->ScrollToLine(firstVisibleLine);
 			
@@ -468,7 +468,7 @@ static void MovePageDown(TextController* self, TextPosition* position) {
 		
 		*position = TextPosition {
 			.line = lastVisibleLine,
-			.column = GetIndentationEnd(self, lastVisibleLine) };
+			.character = GetIndentationEnd(self, lastVisibleLine) };
 			
 		self->ownerEditor->ScrollToLine(lastVisibleLine);
 			
@@ -591,7 +591,7 @@ static void InsertNewLine(TextController* self, TextChange** outChange) {
 		{
 			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
 			
-			const u64 maxColumn = std::min(line.length, caret.position.column);
+			const u64 maxColumn = std::min(line.length, caret.position.character);
 			for (u64 i = 0u; i < maxColumn; i++) {
 				
 				const char ch = line.data[i];
@@ -660,7 +660,7 @@ found_position:
 static void CommandMoveCaret(TextController* self, std::span<ParameterValue> params) {
 	const TextPosition target {
 		.line = static_cast<u64>(params[0].numberValue),
-		.column = static_cast<u64>(params[1].numberValue)};
+		.character = static_cast<u64>(params[1].numberValue)};
 	
 	if (self->isEditCaretsMode) {
 		self->editCaretsPosition = target;
@@ -679,10 +679,10 @@ static void CommandInsertText(TextController* self, std::span<ParameterValue> pa
 static void CommandDeleteRange(TextController* self, std::span<ParameterValue> params, TextChange** outChange) {
 	const TextPosition from {
 		.line = static_cast<u64>(params[0].numberValue),
-		.column = static_cast<u64>(params[1].numberValue)};
+		.character = static_cast<u64>(params[1].numberValue)};
 	const TextPosition to {
 		.line = static_cast<u64>(params[2].numberValue),
-		.column = static_cast<u64>(params[3].numberValue)};
+		.character = static_cast<u64>(params[3].numberValue)};
 	
 	TextChange* change = *outChange = self->NewTextChange();
 	self->buffer.Remove(from, to, change->NewOperation());
@@ -710,7 +710,7 @@ static void CommandSelectLine(TextController* self) {
 		caret.hasSelection = true;
 		caret.selection = TextPosition {
 			.line = caret.position.line,
-			.column = GetIndentationEnd(self, caret.position.line)};
+			.character = GetIndentationEnd(self, caret.position.line)};
 		MoveToLineEnd(self, &caret.position);
 	}
 }
@@ -719,7 +719,7 @@ static void CommandSelectInBrackets(TextController* self) {
 	for (TextController::Caret& caret : self->carets) {
 		
 		const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
-		s64 start = static_cast<s64>(caret.position.column);
+		s64 start = static_cast<s64>(caret.position.character);
 		char bracket = '\0';
 		for (; start >= 0u; start--) {
 			if (line.data[start] == '(' || line.data[start] == '{' || line.data[start] == '[') {
@@ -733,7 +733,7 @@ static void CommandSelectInBrackets(TextController* self) {
 		start++;
 		ASSERT(start >= 0u);
 		
-		u64 end = caret.position.column;
+		u64 end = caret.position.character;
 		for (; end < line.length; end++) {
 			if (bracket == '\0' && (line.data[end] == ')' || line.data[end] == '}' || line.data[end] == ']')) break;
 			else if (bracket == '(' && line.data[end] == ')') break;
@@ -742,9 +742,9 @@ static void CommandSelectInBrackets(TextController* self) {
 		}
 		
 		caret.hasSelection = true;
-		caret.selection.column = start;
+		caret.selection.character = start;
 		caret.selection.line = caret.position.line;
-		caret.position.column = end;		
+		caret.position.character = end;		
 	}
 }
 
@@ -848,7 +848,7 @@ static void CommandDeleteLine(TextController* self, TextChange** outChange) {
 		
 		self->buffer.RemoveChunk(lineFrom, lineTo, change->NewOperation());
 	
-		caret.position.column = GetIndentationEnd(self, lineFrom);
+		caret.position.character = GetIndentationEnd(self, lineFrom);
 		caret.ResetSelection();
 	}
 }
@@ -872,13 +872,13 @@ static void CommandIndentLine(TextController* self, TextChange** outChange) {
 				self->buffer.InsertInLine(
 					TextPosition {
 						.line = ln,
-						.column = GetIndentationEnd(self, ln) },
+						.character = GetIndentationEnd(self, ln) },
 					"\t",
 					change->NewOperation());
 			}
 					
-			caret.position.column++;
-			caret.selection.column++;		
+			caret.position.character++;
+			caret.selection.character++;		
 		
 		} else {
 		
@@ -886,11 +886,11 @@ static void CommandIndentLine(TextController* self, TextChange** outChange) {
 			self->buffer.InsertInLine(
 				TextPosition {
 					.line = caret.position.line,
-					.column = GetIndentationEnd(self, caret.position.line) },
+					.character = GetIndentationEnd(self, caret.position.line) },
 				"\t",
 				change->NewOperation());
 				
-			caret.position.column++;
+			caret.position.character++;
 		}
 	}
 }
@@ -921,11 +921,11 @@ static void UnindentLine(TextController* self, TextController::Caret& caret, Tex
 	
 	// adjust cursor
 	if (caret.position.line == ln)
-		caret.position.column = caret.position.column - std::min(charsToRemove, caret.position.column);
+		caret.position.character = caret.position.character - std::min(charsToRemove, caret.position.character);
 				
 	// adjust selection (if needed)
 	if (caret.hasSelection && caret.selection.line == ln)
-		caret.selection.column = caret.selection.column - std::min(charsToRemove, caret.selection.column);
+		caret.selection.character = caret.selection.character - std::min(charsToRemove, caret.selection.character);
 }
 
 static void CommandUnindentLine(TextController* self, TextChange** outChange) {
@@ -1147,23 +1147,23 @@ static void CommandLineComment(TextController* self, TextChange** outChange) {
 				self->buffer.InsertInLine(
 					TextPosition {
 						.line = ln,
-						.column = indentation},
+						.character = indentation},
 					language->lineComment,
 					change->NewOperation());
 			}
 			
-			caret.position.column += language->lineComment.size();
-			caret.selection.column += language->lineComment.size();
+			caret.position.character += language->lineComment.size();
+			caret.selection.character += language->lineComment.size();
 			
 		} else {
 			self->buffer.InsertInLine(
 				TextPosition {
 					.line = caret.position.line,
-					.column = GetIndentationEnd(self, caret.position.line)},
+					.character = GetIndentationEnd(self, caret.position.line)},
 				language->lineComment,
 			change->NewOperation());
 			
-			caret.position.column += language->lineComment.size();
+			caret.position.character += language->lineComment.size();
 		}
 	}
 }
@@ -1190,9 +1190,9 @@ static void CommandUnLineComment(TextController* self, TextChange** change) {
 				self->buffer.RemoveInLine(ln, pos, pos + language->lineComment.size(), (*change)->NewOperation());
 				
 				if (caret.position.line == ln)
-					caret.position.column -= language->lineComment.size();
+					caret.position.character -= language->lineComment.size();
 				if (caret.selection.line == ln)
-					caret.selection.column -= language->lineComment.size();
+					caret.selection.character -= language->lineComment.size();
 			}	
 		} else {
 			const TextBuffer::Line& line = self->buffer.GetLineAt(caret.position.line);
@@ -1202,7 +1202,7 @@ static void CommandUnLineComment(TextController* self, TextChange** change) {
 			if (!(*change))
 			 	(*change) = self->NewTextChange();
 			self->buffer.RemoveInLine(caret.position.line, pos, pos + language->lineComment.size(), (*change)->NewOperation());
-			caret.position.column -= language->lineComment.size();	
+			caret.position.character -= language->lineComment.size();	
 		}
 	}
 }
@@ -1235,26 +1235,26 @@ static void CommandBlockComment(TextController* self, TextChange** outChange) {
 			self->buffer.InsertInLine(*end,   language->blockComment[1], change->NewOperation());
 			
 			if (end->line == start->line)
-				end->column += language->blockComment[0].size();
-			end->column += language->blockComment[1].size();
+				end->character += language->blockComment[0].size();
+			end->character += language->blockComment[1].size();
 		
 		} else {
 				
 			self->buffer.InsertInLine(
 				TextPosition {
 					.line   = caret.position.line,
-					.column = GetIndentationEnd(self, caret.position.line)},
+					.character = GetIndentationEnd(self, caret.position.line)},
 				language->blockComment[0],
 			change->NewOperation());
 				
 			self->buffer.InsertInLine(
 				TextPosition {
 					.line   = caret.position.line,
-					.column = self->buffer.GetLineAt(caret.position.line).length},
+					.character = self->buffer.GetLineAt(caret.position.line).length},
 				language->blockComment[1],
 			change->NewOperation());
 			
-			caret.position.column += language->blockComment[0].size();
+			caret.position.character += language->blockComment[0].size();
 		}
 	}
 }
@@ -1281,11 +1281,11 @@ static void CommandUnBlockComment(TextController* self, TextChange** change) {
 			}
 			
 			const TextBuffer::Line& startLine = self->buffer.GetLineAt(start->line);
-			const usize posStart = startLine.GetText().find(language->blockComment[0], start->column);
+			const usize posStart = startLine.GetText().find(language->blockComment[0], start->character);
 			if (posStart == std::string_view::npos) return;
 			
 			const TextBuffer::Line& endLine = self->buffer.GetLineAt(end->line);
-			const usize posEnd = endLine.GetText().rfind(language->blockComment[1], end->column);
+			const usize posEnd = endLine.GetText().rfind(language->blockComment[1], end->character);
 			if (posEnd == std::string_view::npos) return;
 			
 			if (!(*change)) {
@@ -1297,17 +1297,17 @@ static void CommandUnBlockComment(TextController* self, TextChange** change) {
 			self->buffer.RemoveInLine(start->line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
 			
 			if (end->line == start->line)
-				end->column += language->blockComment[0].size();
-			end->column -= language->blockComment[1].size();
+				end->character += language->blockComment[0].size();
+			end->character -= language->blockComment[1].size();
 			
 		} else {
 			
 			const std::string_view line = self->buffer.GetLineAt(caret.position.line).GetText();
 			
-			const usize posStart = line.rfind(language->blockComment[0], caret.position.column);
+			const usize posStart = line.rfind(language->blockComment[0], caret.position.character);
 			if (posStart == std::string_view::npos) return;
 			
-			const usize posEnd = line.find(language->blockComment[1], caret.position.column);
+			const usize posEnd = line.find(language->blockComment[1], caret.position.character);
 			if (posEnd == std::string_view::npos) return;
 			
 			if (!(*change)) {
@@ -1318,7 +1318,7 @@ static void CommandUnBlockComment(TextController* self, TextChange** change) {
 			self->buffer.RemoveInLine(caret.position.line, posEnd,   posEnd   + language->blockComment[1].size(), (*change)->NewOperation());
 			self->buffer.RemoveInLine(caret.position.line, posStart, posStart + language->blockComment[0].size(), (*change)->NewOperation());
 			
-			caret.position.column -= language->blockComment[0].size();
+			caret.position.character -= language->blockComment[0].size();
 		}
 	}
 }
@@ -1459,11 +1459,11 @@ static void CommandCut(TextController* self, TextChange** outChange) {
 	
 			from = TextPosition {
 				.line = caret.position.line,
-				.column = GetIndentationEnd(self, caret.position.line) };
+				.character = GetIndentationEnd(self, caret.position.line) };
 	
 			to = TextPosition {
 				.line = caret.position.line,
-				.column = self->buffer.GetLineAt(caret.position.line).length };
+				.character = self->buffer.GetLineAt(caret.position.line).length };
 		}
 		
 		TextChange* change = *outChange = self->NewTextChange();
@@ -1494,11 +1494,11 @@ static void CommandCopy(TextController* self, TextChange** pchange) {
 			
 			from = TextPosition {
 				.line = caret.position.line,
-				.column = GetIndentationEnd(self, caret.position.line) };
+				.character = GetIndentationEnd(self, caret.position.line) };
 	
 			to = TextPosition {
 				.line = caret.position.line,
-				.column = self->buffer.GetLineAt(caret.position.line).length };
+				.character = self->buffer.GetLineAt(caret.position.line).length };
 		}
 	
 		std::string text = self->buffer.GetText(from, to);	

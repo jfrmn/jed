@@ -181,22 +181,22 @@ bool FilePreview::Load(const LoadArgs& args) {
 		
 		const TextPosition minPos {
 			.line = from,
-			.column = 0u};
+			.character = 0u};
 			
 		const TextPosition maxPos {
 			.line = to,
-			.column = textBuffer.GetLineAt(to).length};
+			.character = textBuffer.GetLineAt(to).length};
 		
 		TextPosition clampedSelectionFrom = std::clamp(args.selectionFrom, minPos, maxPos);
 		TextPosition clampedSelectionTo = std::clamp(args.selectionTo, minPos, maxPos);
 		
 		this->selectionFrom = TextPosition {
 			.line = to - clampedSelectionFrom.line,
-			.column = clampedSelectionFrom.column};
+			.character = clampedSelectionFrom.character};
 		
 		this->selectionTo = TextPosition {
 			.line = to - clampedSelectionTo.line,
-			.column = clampedSelectionTo.column};
+			.character = clampedSelectionTo.character};
 	
 		this->hasSelection = true;		
 		

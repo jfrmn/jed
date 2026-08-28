@@ -148,11 +148,11 @@ static void InsertItem(EditorAutocomplete* self) {
 	TextChange* textChange = self->owner->textController.NewTextChange();
 	TextChangeOperation* operation = textChange->NewOperation();	
 
-	if (item.insertPosition.column != self->owner->textController.carets.front().position.column) {
+	if (item.insertPosition.character != self->owner->textController.carets.front().position.character) {
 		self->owner->GetBuffer().RemoveInLine(
 			item.insertPosition.line,
-			item.insertPosition.column,
-			self->owner->textController.carets.front().position.column,
+			item.insertPosition.character,
+			self->owner->textController.carets.front().position.character,
 			operation);
 	}
 		
@@ -174,8 +174,8 @@ void EditorAutocomplete::SortItems() {
 
 		const TextBuffer::Line& line = owner->GetBuffer().GetLineAt(item.insertPosition.line);
 		
-		const u64 textBeforeCursorLen = (owner->textController.carets.front().position.column - item.insertPosition.column);
-		const std::string_view textBeforeCursor = line.GetText().substr(item.insertPosition.column, textBeforeCursorLen);
+		const u64 textBeforeCursorLen = (owner->textController.carets.front().position.character - item.insertPosition.character);
+		const std::string_view textBeforeCursor = line.GetText().substr(item.insertPosition.character, textBeforeCursorLen);
 		
 		if (textBeforeCursor.empty())
 			continue;
@@ -229,7 +229,7 @@ bool EditorAutocomplete::HandleEvent(const Event& event) {
 void EditorAutocomplete::OnInput() {
 	
 	const TextPosition cursor = owner->textController.carets.front().position;
-	if (cursor.line != triggerPosition.line || cursor.column < triggerPosition.column) {
+	if (cursor.line != triggerPosition.line || cursor.character < triggerPosition.character) {
 		owner->editorCaretAttached = nullptr;
 		RemoveReference();
 	

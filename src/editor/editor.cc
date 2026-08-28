@@ -327,7 +327,7 @@ static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition
 	const GlyphRun& run = self->glyphRuns[position.line];
 
 	return D2D_POINT_2F {
-		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.column),
+		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.character),
 		.y = self->area.top  - self->scrollarea.vpY + (position.line * settings.fontEditor.lineHeight) };
 }
 
@@ -385,7 +385,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		const GlyphRun &glyphRun = self->glyphRuns[line];
 		
 		float offsetFrom, offsetTo;
-		glyphRun.MeasureOffsetRange(from.column, to.column, &offsetFrom, &offsetTo);
+		glyphRun.MeasureOffsetRange(from.character, to.character, &offsetFrom, &offsetTo);
 		
 		const float offsetY = y + (settings.fontEditor.lineHeight * line);
 		
@@ -398,7 +398,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		{
 			const GlyphRun& glyphRun = self->glyphRuns[from.line];
 
-			const float offsetFrom = x + glyphRun.MeasureOffset(from.column);
+			const float offsetFrom = x + glyphRun.MeasureOffset(from.character);
 			const float offsetTo   = x + std::max(glyphRun.width, 2.0f);
 			const float offsetY    = y + (settings.fontEditor.lineHeight * from.line);
 
@@ -422,7 +422,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 			const GlyphRun& glyphRun = self->glyphRuns[to.line];
 
 			const float offsetFrom = x + 0.f;
-			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.column), 2.0f);
+			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.character), 2.0f);
 			const float offsetY    = y + (settings.fontEditor.lineHeight * to.line);
 
 			funcAction(offsetY, offsetFrom, offsetTo);
@@ -607,7 +607,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			const GlyphRun& glyphRun = self->glyphRuns[record.from.line];
 			
 			float offsetFrom, offsetTo;
-			glyphRun.MeasureOffsetRange(record.from.column, record.to.column, &offsetFrom, &offsetTo);
+			glyphRun.MeasureOffsetRange(record.from.character, record.to.character, &offsetFrom, &offsetTo);
 						
 			deviceContext->DrawLine(
 				D2D1_POINT_2F {
@@ -637,7 +637,7 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 	
 	return TextPosition {
 		.line = line,
-		.column = column};
+		.character = column};
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -948,9 +948,9 @@ void Editor::Update() {
 				
 				deviceContext->DrawRectangle(
 					D2D1_RECT_F {
-						.left   = offsetX + run.MeasureOffset(result.from.column),
+						.left   = offsetX + run.MeasureOffset(result.from.character),
 						.top    = offsetY + result.from.line * settings.fontEditor.lineHeight,
-						.right  = offsetX + run.MeasureOffset(result.to.column),
+						.right  = offsetX + run.MeasureOffset(result.to.character),
 						.bottom = offsetY + (result.from.line + 1) * settings.fontEditor.lineHeight },
 					settings.GetBrushEditorText());
 			}
@@ -1141,7 +1141,7 @@ void Editor::OnFileChange(const FileChangeRecord* fileChangeRecord) {
 		const u64 newLine = std::min(textController.carets.front().position.line, textController.buffer.GetMaxLine());
 		textController.SetCaretPosition(TextPosition {
 			.line   = newLine,
-			.column = std::min(textController.carets.front().position.column, textController.buffer.GetLineAt(newLine).length)});
+			.character = std::min(textController.carets.front().position.character, textController.buffer.GetLineAt(newLine).length)});
 		scrollarea.vpX = std::min(scrollarea.vpX, scrollarea.GetMaxPositionX());
 		scrollarea.vpY = std::min(scrollarea.vpY, scrollarea.GetMaxPositionY());	
 	

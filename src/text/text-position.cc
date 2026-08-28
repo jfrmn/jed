@@ -7,7 +7,7 @@ bool TextPosition::operator<(const TextPosition& other) const {
 	if (line > other.line)
 		return false;
 	
-	return column < other.column;
+	return character < other.character;
 }
 
 bool TextPosition::operator<=(const TextPosition& other) const {
@@ -17,7 +17,7 @@ bool TextPosition::operator<=(const TextPosition& other) const {
 	if (line > other.line)
 		return false;
 	
-	return column <= other.column;
+	return character <= other.character;
 }
 
 bool TextPosition::operator>(const TextPosition& other) const {
@@ -27,7 +27,7 @@ bool TextPosition::operator>(const TextPosition& other) const {
 	if (line < other.line)
 		return false;
 	
-	return column > other.column;
+	return character > other.character;
 }
 
 bool TextPosition::operator>=(const TextPosition& other) const {
@@ -37,9 +37,9 @@ bool TextPosition::operator>=(const TextPosition& other) const {
 	if (line < other.line)
 		return false;
 	
-	return column >= other.column;
+	return character >= other.character;
 }
 
 bool TextPosition::operator==(const TextPosition& other) const {
-	return this->line == other.line && this->column == other.column;
+	return this->line == other.line && this->character == other.character;
 }

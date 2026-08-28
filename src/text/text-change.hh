@@ -18,16 +18,16 @@ struct TextChangeOperation {
 struct TextChange {
 
 	TextChangeOperation* operations = {};
-	usize capacity = 0u;
-	usize count = 0u;
+	u64 capacity = 0u;
+	u64 count = 0u;
 	
 	TextChangeOperation single = {};
 	
-	void ReserveCapacity(usize newCapa);
-	void ReserveMore(usize additionalCapa);
+	void ReserveCapacity(u64 newCapa);
+	void ReserveMore(u64 additionalCapa);
 	
 	TextChangeOperation* NewOperation();
-	void Clear();	
-
-	DISALLOW_COPY_AND_ASSING(TextChange);
+	void Clear();
+	
+	~TextChange() noexcept;
 };

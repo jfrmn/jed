@@ -90,7 +90,7 @@ void TextBox::Update() {
 	if (!inactive) {
 
 		ASSERT(textController.carets.front().position.line == 0);
-		const float offsetCursor = glyphRun.MeasureOffset(textController.carets.front().position.column);
+		const float offsetCursor = glyphRun.MeasureOffset(textController.carets.front().position.character);
 		
 		deviceContext->FillRectangle(
 			D2D_RECT_F {
@@ -108,7 +108,7 @@ void TextBox::Update() {
 		textController.GetSelection(&selectionStart, &selectionEnd);
 
 		f32 offsetStart, offsetEnd;
-		glyphRun.MeasureOffsetRange(selectionStart.column, selectionEnd.column, &offsetStart, &offsetEnd);
+		glyphRun.MeasureOffsetRange(selectionStart.character, selectionEnd.character, &offsetStart, &offsetEnd);
 
 		deviceContext->FillRectangle(
 			D2D_RECT_F {

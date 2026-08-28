@@ -11,12 +11,12 @@ void TextChangeOperation::Clear() {
 
 void TextChangeOperation::AdjustPosition(TextPosition& position) const {
 	
-	if (start.line == position.line && start.column < position.column) {
+	if (start.line == position.line && start.character < position.character) {
 		if (!removedText.empty())
-			position.column -= removalEnd.column - start.column;
+			position.character -= removalEnd.character - start.character;
 						
 		if (!insertedText.empty())
-			position.column += insertionEnd.column - start.column;
+			position.character += insertionEnd.character - start.character;
 	}
 	
 	if (start.line <= position.line) {

@@ -179,23 +179,23 @@ static D2D1_COLOR_F GetColorForLabel(std::string_view label) {
 static Lsp::Position ToLspPosition(TextPosition textpos) {
 	return Lsp::Position {
 		.line = textpos.line,
-		.character = textpos.column };
+		.character = textpos.character };
 }
 
 static TextPosition ToTextPosition(Lsp::Position pos) {
 	return TextPosition {
 		.line = pos.line,
-		.column = pos.character };
+		.character = pos.character };
 }
 
 static Lsp::Range ToLspRange(TextPosition start, TextPosition end) {
 	return Lsp::Range {
 		.start = Lsp::Position {
 			.line = start.line,
-			.character = start.column },
+			.character = start.character },
 		.end = Lsp::Position {
 			.line = end.line,
-			.character = end.column }};
+			.character = end.character }};
 }
 
 static Lsp::TextDocumentIdentifier ToLspTextDocumentIdentifier(const Editor::TextDocumentIdentifier& textDocIdent) {

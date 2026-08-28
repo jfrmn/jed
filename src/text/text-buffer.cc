@@ -141,11 +141,11 @@ std::string TextBuffer::GetText(const TextPosition& from, const TextPosition& to
 
 	if (from.line == to.line) {
 		const Line& line = GetLineAt(from.line);
-		result = std::string {line.GetTextWithLinebreak().substr(from.column, (to.column - from.column))};
+		result = std::string {line.GetTextWithLinebreak().substr(from.character, (to.character - from.character))};
 		
 	} else {	
 		const Line &firstLine = GetLineAt(from.line);
-		result += firstLine.GetTextWithLinebreak().substr(from.column);
+		result += firstLine.GetTextWithLinebreak().substr(from.character);
 		
 		for (u64 ln = from.line + 1; ln < to.line; ln++) {
 			const Line& line = GetLineAt(ln);
@@ -153,7 +153,7 @@ std::string TextBuffer::GetText(const TextPosition& from, const TextPosition& to
 		}
 		
 		const Line& lastLine = GetLineAt(to.line);
-		result += lastLine.GetText().substr(0, to.column);
+		result += lastLine.GetText().substr(0, to.character);
 	}
 	
 	return result;
@@ -202,16 +202,16 @@ void TextBuffer::Insert(const TextPosition& where, std::string_view textToInsert
 	Line*  line  = &lines[where.line];
 	Chunk* chunk = line->chunk;
 
-	const u64 lengthTrailingPart = (line->LengthWithLinebreak() - where.column);
+	const u64 lengthTrailingPart = (line->LengthWithLinebreak() - where.character);
 
 	if (chunk->isShared) {
 		
 		Chunk* newChunk = AllocateChunk(this);
 		newChunk->data.reserve(line->LengthWithLinebreak() + textToInsert.length());
 
-		newChunk->data.append(line->data, where.column);
+		newChunk->data.append(line->data, where.character);
 		newChunk->data.append(textToInsert);
-		newChunk->data.append(line->data + where.column, lengthTrailingPart);
+		newChunk->data.append(line->data + where.character, lengthTrailingPart);
 
 		DecreaseReference(this, chunk);
 		chunk = newChunk;
@@ -219,7 +219,7 @@ void TextBuffer::Insert(const TextPosition& where, std::string_view textToInsert
 	} else {
 		
 		chunk->references = 0u;
-		chunk->data.insert(where.column, textToInsert);
+		chunk->data.insert(where.character, textToInsert);
 	}
 
 	std::deque<Line> newLines {};
@@ -244,7 +244,7 @@ void TextBuffer::Insert(const TextPosition& where, std::string_view textToInsert
 		change->start = where;
 		change->insertionEnd = TextPosition {
 			.line   = where.line + newLines.size() - 1,
-			.column = newLines.back().LengthWithLinebreak() - lengthTrailingPart };
+			.character = newLines.back().LengthWithLinebreak() - lengthTrailingPart };
 		change->insertedText = std::string {textToInsert};
 	}
 }
@@ -259,16 +259,16 @@ void TextBuffer::InsertInLine(const TextPosition& where, std::string_view textTo
 		Chunk* newChunk = AllocateChunk(this);
 		newChunk->data.reserve(line->LengthWithLinebreak() + textToInsert.length());
 
-		newChunk->data.append(line->data, where.column);
+		newChunk->data.append(line->data, where.character);
 		newChunk->data.append(textToInsert);
-		newChunk->data.append(line->data + where.column, line->LengthWithLinebreak() - where.column);
+		newChunk->data.append(line->data + where.character, line->LengthWithLinebreak() - where.character);
 		newChunk->references = 1u;
 
 		DecreaseReference(this, chunk);
 		chunk = newChunk;
 
 	} else {
-		chunk->data.insert(where.column, textToInsert);
+		chunk->data.insert(where.character, textToInsert);
 	}
 
 	UpdateLineFromChunk(*line, chunk);
@@ -277,7 +277,7 @@ void TextBuffer::InsertInLine(const TextPosition& where, std::string_view textTo
 		ASSERT(change->removedText.empty() || change->start == where);
 		
 		change->start = where;
-		change->insertionEnd = TextPosition {where.line, where.column + textToInsert.size()};
+		change->insertionEnd = TextPosition {where.line, where.character + textToInsert.size()};
 		change->insertedText = std::string {textToInsert};
 	}
 }
@@ -319,33 +319,33 @@ void TextBuffer::Remove(const TextPosition& from, const TextPosition& to, /*out*
 
 		if (from.line == to.line) {
 			ASSERT(fromLine == toLine);
-			change->removedText = std::string {fromLine->data + from.column, to.column - from.column};
+			change->removedText = std::string {fromLine->data + from.character, to.character - from.character};
 		
 		} else {
-			change->removedText.append(fromLine->data + from.column, fromLine->LengthWithLinebreak() - from.column);
+			change->removedText.append(fromLine->data + from.character, fromLine->LengthWithLinebreak() - from.character);
 			for (u64 i = from.line+1; i <= to.line-1; i++)
 				change->removedText.append(lines[i].data, lines[i].LengthWithLinebreak());
-			change->removedText.append(toLine->data, to.column);
+			change->removedText.append(toLine->data, to.character);
 		}
 	}
 
-	const u64 lengthTrailingPart = (toLine->LengthWithLinebreak() - to.column);
+	const u64 lengthTrailingPart = (toLine->LengthWithLinebreak() - to.character);
 
 	if (chunk->isShared) {
 		
 		Chunk* newChunk = AllocateChunk(this);
 
-		newChunk->data.reserve(from.column + lengthTrailingPart);
-		newChunk->data.append(fromLine->data, from.column);
-		newChunk->data.append(toLine->data + to.column, lengthTrailingPart);
+		newChunk->data.reserve(from.character + lengthTrailingPart);
+		newChunk->data.append(fromLine->data, from.character);
+		newChunk->data.append(toLine->data + to.character, lengthTrailingPart);
 		newChunk->references = 1u;
 
 		DecreaseReference(this, chunk);
 		chunk = newChunk;
 
 	} else {
-		chunk->data.resize(from.column);
-		chunk->data.append(toLine->data + to.column, lengthTrailingPart);
+		chunk->data.resize(from.character);
+		chunk->data.append(toLine->data + to.character, lengthTrailingPart);
 	}
 
 	fromLine->lengthLinebreak = toLine->lengthLinebreak;
@@ -434,10 +434,10 @@ void TextBuffer::RemoveChunk(u64 first, u64 last, /*out*/ TextChangeOperation* c
 // 	  * edit = TextEdit {
 // 			.start = TextPosition {
 // 				.line = linenr,
-// 				.column = 0 },
+// 				.character = 0 },
 // 			.end = TextPosition {
 // 				.line = line.LengthWithLinebreak(),
-// 				.column = 0 },
+// 				.character = 0 },
 // 			.text = std::string_view {}};
 // 	}
 

@@ -22,8 +22,8 @@ struct ScopedBuffer {
 	TextBuffer& operator*()  { return buffer; }
 };
 
-TextPosition Pos(u64 line, u64 column) {
-	return TextPosition {.line = line, .column = column};
+TextPosition Pos(u64 line, u64 characeter) {
+	return TextPosition {.line = line, .character = characeter};
 }
 
 // Return a line's text as a std::string. GetText() returns a std::string_view,

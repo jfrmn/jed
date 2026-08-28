@@ -53,7 +53,7 @@ EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 			if (from.line != to.line) {
 				to = TextPosition {
 					.line = from.line,
-					.column = editor->GetBuffer().GetLineAt(from.line).length };
+					.character = editor->GetBuffer().GetLineAt(from.line).length };
 			}
 
 			initText = editor->GetBuffer().GetText(from, to);
@@ -313,7 +313,7 @@ void EditorSearch::Update() {
 				const SearchResult &result = threadData->results[i];
 				
 				char locationBuffer[32] {0};
-				const u64 locationBufferLen = sprintf_s(locationBuffer, "%zu:%zu", result.from.line, result.from.column);
+				const u64 locationBufferLen = sprintf_s(locationBuffer, "%zu:%zu", result.from.line, result.from.character);
 
 				if (maxLocationLength < locationBufferLen)
 					maxLocationLength = locationBufferLen;
@@ -358,9 +358,9 @@ void EditorSearch::Update() {
 				const float locationOffset = settings.fontEditor.spaceAdvance * maxLocationLength;
 				deviceContext->FillRectangle(
 					D2D1_RECT_F {
-						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.column - numSkippedCharacters),
+						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.character - numSkippedCharacters),
 						.top    = area.bottom + (settings.fontEditor.lineHeight * i),
-						.right  = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.to.column - numSkippedCharacters),
+						.right  = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.to.character - numSkippedCharacters),
 						.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1)) },
 					settings.GetBrushUiSearchResult());
 
@@ -472,7 +472,7 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 		TextBuffer& textBuffer = self->owner->GetBuffer();
 		
 		TextChangeOperation* replaceOperation = change->NewOperation();		
-		textBuffer.RemoveInLine(itSearchResult->from.line, itSearchResult->from.column, itSearchResult->to.column, replaceOperation);
+		textBuffer.RemoveInLine(itSearchResult->from.line, itSearchResult->from.character, itSearchResult->to.character, replaceOperation);
 		textBuffer.InsertInLine(itSearchResult->from, replacementText, replaceOperation);
 		
 		self->owner->ProcessTextChange(change);
@@ -493,8 +493,8 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 				
 				if (it->from.line != replaceOperation->start.line) break;
 				
-				it->from.column -= replaceOperation->removalEnd.column - replaceOperation->start.column;
-				it->from.column += replaceOperation->insertionEnd.column - replaceOperation->start.column;	
+				it->from.character -= replaceOperation->removalEnd.character - replaceOperation->start.character;
+				it->from.character += replaceOperation->insertionEnd.character - replaceOperation->start.character;	
 			}
 			
 			if (itNextResult == self->threadData->results.end())
@@ -536,7 +536,7 @@ static void ActionReplaceAll(EditorSearch* self) {
 		const EditorSearch::SearchResult& result = self->threadData->results[i];
 	
 		TextChangeOperation* replaceOperation = change->NewOperation();
-		textBuffer.RemoveInLine(result.from.line, result.from.column, result.to.column, replaceOperation);
+		textBuffer.RemoveInLine(result.from.line, result.from.character, result.to.character, replaceOperation);
 		textBuffer.InsertInLine(result.from, replacementText, replaceOperation);
 	
 		// adjust the position of any result that occurs on the same line	
@@ -546,8 +546,8 @@ static void ActionReplaceAll(EditorSearch* self) {
 			
 			if (nextResult.from.line != replaceOperation->start.line) break;
 			
-			nextResult.from.column -= replaceOperation->removalEnd.column - replaceOperation->start.column;
-			nextResult.from.column += replaceOperation->insertionEnd.column - replaceOperation->start.column;	
+			nextResult.from.character -= replaceOperation->removalEnd.character - replaceOperation->start.character;
+			nextResult.from.character += replaceOperation->insertionEnd.character - replaceOperation->start.character;	
 		}
 		
 		self->owner->AddInsertAnimationData(replaceOperation->start, replaceOperation->insertionEnd);
@@ -701,10 +701,10 @@ static DWORD WINAPI WorkerThread(LPVOID userdata) {
 				td->results.push_back(EditorSearch::SearchResult {
 					.from = TextPosition {
 						.line = i,
-						.column = pos },
+						.character = pos },
 					.to = TextPosition {
 						.line = i,
-						.column = pos + td->searchTerm.size() }});
+						.character = pos + td->searchTerm.size() }});
 
 				textRemaining = std::string_view {it + td->searchTerm.size(), textRemaining.end()};
 			
