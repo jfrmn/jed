@@ -8,7 +8,7 @@
 
 #include "ui/constants.h"
 #include "text/text-position.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #include <algorithm>
 
@@ -54,7 +54,7 @@ void EditorAutocomplete::Update() {
 			runLabel.Shape(items[i].label, settings.fontEditor);
 			runDetails.Shape(items[i].details, settings.fontEditor);
 			
-			const f32 currentWidth = (PADDING_X2 + settings.fontEditor.GetSpaceAdvance()) + runLabel.width + runDetails.width + PADDING_X3;
+			const f32 currentWidth = (PADDING_X2 + settings.fontEditor.spaceAdvance) + runLabel.width + runDetails.width + PADDING_X3;
 			if (width < currentWidth)
 				width = currentWidth;
 		}

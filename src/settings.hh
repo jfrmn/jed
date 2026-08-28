@@ -2,7 +2,7 @@
 #include "events.hh"
 #include "commands.hh"
 #include "util/color.hh"
-#include "graphics/font.hh"
+#include "glyph-run.hh"
 
 #include <unordered_map>
 

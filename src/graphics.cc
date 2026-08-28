@@ -1,16 +1,71 @@
-#include "effects.hh"
-#include "settings.hh"
+#include "graphics.hh"
 #include "logging.hh"
 #include "util.hh"
+#include "settings.hh"
 
-#include "ui/constants.h"
-#include "graphics/factories.hh"
-#include "util/color.hh"
-
-#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
 #include <d2d1_1.h>
+#include <d2d1effects_2.h>
+#include <dwrite.h>
+#include <wincodec.h>
+#undef LoadBitmap
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ID2D1Factory* d2dFactory = nullptr;
+IDWriteFactory* dwFactory = nullptr;
+IWICImagingFactory* wicFactory = nullptr;
+
+bool InitFactories() {
+
+	ASSERT(!d2dFactory);
+	ASSERT(!dwFactory);
+	ASSERT(!dwFactory);
+
+	D2D1_FACTORY_OPTIONS options {};
+	options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+	
+	if (auto hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, options, &d2dFactory); hr != S_OK) {
+		LogError("D2D1CreateFactory() failed. HRESULT: %", StrHr(hr));
+		return false;
+	}
+
+	if (auto hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&dwFactory); hr != S_OK) {
+		LogError("DWriteCreateFactory() failed. HRESULT: %", StrHr(hr));
+		return false;
+	}
+
+	if (auto hr = CoInitialize(NULL); hr != S_OK) {
+		LogError("CoInitialize() failed. HRESULT: %", StrHr(hr));
+		return false;
+	}
+
+	if (auto hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wicFactory)); hr != S_OK) {
+		LogError("Failed to create wicFactory! HRESULT: %", StrHr(hr));
+		return false;
+	}
+
+	return true;
+}
+
+void ShutdownFactories() {
+	if (wicFactory) {
+		wicFactory->Release();
+		wicFactory = nullptr;
+	}
+
+	CoUninitialize();
+
+	if (dwFactory) {
+		dwFactory->Release();
+		dwFactory = nullptr;
+	}
+
+	if (d2dFactory) {
+		d2dFactory->Release();
+		d2dFactory = nullptr;
+	}
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static const GUID guidGaussianBlurEffect { 0x1feb6d69, 0x2fe6, 0x4ac9, { 0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5 } };
@@ -19,23 +74,12 @@ static const GUID guidBlendEffect        { 0xc80ecff0, 0x3fd5, 0x4f05, { 0x83, 0
 
 static constexpr f32 STANDARD_DEVIATION = 10.0f;
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ID2D1Effect* blurEffect = nullptr;
 ID2D1Effect* shadowEffect = nullptr;
 ID2D1Effect* blendEffect = nullptr;
 
-// We use this brush to define the alpha mask (aka draw the text) when using the BlendImages-function.
-// It is a completely opaque and solid white brush.
-// Even though the brush will be used on an bitmap-rendertarget and was create on the deviceContext this will still work,
-// because we use CreateCompatibleRenderTarget.
-// See: https://learn.microsoft.com/en-us/windows/win32/direct2d/resources-and-resource-domains#compatible-render-targets-and-shared-bitmaps
-ID2D1SolidColorBrush* alphaMaskBrush = nullptr;
-
-// global brush to use everywhere
-ID2D1SolidColorBrush* brush = nullptr;
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bool InitEffects(ID2D1DeviceContext* deviceContext) {
+bool InitGraphics(ID2D1DeviceContext* deviceContext) {
 	
 	if (HRESULT hr = deviceContext->CreateEffect(guidGaussianBlurEffect, &blurEffect); hr != S_OK) {
 		LogError("CreateEffect() failed for blur-effect, HRESULT: %", StrHr(hr));
@@ -71,10 +115,11 @@ bool InitEffects(ID2D1DeviceContext* deviceContext) {
 		return false;
 	}
 	
+	::deviceContext = deviceContext;
 	return true;
 }
 
-void ShutdownEffects() {
+void ShutdownGraphics() {
 	
 	if (blurEffect) {
 		blurEffect->Release();
@@ -159,7 +204,6 @@ void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const 
 	deviceContext->DrawImage(shadowEffect, D2D1_POINT_2F {area.left, area.top});
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ID2D1BitmapRenderTarget* CreateCompatibleRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_SIZE_F& size) {
 	ID2D1BitmapRenderTarget* renderTarget = nullptr;
 	if (HRESULT hr = deviceContext->CreateCompatibleRenderTarget(size, &renderTarget); hr != S_OK) {
@@ -177,14 +221,13 @@ void BlendImages(ID2D1DeviceContext* deviceContext, const D2D_POINT_2F& pos, ID2
 	deviceContext->DrawImage(blendEffect, D2D_POINT_2F {std::floor(pos.x), std::floor(pos.y)});
 }
 
+ID2D1SolidColorBrush* alphaMaskBrush = nullptr;
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void PushLayer(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& boundingBox) {
-	PushLayer(deviceContext, ToRounded(boundingBox));
-}
-
-void PushLayer(ID2D1DeviceContext* deviceContext, const D2D1_ROUNDED_RECT& boundingBox) {
+	
 	ID2D1RoundedRectangleGeometry* geometry = nullptr;
-	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(boundingBox, &geometry); hr != S_OK) {
+	if (HRESULT hr = d2dFactory->CreateRoundedRectangleGeometry(ToRounded(boundingBox), &geometry); hr != S_OK) {
 		LogError("CreateRoundedRectangleGeometry() failed. HRESULT: %", StrHr(hr));
 		return;
 	}
@@ -204,9 +247,9 @@ void PopLayer(ID2D1DeviceContext* deviceContext) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ID2D1SolidColorBrush* GetBrush(const Color& clr) {
+ID2D1SolidColorBrush* brush = nullptr;
+
+ID2D1SolidColorBrush* UseColor(const Color& clr) {
 	brush->SetColor(clr.ToD2D());
 	return brush;
 }
-
-

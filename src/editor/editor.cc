@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "settings.hh"
 
-#include "graphics/effects.hh"
+#include "graphics.hh"
 #include "language/language.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
@@ -319,7 +319,7 @@ void Editor::ProcessTextChange(const TextChange* change) {
 }
 
 static float GetLineNumberWidth() {
-	return std::ceil((settings.fontEditor.GetSpaceAdvance() * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
+	return std::ceil((settings.fontEditor.spaceAdvance * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
 }
 
 static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition& position) {
@@ -879,14 +879,14 @@ void Editor::Update() {
 		}
 		
 		const D2D_SIZE_F caretSize {
-			.width  = settings.fontEditor.GetSpaceAdvance(),
+			.width  = settings.fontEditor.spaceAdvance,
 			.height = settings.fontEditor.lineHeight};
 		
 		for (const TextController::Caret& caret : textController.carets) {
 			
 			// draw selection
 			if (TextPosition selFrom, selTo; caret.GetSelection(&selFrom, &selTo)) {
-				GetBrush(settings.colors.selection);
+				UseColor(settings.colors.selection);
 				IterateGlyphRange(this, selFrom, selTo, HighlightTextRange);
 			}
 			
@@ -962,7 +962,7 @@ void Editor::Update() {
 	//
 	if (insertAnimationRunning) {
 		
-		ID2D1SolidColorBrush* brushInsertAnim = GetBrush(settings.colors.selection);
+		ID2D1SolidColorBrush* brushInsertAnim = UseColor(settings.colors.selection);
 		brushInsertAnim->SetOpacity(insertAnimationOpacity);
 		DEFER(brushInsertAnim->SetOpacity(1.0f));
 		
@@ -989,7 +989,7 @@ void Editor::Update() {
 			const EditorDiagnostics::Record& record = editorDiagnostics.records[i];
 			
 			// change the brush color
-			GetBrush(Diagnostics::SEVERITY_COLORS[record.severity]);
+			UseColor(Diagnostics::SEVERITY_COLORS[record.severity]);
 			
 			// draw underlines
 			IterateGlyphRange(this, record.from, record.to, [] (f32 offsetY, f32 offsetFrom, f32 offsetTo) {

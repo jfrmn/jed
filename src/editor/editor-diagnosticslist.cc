@@ -8,8 +8,8 @@
 
 #include "ui/constants.h"
 
-#include "graphics/glyph-run.hh"
-#include "graphics/effects.hh"
+#include "glyph-run.hh"
+#include "graphics.hh"
 
 #include "util.hh"
 

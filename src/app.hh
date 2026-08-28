@@ -3,7 +3,7 @@
 #include "search-bar.hh"
 #include "ui/window.hh"
 #include "ui/status-bar.hh"
-#include "graphics/glyph-run.hh"
+#include "glyph-run.hh"
 
 #include <vector>
 #include <string>

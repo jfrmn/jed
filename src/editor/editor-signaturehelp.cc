@@ -5,7 +5,7 @@
 #include "settings.hh"
 #include "util.hh"
 
-#include "graphics/effects.hh"
+#include "graphics.hh"
 #include "ui/constants.h"
 
 #define WIN32_LEAN_AND_MEAN

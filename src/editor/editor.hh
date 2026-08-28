@@ -5,7 +5,7 @@
 #include "text/text-controller.hh"
 
 #include "ui/scrollarea.hh"
-#include "graphics/glyph-run.hh"
+#include "glyph-run.hh"
 
 #include "editor/editor-diagnostics.hh"
 

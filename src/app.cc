@@ -8,7 +8,7 @@
 #include "logging.hh"
 #include "util.hh"
 
-#include "graphics/effects.hh"
+#include "graphics.hh"
 #include "editor/editor.hh"
 #include "ui/constants.h"
 
@@ -615,7 +615,7 @@ void App::Update() {
 								D2D_RECT_F {
 									.left = previewPanelArea.left + offsetX,
 									.top = previewPanelArea.top + offsetY,
-									.right = previewPanelArea.left + offsetX + settings.fontEditor.GetSpaceAdvance(),
+									.right = previewPanelArea.left + offsetX + settings.fontEditor.spaceAdvance,
 									.bottom = previewPanelArea.top + offsetY + settings.fontUi.lineHeight},
 								settings.GetBrushEditorText());
 						}

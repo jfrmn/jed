@@ -1,7 +1,6 @@
 #include "window.hh"
 #include "globals.hh"
-
-#include "graphics/factories.hh"
+#include "graphics.hh"
 #include "logging.hh"
 #include "util.hh"
 
@@ -228,7 +227,7 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN: {
 			self->event.type = Event::Type_KeyPress;
-			self->event.keypress.vkc = wParam;
+			self->event.keypress.vkc = static_cast<u32>(wParam);
 			self->event.keypress.mods = CollectKeyModifiers();
 			return 0L;
 		} break;

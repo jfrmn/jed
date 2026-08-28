@@ -1,6 +1,6 @@
 #pragma once
 #include "text/text-buffer.hh"
-#include "graphics/glyph-run.hh"
+#include "glyph-run.hh"
 
 #include <vector>
 

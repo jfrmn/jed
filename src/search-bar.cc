@@ -12,7 +12,7 @@
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/parameter-configurator.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #include <cmath>
 #include <algorithm>

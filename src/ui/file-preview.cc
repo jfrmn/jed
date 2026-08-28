@@ -3,7 +3,7 @@
 #include "settings.hh"
 
 #include "ui/constants.h"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #include "logging.hh"
 #include "util.hh"

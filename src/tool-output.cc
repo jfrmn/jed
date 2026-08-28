@@ -8,7 +8,7 @@
 #include "util/diagnostics.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #include <charconv>
 #include <algorithm>
@@ -449,7 +449,7 @@ static void RenderOutput(ToolOutput* self) {
 					.top    = self->area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - self->scrollarea.vpY,
 					.right  = self->area.left + PADDING + offsetTo,
 					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - self->scrollarea.vpY},
-				GetBrush(record.color));
+				UseColor(record.color));
 		}
 	}
 	
@@ -537,7 +537,7 @@ static void RenderOutput(ToolOutput* self) {
 		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - self->scrollarea.vpY;
 		self->filePreview.OnUpdate();
 			
-		deviceContext->DrawRectangle(self->filePreview.GetArea(), GetBrush(record.color));
+		deviceContext->DrawRectangle(self->filePreview.GetArea(), UseColor(record.color));
 	}
 		
 }
@@ -671,7 +671,7 @@ void ToolOutput::Update() {
 				
 				deviceContext->FillRoundedRectangle(ToRounded(
 					MakeRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea))),
-					GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
+					UseColor(Color::FromKnown(D2D1::ColorF::Green)));
 				
 				deviceContext->DrawRoundedRectangle(ToRounded(
 					progressArea),

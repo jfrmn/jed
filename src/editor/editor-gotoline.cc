@@ -6,7 +6,7 @@
 
 #include "ui/constants.h"
 #include "logging.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -43,7 +43,7 @@ void EditorGotoLine::Update() {
 	//
 	const f32 heightHeadline = settings.fontUi.lineHeight;
 	const f32 totalHeight = MARGIN + heightHeadline + MARGIN + textbox.Height() + MARGIN;
-	const f32 textBoxWidth = (settings.fontEditor.GetSpaceAdvance() * MAX_DIGITS) + PADDING_X2;
+	const f32 textBoxWidth = (settings.fontEditor.spaceAdvance * MAX_DIGITS) + PADDING_X2;
 	
 	area = D2D_RECT_F {
 		.left   = owner->area.right - MARGIN - SCROLLBAR_WIDTH_WIDE - textBoxWidth - MARGIN_X2,

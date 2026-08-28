@@ -7,8 +7,8 @@
 #include "util.hh"
 #include "logging.hh"
 
-#include "graphics/effects.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics.hh"
+#include "glyph-run.hh"
 #include "editor/editor.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
@@ -285,7 +285,7 @@ void EditorSearch::Update() {
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
 				std::string_view {textBuffer},
-				area.left   + settings.fontUi.lineHeight + PADDING_X2 + settings.fontUi.GetSpaceAdvance(),
+				area.left   + settings.fontUi.lineHeight + PADDING_X2 + settings.fontUi.spaceAdvance,
 				area.bottom - settings.fontUi.lineHeight - PADDING,
 				settings.fontUi,
 				settings.GetBrushUiText());
@@ -355,7 +355,7 @@ void EditorSearch::Update() {
 				
 				staticGlyphRun.Shape(lineText, settings.fontEditor);
 
-				const float locationOffset = settings.fontEditor.GetSpaceAdvance() * maxLocationLength;
+				const float locationOffset = settings.fontEditor.spaceAdvance * maxLocationLength;
 				deviceContext->FillRectangle(
 					D2D1_RECT_F {
 						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.column - numSkippedCharacters),

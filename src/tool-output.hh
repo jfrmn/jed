@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "text/text-position.hh"
-#include "graphics/glyph-run.hh"
+#include "glyph-run.hh"
 #include "util/parameter.hh"
 
 #include "ui/scrollarea.hh"

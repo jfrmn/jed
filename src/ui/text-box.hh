@@ -1,7 +1,6 @@
 #pragma once
 #include "text/text-controller.hh"
-#include "graphics/glyph-run.hh"
-#include "graphics/font.hh"
+#include "glyph-run.hh"
 
 #include <string>
 

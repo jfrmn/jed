@@ -7,8 +7,8 @@
 
 #include "ui/constants.h"
 #include "ui/window.hh"
-#include "graphics/effects.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics.hh"
+#include "glyph-run.hh"
 
 #include <string>
 #include <algorithm>

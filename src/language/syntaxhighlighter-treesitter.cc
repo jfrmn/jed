@@ -1,7 +1,7 @@
 #include "syntaxhighlighter-treesitter.hh"
 #include "settings.hh"
 #include "editor/editor.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 #include "logging.hh"
 #include "util.hh"
 

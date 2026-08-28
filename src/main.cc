@@ -2,9 +2,8 @@
 #include "globals.hh"
 #include "settings.hh"
 
-#include "graphics/factories.hh"
-#include "graphics/effects.hh"
-#include "graphics/glyph-run.hh"
+#include "graphics.hh"
+#include "glyph-run.hh"
 
 #include "language/language.hh"
 #include "language/json-helper.hh"
@@ -70,7 +69,7 @@ int main(int argc, char** argv) {
 		LogWarning("failed to load settings");
 	}
 	
-	if (!InitEffects(mainWindow.deviceContext)) {
+	if (!InitGraphics(mainWindow.deviceContext)) {
 		LogFatal("init effects failed");
 		return -1;
 	}
@@ -126,7 +125,7 @@ int main(int argc, char** argv) {
 	app.Shutdown();
 	mainWindow.CleanUp();
 	fileWatcher.Shutdown();
-	ShutdownEffects();
+	ShutdownGraphics();
 	ShutdownFactories();	
 	return 0;
 }

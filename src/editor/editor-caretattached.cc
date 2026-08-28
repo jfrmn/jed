@@ -4,7 +4,7 @@
 
 #include "ui/constants.h"
 
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

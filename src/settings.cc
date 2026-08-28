@@ -1,10 +1,7 @@
 #include "settings.hh"
-#include "graphics/factories.hh"
-#include "graphics/effects.hh"
-
 #include "util.hh"
 #include "logging.hh"
-
+#include "graphics.hh"
 #include "tools.hh"
 
 #define TOML_ABI_NAMESPACES 0

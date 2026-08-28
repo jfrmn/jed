@@ -11,7 +11,7 @@
 
 #include "util.hh"
 #include "language/language.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 #include "app.hh"
 #include "tools.hh"
 
@@ -152,7 +152,7 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 			area.top + PADDING,
 			PROGRESS_BAR_WIDTH * app.toolOutput.progressValue,
 			settings.fontUi.lineHeight)),
-		GetBrush(Color::FromKnown(D2D1::ColorF::Green)));
+		UseColor(Color::FromKnown(D2D1::ColorF::Green)));
 	
 	deviceContext->DrawRoundedRectangle(ToRounded(
 		D2D_RECT_F {
@@ -228,7 +228,7 @@ static f32 UpdateLanguageSelector(StatusBar* self, f32 posX, u64 i) {
 				area.top,
 				settings.fontUi.lineHeight + PADDING_X2,
 				settings.fontUi.lineHeight + PADDING_X2),
-			GetBrush(color));
+			UseColor(color));
 	
 		deviceContext->DrawBitmap(
 			icon,
@@ -615,7 +615,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 				.top = area.top + PADDING,
 				.right = area.left + PADDING + offsetTo,
 				.bottom = area.bottom - PADDING}),
-			GetBrush(caretInfoText.bgColor));
+			UseColor(caretInfoText.bgColor));
 	}
 	
 	ID2D1Bitmap* bitmapText = nullptr, *bitmapColor = nullptr;
@@ -654,7 +654,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 					.top = 0u,
 					.right = PADDING + offsetTo,
 					.bottom = areaSize.height},
-				GetBrush(colorArea.color));
+				UseColor(colorArea.color));
 		}
 			
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)

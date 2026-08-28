@@ -7,7 +7,7 @@
 #include "util.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
-#include "graphics/effects.hh"
+#include "graphics.hh"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool ParameterConfigurator::Item::HasTextBox() const {
@@ -120,7 +120,7 @@ void ParameterConfigurator::Update() {
 			if (selectedItem == itemCount && isButtonSelected[i]) {
 				deviceContext->FillRectangle(
 					areaButton[i],
-					GetBrush(isEnabled[i] ? backgroundColors[i] : settings.colors.uiBackground));
+					UseColor(isEnabled[i] ? backgroundColors[i] : settings.colors.uiBackground));
 			} else {
 				deviceContext->FillRectangle(areaButton[i], settings.GetBrushUiBackground(false));
 			}
