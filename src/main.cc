@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 		LogError("init perforamnce counters failed");
 	
 	
-	const Window::CreateParams windowCreateParams {.className = "SLICKEDITWND", .title = "slick-edit", .width = 1920, .height = 1080, .hWndParent = NULL};
+	const Window::CreateParams windowCreateParams {.className = "JEDWND", .title = "jed", .width = 1920, .height = 1080, .hWndParent = NULL};
 	if (!mainWindow.Create(windowCreateParams)) {
 		LogFatal("creating window failed");
 		return -1;

@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.12)
-project (slick-edit)
+project (jed)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -8,7 +8,7 @@ set (CMAKE_CXX_FLAGS "/DWIN32 /D_WINDOWS /Zi /W3 /Zc:preprocessor")
 set (CMAKE_CXX_FLAGS_DEBUG   "/MDd /Ob0 /Od /DDEBUG /EHsc /RTC1")
 set (CMAKE_CXX_FLAGS_RELEASE "/MD  /Ob2 /O2 /DRELEASE")
 
-add_executable (slick-edit)
+add_executable (jed)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # dependencies
@@ -18,7 +18,7 @@ set (BUILD_SHARED_LIBS OFF)
 #
 # toml++
 #
-target_include_directories (slick-edit PRIVATE "deps/tomlplusplus/include")
+target_include_directories (jed PRIVATE "deps/tomlplusplus/include")
 
 #
 # pearl regex lib
@@ -32,15 +32,15 @@ set (PCRE2_BUILD_PCRE2GREP OFF)
 set (PCRE2_BUILD_TESTS OFF)
 
 add_subdirectory ("deps/pcre2")
-target_link_libraries (slick-edit pcre2-8-static)
-target_include_directories (slick-edit PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2/interface")
+target_link_libraries (jed pcre2-8-static)
+target_include_directories (jed PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2/interface")
 
 #
 # tree-sitter
 #
 add_subdirectory ("deps/tree-sitter")
-target_link_libraries (slick-edit tree-sitter)
-target_include_directories (slick-edit PRIVATE "deps/tree-sitter/lib/include")
+target_link_libraries (jed tree-sitter)
+target_include_directories (jed PRIVATE "deps/tree-sitter/lib/include")
 
 #
 # cJSON
@@ -48,8 +48,8 @@ target_include_directories (slick-edit PRIVATE "deps/tree-sitter/lib/include")
 set (CJSON_BUILD_SHARED_LIBS OFF)
 
 add_subdirectory ("deps/cJSON")
-target_link_libraries(slick-edit cjson)
-target_include_directories (slick-edit PRIVATE "deps/cJSON")
+target_link_libraries(jed cjson)
+target_include_directories (jed PRIVATE "deps/cJSON")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # main executable
@@ -59,33 +59,34 @@ if (CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
 	list(APPEND WINDOWS_DEPENDENCIES dbghelp.lib)
 endif()
 
-target_link_libraries(slick-edit ${WINDOWS_DEPENDENCIES})
-set_target_properties(slick-edit PROPERTIES CXX_STANDARD 20)
+target_link_libraries(jed ${WINDOWS_DEPENDENCIES})
+set_target_properties(jed PROPERTIES CXX_STANDARD 20)
 
-target_include_directories (slick-edit PRIVATE "src")
+target_include_directories (jed PRIVATE "src")
 
 file (GLOB_RECURSE SOURCES "src/*")
-target_sources (slick-edit PRIVATE ${SOURCES})
+target_sources (jed PRIVATE ${SOURCES})
 
-install (TARGETS slick-edit RUNTIME DESTINATION .)
-install (FILES "$<TARGET_PDB_FILE:slick-edit>" DESTINATION .)
+install (TARGETS jed RUNTIME DESTINATION .)
+install (FILES "$<TARGET_PDB_FILE:jed>" DESTINATION .)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # test executable
 
-add_executable (slick-edit-tests)
+add_executable (jed-tests)
 
-target_include_directories (slick-edit-tests PRIVATE "deps/doctest")
-target_include_directories (slick-edit-tests PRIVATE "src")
-target_include_directories (slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edit,INCLUDE_DIRECTORIES>)
+target_compile_options (jed-tests PRIVATE "/EHsc")
 
-target_link_libraries(slick-edit-tests PRIVATE $<TARGET_PROPERTY:slick-edit,LINK_LIBRARIES>)
-# set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD $<TARGET_PROPERTY:slick-edit,CXX_STANDARD>)
-set_target_properties(slick-edit-tests PROPERTIES CXX_STANDARD 20)
+target_include_directories (jed-tests PRIVATE "deps/doctest")
+target_include_directories (jed-tests PRIVATE "src")
+target_include_directories (jed-tests PRIVATE $<TARGET_PROPERTY:jed,INCLUDE_DIRECTORIES>)
+
+target_link_libraries(jed-tests PRIVATE $<TARGET_PROPERTY:jed,LINK_LIBRARIES>)
+set_target_properties(jed-tests PROPERTIES CXX_STANDARD 20)
 
 file (GLOB_RECURSE TEST_SOURCES "src/*" "test/*")
 list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
-target_sources (slick-edit-tests PRIVATE ${TEST_SOURCES})
+target_sources (jed-tests PRIVATE ${TEST_SOURCES})
 
-install (TARGETS slick-edit-tests RUNTIME DESTINATION .)
-install (FILES "$<TARGET_PDB_FILE:slick-edit-tests>" DESTINATION .)
+install (TARGETS jed-tests RUNTIME DESTINATION .)
+install (FILES "$<TARGET_PDB_FILE:jed-tests>" DESTINATION .)

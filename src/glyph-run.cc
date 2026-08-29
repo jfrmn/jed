@@ -130,7 +130,7 @@ bool Font::Init(const Description& desc) {
 		fontFace1->GetGlyphIndices(&space, 1, &glyphIndexSpace);
 		
 		s32 designGlyphAdvance = 0;
-		fontFace->GetDesignGlyphAdvances(1, &glyphIndexSpace, &designGlyphAdvance, FALSE);
+		fontFace1->GetDesignGlyphAdvances(1, &glyphIndexSpace, &designGlyphAdvance, FALSE);
 		
 		DWRITE_FONT_METRICS metrics {};
 		fontFace1->GetMetrics(&metrics);

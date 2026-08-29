@@ -19,12 +19,6 @@ param(
 	[string] $installDir = ""
 )
 
-#if (-not $env:_VSDEVSHELL) {
-#	Import-Module "D:\Apps\Visual Studio 2022\Common7\Tools\Microsoft.VisualStudio.DevShell.dll";
-#	Enter-VsDevShell a93d51fe -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
-#	$env:_VSDEVSHELL = "-arch=x64 -host_arch=x64"
-#}
-
 if (-not $env:_VSDEVSHELL) {
 	Import-Module "D:\Apps\Visual Studio 2026\Common7\Tools\Microsoft.VisualStudio.DevShell.dll";
 	Enter-VsDevShell fd534939 -SkipAutomaticLocation -DevCmdArguments "-arch=x64 -host_arch=x64"
@@ -53,7 +47,8 @@ if (-not (Test-Path ".\out\$profile")) {
 	
 if ($reconfigure) {
 	Write-Step "reconfiguring";
-	& cmake -S . -B .\out\$profile -G "Ninja" -DCMAKE_BUILD_TYPE="$profile";
+	$buildType = if (($profile -eq "debug") -or ($profile -eq "stable")) { "Debug" } else { "Release" };
+	& cmake -S . -B .\out\$profile -G "Ninja" -DCMAKE_BUILD_TYPE="$buildType";
 
 	if ($LASTEXITCODE -ne 0) {
 		exit;
@@ -80,10 +75,10 @@ if ($install) {
 
 if ($test) {
 	Write-Step "running tests";
-	& ./out/$profile/slick-edit-tests.exe
+	& ./out/$profile/jed-tests.exe
 }
 
 if ($run) {
 	Write-Step "running";
-	& ./out/$profile/slick-edit.exe
+	& ./out/$profile/jed.exe
 }

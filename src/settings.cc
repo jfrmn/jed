@@ -478,7 +478,7 @@ static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
 	
 	ID2D1BitmapRenderTarget* bitmapRenderTarget = nullptr;
 	if (HRESULT hr = deviceContext->CreateCompatibleRenderTarget({32.0f, 32.0f}, &bitmapRenderTarget); hr != S_OK) {
-		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %", StrHr(hr));
+		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %s", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -488,13 +488,13 @@ static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
 	bitmapRenderTarget->Clear(D2D1_COLOR_F {1.0f, 0.0f, 1.0f, 1.0f});
 		
 	if (HRESULT hr = bitmapRenderTarget->EndDraw(); hr != S_OK) {
-		LogError("EndDraw() failed. HRESULT: %", StrHr(hr));
+		LogError("EndDraw() failed. HRESULT: %s", StrHr(hr));
 		return nullptr;
 	}
 		
 	ID2D1Bitmap* dummyIcon = nullptr;
 	if (HRESULT hr = bitmapRenderTarget->GetBitmap(&dummyIcon); hr != S_OK) {
-		LogError("GetBitmap() failed. HRESULT: %", StrHr(hr));
+		LogError("GetBitmap() failed. HRESULT: %s", StrHr(hr));
 		return nullptr;
 	}
 	
@@ -585,7 +585,7 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 	filePath[length] = '\0';
 
 	if (GetFileAttributesW(filePath) == INVALID_FILE_ATTRIBUTES) {
-		LogError("file does not exists: '%s'", SIZE_AND_DATA(utf8Path));
+		LogError("file does not exists: '%.*s'", SIZE_AND_DATA(utf8Path));
 		return false;
 	}
 
@@ -598,14 +598,14 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 
 	IWICBitmapFrameDecode* frameDecode = nullptr;
 	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
-		LogError("failed to decode frame. HRESULT: %", StrHr(hr));
+		LogError("failed to decode frame. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 	DEFER(frameDecode->Release());
 	
 	IWICFormatConverter* converter = nullptr;
 	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
-		LogError("CreateFormatConverter() failed. HRESULT: %", StrHr(hr));
+		LogError("CreateFormatConverter() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 	DEFER(converter->Release());
@@ -617,20 +617,20 @@ static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContex
 			nullptr,
 			0.0f,
 			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
-		LogError("failed to initialize converter. HRESULT: %", StrHr(hr));
+		LogError("failed to initialize converter. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 
 	IWICBitmap* wicBitmap = nullptr;
 	if (HRESULT hr = wicFactory->CreateBitmapFromSource(converter, WICBitmapCreateCacheOption::WICBitmapNoCache, &wicBitmap); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %", StrHr(hr));
+		LogError("CreateBitmapFromSource() failed. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 	DEFER(wicBitmap->Release());
 	
 	ID2D1Bitmap* bitmap = nullptr;
 	if (HRESULT hr = deviceContext->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
-		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %", StrHr(hr));
+		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %s", StrHr(hr));
 		return false;
 	}
 	

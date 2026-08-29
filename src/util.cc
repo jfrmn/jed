@@ -199,7 +199,7 @@ bool StringEqualsCaseInsen(std::string_view lhs, std::wstring_view rhs) {
 	if (lhs.size() != rhs.size()) return false;
 
 	for (u64 i = 0; i < lhs.size(); i++) {
-		if (lhs[i] >= 128 || rhs[i] >= 128) return false;
+		if (lhs[i] < 0 || rhs[i] >= 128) return false;
 		if (tolower(lhs[i]) != tolower(static_cast<char>(rhs[i])))
 			return false;
 	}
@@ -290,7 +290,7 @@ bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer, /*out*/ 
 
 	DWORD bytesRead = 0;
 	if (!ReadFile(hFile, buffer->data(), static_cast<u32>(fileSize), &bytesRead, NULL)) {
-		LogError("ReadFile() failed. LastError: %", StrLastErr(GetLastError()));
+		LogError("ReadFile() failed. LastError: %s", StrLastErr(GetLastError()));
 		return false;
 	}
 
