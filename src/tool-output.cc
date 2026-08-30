@@ -1,5 +1,4 @@
 #include "tool-output.hh"
-#include "globals.hh"
 #include "settings.hh"
 #include "util.hh"
 #include "logging.hh"

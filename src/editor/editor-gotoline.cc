@@ -1,6 +1,5 @@
 #include "editor-gotoline.hh"
 #include "editor.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
 

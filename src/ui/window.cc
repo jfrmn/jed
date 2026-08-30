@@ -1,5 +1,4 @@
 #include "window.hh"
-#include "globals.hh"
 #include "graphics.hh"
 #include "logging.hh"
 #include "util.hh"

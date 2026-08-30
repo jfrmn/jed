@@ -1,6 +1,5 @@
 #include "editor-search.hh"
 #include "basic.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
 
@@ -663,14 +662,12 @@ bool EditorSearch::HandleEvent(const Event& event) {
 			return true;
 		}
 		
-	} else {
-		ASSERT(focusedTextbox);
-		const auto [handled, changed] = focusedTextbox->HandleEvent(event);
-		searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
-		return handled;
 	}
-	
-	return false;
+
+	ASSERT(focusedTextbox);
+	const auto [handled, changed] = focusedTextbox->HandleEvent(event);
+	searchIsDirty |= changed && (focusedTextbox == &textboxSearch);
+	return handled;	
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

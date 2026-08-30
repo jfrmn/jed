@@ -1,6 +1,5 @@
 #include "search-bar.hh"
 #include "basic.hh"
-#include "globals.hh"
 #include "commands.hh"
 #include "tools.hh"
 #include "events.hh"
@@ -12,9 +11,9 @@
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/parameter-configurator.hh"
+#include "ui/animation.hh"
 #include "graphics.hh"
 
-#include <cmath>
 #include <algorithm>
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,18 +22,6 @@
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-static constexpr f32 ITEM_HIGHLIGHT_OPACITY_VALUE_MAX = (F32_PI * 2.0f) * 10.0f; // 10 cylces
-static constexpr f32 ITEM_HIGHLIGHT_OPACITY_SPEED = 0.004f;
-
-static constexpr f32 SPAWN_ANIMATION_MAX = 1.0f;
-static constexpr f32 SPAWN_ANIMATION_SPEED = 0.008f;
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static float ItemHeight() {
-	return MARGIN_X2 + (settings.fontUi.lineHeight * 2);
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBar::Init(std::string_view placeholderText) {
 	
 	textBox.Init(&settings.fontUi, placeholderText);
@@ -52,6 +39,10 @@ SearchBar::~SearchBar() noexcept {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static float ItemHeight() {
+	return MARGIN_X2 + (settings.fontUi.lineHeight * 2);
+}
+
 static void OnClickItem(void* ud, u64 i) {
 	auto self = static_cast<SearchBar*>(ud);
 	self->OnPickItem(i, nullptr);
@@ -69,26 +60,18 @@ void SearchBar::OnUpdate() {
 	// update animation
 	//
 	{
-		itemHighlightAnimationValue += ITEM_HIGHLIGHT_OPACITY_SPEED * deltaTime;
-		if (itemHighlightAnimationValue > ITEM_HIGHLIGHT_OPACITY_VALUE_MAX)
-			itemHighlightAnimationValue = ITEM_HIGHLIGHT_OPACITY_VALUE_MAX;
-		else needsUpdate = true;
-		
-		spawnAnimationValue += SPAWN_ANIMATION_SPEED * deltaTime;
-		if (spawnAnimationValue > SPAWN_ANIMATION_MAX)
-			spawnAnimationValue = SPAWN_ANIMATION_MAX;
-		else needsUpdate = true;
+		AnimationCycling::Advance(&itemHighlightAnimationValue);
+		AnimationLinear::Advance(&spawnAnimationValue, 0.008f);
 	}
 	
 	//
 	// spawn animation
 	//
-	//LogDevVar(spawnAnimationValue);
 	const f32 halfWidth = RectWidth(area) / 2.0f;
 	const D2D_RECT_F animatedArea {
-		.left = area.left + halfWidth - (halfWidth * spawnAnimationValue),
-		.top = area.top,
-		.right = area.right - halfWidth + (halfWidth * spawnAnimationValue),
+		.left   = area.left + halfWidth - (halfWidth * AnimationLinear::Value(spawnAnimationValue)),
+		.top    = area.top,
+		.right  = area.right - halfWidth + (halfWidth * AnimationLinear::Value(spawnAnimationValue)),
 		.bottom = area.bottom};
 	
 	//
@@ -147,7 +130,7 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 		const f32 opacityBefore = brushGlow->GetOpacity();
 		DEFER(brushGlow->SetOpacity(opacityBefore));
 		
-		const f32 opacity = std::sin(itemHighlightAnimationValue) * 0.4f + 0.5f;
+		const f32 opacity = AnimationCycling::Value(itemHighlightAnimationValue);
 		brushGlow->SetOpacity(opacity);
 		
 		deviceContext->FillRectangle(itemArea, brushGlow);

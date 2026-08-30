@@ -1,5 +1,4 @@
 #include "app.hh"
-#include "globals.hh"
 #include "settings.hh"
 
 #include "graphics.hh"
@@ -11,10 +10,7 @@
 #include "ui/window.hh"
 #include "logging.hh"
 #include "file-watcher.hh"
- 
-// @DUMMY
-#include "editor/editor.hh"
- 
+  
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static bool GetPerformanceFrequency(u64* ticksPerMs) {
 	LARGE_INTEGER freq;
@@ -33,6 +29,9 @@ static u64 GetPerformanceTimestamp() {
 	QueryPerformanceCounter(&ticks);	
 	return ticks.QuadPart;
 }
+
+extern bool needsUpdate;
+extern f32 deltaTime;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 int main(int argc, char** argv) {

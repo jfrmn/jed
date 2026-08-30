@@ -17,6 +17,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <cctype>
 #include <algorithm>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -180,7 +181,7 @@ static u64 GetIndentationEnd(TextController* self, u64 linenr) {
 
 	u64 col = 0;
 	for (; col < line.length; col++) {
-		if (std::isspace(line.data[col]) != 0) {
+		if (std::isspace(line.data[col]) == 0) {
 			return col;
 		}
 	}
@@ -350,11 +351,11 @@ static void MoveToNextWord(TextController* self, TextPosition* position) {
 	}
 
 	char currentChar = line.data[position->character];
-	const int wasAlphaNumeric = std::isalnum(currentChar);
+	const bool wasAlphaNumeric = std::isalnum(currentChar) != 0;
 
 	// @FIXME does not respect multibyte-codepoints
 
-	while (std::isalnum(currentChar) == wasAlphaNumeric
+	while ((std::isalnum(currentChar) != 0) == wasAlphaNumeric
 		|| IsMultibyteCodepointMember(currentChar)) {
 
 		position->character++;
@@ -384,9 +385,9 @@ static void MoveToPrevWord(TextController* self, TextPosition* position) {
 	u64 prevColumn = position->character - 1;
 	char prevChar = line.data[prevColumn];
 
-	const int wasAlphaNumeric = std::isalnum(prevChar);
+	const bool wasAlphaNumeric = std::isalnum(prevChar) != 0;
 
-	while (std::isalnum(prevChar) == wasAlphaNumeric
+	while ((std::isalnum(prevChar) != 0) == wasAlphaNumeric
 		|| IsMultibyteCodepointMember(prevChar)) {
 		
 		if (prevColumn == 0u) {
@@ -1778,8 +1779,8 @@ bool TextController::HandleEvent(const Event& event, /*out*/ TextChange** change
 		else if (event.keypress.vkc == VK_LEFT   && event.keypress.mods == (KM_Ctrl | KM_Shift)) Select(this, MoveToPrevWord);
 		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == KM_Shift) Select(this, MoveToLineStart);
 		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) Select(this, MoveToLineEnd);
-		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == (KM_Shift | KM_Ctrl)) Select(this, MoveToBufferStart);
-		else if (event.keypress.vkc == VK_END    && event.keypress.mods == KM_Shift) Select(this, MoveToBufferEnd);
+		else if (event.keypress.vkc == VK_HOME   && event.keypress.mods == (KM_Ctrl | KM_Shift)) Select(this, MoveToBufferStart);
+		else if (event.keypress.vkc == VK_END    && event.keypress.mods == (KM_Ctrl | KM_Shift)) Select(this, MoveToBufferEnd);
 		else if (event.keypress.vkc == VK_PRIOR  && event.keypress.mods == KM_Shift) Select(this, MovePageUp);
 		else if (event.keypress.vkc == VK_NEXT   && event.keypress.mods == KM_Shift) Select(this, MovePageDown);
 		else if (event.keypress.vkc == VK_BACK   && event.keypress.mods == KM_None)  Delete(this, change, MovePrevChar);

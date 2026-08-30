@@ -1,5 +1,5 @@
 #include "parameter-configurator.hh"
-#include "globals.hh"
+
 #include "events.hh"
 #include "settings.hh"
 

@@ -1,5 +1,5 @@
 #include "file-preview.hh"
-#include "globals.hh"
+
 #include "settings.hh"
 
 #include "ui/constants.h"

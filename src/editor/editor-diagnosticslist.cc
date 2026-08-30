@@ -1,17 +1,15 @@
 #include "editor-diagnosticslist.hh"
-#include "globals.hh"
 #include "events.hh"
+#include "glyph-run.hh"
+#include "graphics.hh"
 #include "settings.hh"
+#include "util.hh"
 
 #include "editor/editor.hh"
 #include "editor/editor-diagnostics.hh"
 
 #include "ui/constants.h"
-
-#include "glyph-run.hh"
-#include "graphics.hh"
-
-#include "util.hh"
+#include "ui/animation.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

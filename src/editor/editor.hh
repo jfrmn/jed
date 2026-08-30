@@ -75,10 +75,9 @@ struct Editor {
 	
 	bool insertAnimationRunning                          = false;
 	std::vector<InsertAnimationData> insertAnimationData = {};
-	f32 insertAnimationOpacity                           = 0.0f;
+	f32 insertAnimationValue                             = 0.0f;
 	
-	f32 cursorBlinkValue = 0.0f;
-	u64 cursorBlickStopTick = 0u;
+	f32 cursorBlinkAnimationValue = 0.0f;
 	
 	TSParser* tsParser = nullptr;
 	TSTree* tsTree = nullptr;

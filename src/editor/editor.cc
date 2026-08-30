@@ -1,11 +1,11 @@
 #include "editor.hh"
-#include "globals.hh"
 #include "settings.hh"
 
 #include "graphics.hh"
 #include "language/language.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
+#include "ui/animation.hh"
 
 #include "logging.hh"
 #include "util.hh"
@@ -31,10 +31,6 @@
 #undef DrawText
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-constexpr float INSERT_ANIMATION_SPEED = 0.002f;
-constexpr float CURSOR_ANIMATION_SPEED = 0.004f;
-constexpr float CURSOR_ANIMATION_MAX_VALUE = (2.0f * F32_PI * 10.0f); // 10 cycles
-
 #define LINENUMBERS_MAX_DIGITS 4
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -363,7 +359,7 @@ void Editor::AddInsertAnimationData(TextPosition from, TextPosition to) {
 }
 
 void Editor::StartInsertAnimation() {	
-	insertAnimationOpacity = 1.0f;
+	insertAnimationValue = 0.0f;
 	insertAnimationRunning = true;
 }
 
@@ -872,11 +868,8 @@ void Editor::Update() {
 	//	
 	{
 		f32 fillingOpacity = NAN;
-		if (cursorBlinkValue < CURSOR_ANIMATION_MAX_VALUE) {
-			fillingOpacity = std::cos(cursorBlinkValue + F32_PI) * 0.5f + 0.5f;
-			cursorBlinkValue += CURSOR_ANIMATION_SPEED * deltaTime;
-			needsUpdate = true;
-		}
+		if (const bool ended = AnimationCycling::Advance(&cursorBlinkAnimationValue); !ended)
+			fillingOpacity = AnimationCycling::Value(cursorBlinkAnimationValue, 0.5f, -(F32_PI / 2.0f));
 		
 		const D2D_SIZE_F caretSize {
 			.width  = settings.fontEditor.spaceAdvance,
@@ -895,7 +888,7 @@ void Editor::Update() {
 				TranslateTextPosition(this, caret.position),
 				caretSize);
 				
-			ID2D1SolidColorBrush* brushCaret = settings.GetBrushEditorText();			
+			ID2D1SolidColorBrush* brushCaret = settings.GetBrushEditorText();
 			deviceContext->DrawRectangle(caretRect, brushCaret);
 			
 			// draw blink animation
@@ -960,22 +953,19 @@ void Editor::Update() {
 	//
 	// insert-animation
 	//
-	if (insertAnimationRunning) {
+	if (!insertAnimationData.empty()) {
+		
+		const bool animationEnded = AnimationLinear::Advance(&insertAnimationValue);
 		
 		ID2D1SolidColorBrush* brushInsertAnim = UseColor(settings.colors.selection);
-		brushInsertAnim->SetOpacity(insertAnimationOpacity);
+		brushInsertAnim->SetOpacity(1.0f - AnimationLinear::Value(insertAnimationValue));
 		DEFER(brushInsertAnim->SetOpacity(1.0f));
 		
 		for (const InsertAnimationData& insertData : insertAnimationData)
 			IterateGlyphRange(this, insertData.from, insertData.to, HighlightTextRange);
 		
-		insertAnimationOpacity -= deltaTime * INSERT_ANIMATION_SPEED;
-		if (insertAnimationOpacity < .0f) {
+		if (animationEnded)
 			insertAnimationData.clear();
-			insertAnimationRunning = false;
-		} else {
-			needsUpdate = true;
-		}
 	}
 
 	//
@@ -1165,12 +1155,6 @@ void Editor::OnFileChange(const FileChangeRecord* fileChangeRecord) {
 }
 
 bool Editor::HandleEvent(const Event& event) {
-
-	if (toolWindow && toolWindow->HandleEvent(event))
-		return true;
-	
-	if (editorCaretAttached && editorCaretAttached->HandleEvent(event))
-		return true;
 	
 	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_ESCAPE && event.keypress.mods == KM_None) {
 		if (toolWindow) {
@@ -1182,11 +1166,15 @@ bool Editor::HandleEvent(const Event& event) {
 		 	editorCaretAttached->RemoveReference();
 		 	editorCaretAttached = nullptr;
 		 	return true;
-	 	}
-	 	
-	 	return false;
+	 	}	 	
 	}
-			
+
+	if (toolWindow && toolWindow->HandleEvent(event))
+		return true;
+
+	if (editorCaretAttached && editorCaretAttached->HandleEvent(event))
+		return true;
+
 	if (event.type == Event::Type_Command) {
 		if (event.cmd.id == Command::Id_Editor_OpenSearch) {		
 			const bool showReplace = event.cmd.parameters.front().boolValue;
@@ -1301,15 +1289,13 @@ bool Editor::HandleEvent(const Event& event) {
 		
 	if (TextChange* change = nullptr; textController.HandleEvent(event, &change)) {
 		if (change) {
-	
 			ProcessTextChange(change);
 		
-				if (editorCaretAttached)
+			if (editorCaretAttached)
 				editorCaretAttached->OnInput();
-			
-			cursorBlinkValue = 0u;
 		}
 		
+		cursorBlinkAnimationValue = 0.0f;
 		return true;
 	}
 	
