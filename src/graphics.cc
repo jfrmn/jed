@@ -77,6 +77,7 @@ static constexpr f32 STANDARD_DEVIATION = 10.0f;
 ID2D1Effect* blurEffect = nullptr;
 ID2D1Effect* shadowEffect = nullptr;
 ID2D1Effect* blendEffect = nullptr;
+ID2D1DeviceContext* deviceContext = nullptr;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bool InitGraphics(ID2D1DeviceContext* deviceContext) {

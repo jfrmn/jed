@@ -1,6 +1,5 @@
 #include "app.hh"
 #include "basic.hh"
-#include "globals.hh"
 #include "settings.hh"
 #include "file-watcher.hh"
 #include "explorer.hh"
@@ -11,6 +10,7 @@
 #include "graphics.hh"
 #include "editor/editor.hh"
 #include "ui/constants.h"
+#include "ui/animation.hh"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -1158,7 +1158,9 @@ void App::HandleEvent(const Event& event) {
 
 void App::PullEvent() {
 	const Event& event = mainWindow.event;
-	if (Command command; settings.LookupKeyBind(event, &command)) {
+	if (event.type == Event::Type_None) {
+		return;
+	} else if (Command command; settings.LookupKeyBind(event, &command)) {
 		HandleEvent(Event {
 			.type = Event::Type_Command,
 			.cmd = command});

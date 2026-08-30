@@ -1,6 +1,6 @@
 #include "editor-selectgototype.hh"
 #include "editor.hh"
-#include "globals.hh"
+
 #include "events.hh"
 #include "settings.hh"
 #include "editor-textlocationlist.hh"

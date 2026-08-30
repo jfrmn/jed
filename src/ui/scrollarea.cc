@@ -1,8 +1,8 @@
 #include "scrollarea.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
 #include "util.hh"
+#include "graphics.hh"
 #include "ui/window.hh"
 
 #include <algorithm>

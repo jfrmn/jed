@@ -1,7 +1,6 @@
 #include "editor-autocomplete.hh"
 #include "editor/editor.hh"
 #include "editor/editor-signaturehelp.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
 #include "util.hh"
@@ -15,7 +14,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1_1.h>
-
 
 EditorAutocomplete* EditorAutocomplete::Make(Editor* editor) {
 

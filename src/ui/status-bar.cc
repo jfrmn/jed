@@ -1,5 +1,4 @@
 #include "status-bar.hh"
-#include "globals.hh"
 #include "settings.hh"
 
 #include "editor/editor.hh"

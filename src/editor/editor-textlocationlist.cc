@@ -1,6 +1,6 @@
 #include "editor-textlocationlist.hh"
 #include "events.hh"
-#include "globals.hh"
+
 #include "editor.hh"
 #include "settings.hh"
 #include "events.hh"

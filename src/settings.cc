@@ -337,6 +337,7 @@ Settings settings {
 		{MakeKey(VK_F11,   KM_None),            Settings::KeyBind {.commandId = Command::Id_ClosePanel}},
 		{MakeKey(VK_F12,   KM_None),            Settings::KeyBind {.commandId = Command::Id_CloseFile}},
 		{MakeKey(VK_F12,   KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_ClosePanelAndFile}},
+		{MakeKey('N',      KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_NewFile}},
 		
 		{MakeKey(VK_NEXT,  KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_GotoNextDiagnosticRecord}},
 		{MakeKey(VK_PRIOR, KM_Ctrl),            Settings::KeyBind {.commandId = Command::Id_GotoPrevDiagnosticRecord}},

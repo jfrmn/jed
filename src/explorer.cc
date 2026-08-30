@@ -1,14 +1,14 @@
 #include "explorer.hh"
-#include "globals.hh"
 #include "app.hh"
 #include "settings.hh"
 #include "util.hh"
 #include "logging.hh"
+#include "graphics.hh"
+#include "glyph-run.hh"
 
 #include "ui/constants.h"
 #include "ui/window.hh"
-#include "graphics.hh"
-#include "glyph-run.hh"
+#include "ui/animation.hh"
 
 #include <string>
 #include <algorithm>
@@ -20,19 +20,7 @@
 #include <comdef.h>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-constexpr float HIGHLIGHT_ANIMATION_MAX_VALUE = F32_PI;
-constexpr float HIGHLIGHT_ANIMATION_SPEED = 0.006f;
-
 constexpr float TEXTBOX_PANEL_WIDTH = 250.0f;
-
-constexpr float COPY_ANIMATION_MAX = F32_PI;
-constexpr float COPY_ANIMATION_SPEED = 0.006f;
-
-constexpr float INSERT_ANIMATION_MAX = 1.0f;
-constexpr float INSERT_ANIMATION_SPEED = 0.002f;
-
-constexpr float ACTIVE_ITEM_ANIMATION_MAX = (F32_PI * 2.0f) * 10.0f; // 10 cycles
-constexpr float ACTIVE_ITEM_ANIMATION_SPEED = 0.004f;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
@@ -296,7 +284,6 @@ static void CommandCopyOrCut(Explorer* self, bool cut) {
 			}
 		}
 		
-		self->copyAnimationRunning = true;
 		self->copyAnimationValue = 0.0f;
 	}
 }
@@ -412,7 +399,6 @@ static void CommandPaste(Explorer* self) {
 			return;
 		}
 		
-		self->insertAnimationRunning = true;
 		self->insertAnimationValue = 0.0f;
 	}
 }
@@ -730,7 +716,6 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 	delete self->newItemDialog;
 	self->newItemDialog = nullptr;
 	RefreshPanelItems(self->activePanel, directoryPath, true);
-	self->insertAnimationRunning = true;
 	self->insertAnimationValue = 0.0f;
 }
 
@@ -837,7 +822,7 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 			ID2D1Brush* brush = nullptr;
 			if (isActiveItemOrRenamed) {
 				brush = settings.GetBrushDropShadow();
-				brush->SetOpacity(std::sin(self->activeItemAnimationValue) * 0.4f + 0.5f);
+				brush->SetOpacity(AnimationCycling::Value(self->activeItemAnimationValue, 0.4f));
 				DEFER(brush->SetOpacity(1.0));
 				
 				deviceContext->FillRectangle(itemArea, brush);
@@ -855,24 +840,26 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 				deviceContext->FillRoundedRectangle(ToRounded(itemArea), settings.GetBrushSelection());
 				
 			if (item.flags & Explorer::Item::Flag_Inserted) {
+					
 				ID2D1SolidColorBrush* insertAnimBrush = settings.GetBrushSelection();
-				insertAnimBrush->SetOpacity(1.0f - self->insertAnimationValue);
+				insertAnimBrush->SetOpacity(1.0f - AnimationLinear::Value(self->insertAnimationValue));
 				DEFER(insertAnimBrush->SetOpacity(1.0f));
 				
 				deviceContext->FillRectangle(itemArea, insertAnimBrush);
 				
-				if (!self->insertAnimationRunning)
+				if (AnimationLinear::Ended(self->insertAnimationValue))
 					item.flags &= ~Explorer::Item::Flag_Inserted;
 			}
 			
 			if (item.flags & Explorer::Item::Flag_Copied) {
+				
 				ID2D1SolidColorBrush* copyAnimBrush = settings.GetBrushSelection();
-				copyAnimBrush->SetOpacity(std::sin(self->copyAnimationValue));
+				copyAnimBrush->SetOpacity(AnimationPulse::Value(self->copyAnimationValue));
 				DEFER(copyAnimBrush->SetOpacity(1.0f));
 				
 				deviceContext->FillRectangle(itemArea, copyAnimBrush);
 				
-				if (!self->copyAnimationRunning)
+				if (AnimationPulse::Ended(self->copyAnimationValue))
 					item.flags &= ~Explorer::Item::Flag_Copied;
 			}
 		}
@@ -926,31 +913,14 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 }
 
 void Explorer::Update() {
-
+	
 	// advance animations
 	{
-		if (insertAnimationRunning) {
-			insertAnimationValue += INSERT_ANIMATION_SPEED * deltaTime;
-			if (insertAnimationValue > INSERT_ANIMATION_MAX) {
-				insertAnimationValue = INSERT_ANIMATION_MAX;
-				insertAnimationRunning = false;
-			} else needsUpdate = true;
-		}
-		
-		if (copyAnimationRunning) {
-			copyAnimationValue += COPY_ANIMATION_SPEED * deltaTime;
-			if (copyAnimationValue >= COPY_ANIMATION_MAX) {
-				copyAnimationValue =  COPY_ANIMATION_MAX;
-				copyAnimationRunning = false;
-			} else needsUpdate = true;
-		}
-		
-		activeItemAnimationValue += ACTIVE_ITEM_ANIMATION_SPEED * deltaTime;
-		if (activeItemAnimationValue > ACTIVE_ITEM_ANIMATION_MAX)
-			activeItemAnimationValue = ACTIVE_ITEM_ANIMATION_MAX;
-		else needsUpdate = true;
+		AnimationLinear::Advance(&insertAnimationValue);
+		AnimationPulse::Advance(&copyAnimationValue);
+		AnimationCycling::Advance(&activeItemAnimationValue);
 	}
-		
+
 	// panels
 	{
 		for (Panel* panel = activePanel->parent; panel != nullptr; panel = panel->parent)
@@ -1008,15 +978,17 @@ void Explorer::Update() {
 bool Explorer::HandleEvent(const Event& event) {
 	
 	if (event.type == Event::Type_KeyPress) {
-		if (event.keypress.vkc == VK_ESCAPE || event.keypress.vkc == VK_RIGHT) {
-			delete newItemDialog;
-			newItemDialog = nullptr;
-			return true;
-			
-		} else if (event.keypress.vkc == VK_RETURN) {
-			if (newItemDialog) {
-				ActionConfirmTextboxPanel(this);
+		if (newItemDialog) {
+			if (event.keypress.vkc == VK_ESCAPE || event.keypress.vkc == VK_LEFT) {
+				delete newItemDialog;
+				newItemDialog = nullptr;
 				return true;
+			
+			} else if (event.keypress.vkc == VK_RETURN) {
+				if (newItemDialog) {
+					ActionConfirmTextboxPanel(this);
+					return true;
+				}
 			}
 		
 		} else if (event.keypress.vkc == VK_DOWN || event.keypress.vkc == VK_UP) {
@@ -1097,11 +1069,12 @@ bool Explorer::HandleEvent(const Event& event) {
 	
 		return true;
 	
-	} else if (newItemDialog) {
-		return newItemDialog->textbox.HandleEvent(event).handled;
 	}
+
+	if (newItemDialog)
+		return newItemDialog->textbox.HandleEvent(event).handled;
 	
-	return false;	
+	return false;
 }
 
 Explorer::~Explorer() noexcept {}

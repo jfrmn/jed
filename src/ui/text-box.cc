@@ -1,8 +1,8 @@
 #include "text-box.hh"
 #include "basic.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
+#include "graphics.hh"
 
 #include "ui/constants.h"
 

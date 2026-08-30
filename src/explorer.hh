@@ -12,6 +12,7 @@ struct Explorer {
 	
 	//-------------------------------------------
 	// types
+	//-------------------------------------------
 	
 	struct Panel;
 
@@ -61,22 +62,24 @@ struct Explorer {
 
 	//-------------------------------------------
 	// data
+	//-------------------------------------------
 
 	Panel* activePanel = nullptr;
 	NewItemDialog* newItemDialog = nullptr;
 	
-	bool insertAnimationRunning = false;
-	f32  insertAnimationValue = 0.0f;
+	//bool insertAnimationRunning   = false;
+	f32  insertAnimationValue     = 0.0f;
 	
-	bool copyAnimationRunning = false;
-	f32  copyAnimationValue = 0.0f;
+	//bool copyAnimationRunning     = false;
+	f32  copyAnimationValue       = 0.0f;
 	
-	f32 activeItemAnimationValue = 0.0f;
+	f32  activeItemAnimationValue = 0.0f;
 	
 	bool shouldClose = false;
 	
 	//-------------------------------------------
 	// functions
+	//-------------------------------------------
 	
 	static Explorer* Make();
 	~Explorer() noexcept;

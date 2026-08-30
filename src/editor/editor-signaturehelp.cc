@@ -1,6 +1,5 @@
 #include "editor-signaturehelp.hh"
 #include "editor/editor.hh"
-#include "globals.hh"
 #include "events.hh"
 #include "settings.hh"
 #include "util.hh"
