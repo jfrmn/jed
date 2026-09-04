@@ -741,6 +741,22 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 		}
 	}
 	
+	//
+	// load fallback font
+	//
+	if (!fontEditor.Init(Font::Description {
+		.name = "Consolas",
+		.size = 12.0f})) {
+		LogFatal("failed to load fallback font 'Consolas' 12pt");
+		return false;
+	}
+	if (!fontEditor.Init(Font::Description {
+		.name = "Arial",
+		.size = 12.0f})) {
+		LogFatal("failed to load fallback font 'Arial' 12pt");
+		return false;
+	}
+	
 	const std::string settingsFilepath = 
 #ifdef _DEBUG
 	 ".\\settings.toml";

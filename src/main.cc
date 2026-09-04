@@ -8,60 +8,52 @@
 #include "language/json-helper.hh"
 
 #include "ui/window.hh"
+#include "ui/animation.hh"
 #include "logging.hh"
 #include "file-watcher.hh"
-  
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static bool GetPerformanceFrequency(u64* ticksPerMs) {
-	LARGE_INTEGER freq;
-	if (!QueryPerformanceFrequency(&freq)) {
-		LogError("QueryPerformanceFrequency() failed. Last Error: %s", StrLastErr(GetLastError()));
-		return false;
-	}
-	
-	*ticksPerMs = (freq.QuadPart / 1000);
-	LogInfo("Performance Frequency: %zu/ms", *ticksPerMs);
-	return true;
-}
 
-static u64 GetPerformanceTimestamp() {
-	LARGE_INTEGER ticks;
-	QueryPerformanceCounter(&ticks);	
-	return ticks.QuadPart;
-}
 
-extern bool needsUpdate;
-extern f32 deltaTime;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-int main(int argc, char** argv) {
+// NOTE: don't make these functions static, they are used in the test-executable also...
 
-	LogInfo("application startup");
-
+bool Init() {
 	if (!InitJsonLib()) {
 		LogFatal("failed to set malloc and free for json allocator");
-		return -1;
+		return false;
 	}
 	
 	if (!InitFactories()) {
 		LogFatal("init directx factories failed");
-		return -1;
+		return false;
 	}
 	
 	if (!InitStaticShapingBuffer()) {
 		LogFatal("init StaticTextAnalyzer failed");
-		return -1;
+		return false;
 	}
 	
-	u64 ticksPerMs = 0u;	
-	if (!GetPerformanceFrequency(&ticksPerMs))
-		LogError("init perforamnce counters failed");
+	if (!InitPerformanceCounter()) {
+		LogFatal("init performance counter failed");
+		return false;
+	}
+
+	const Window::CreateParams windowCreateParams {
+	 	.className = "JEDWND",
+#ifndef _TESTING
+	 	.title = "jed",
+	 	.width = 1920,
+	 	.height = 1080,
+#else
+	 	.title = "jed - TESTING",
+	 	.width = 800,
+	 	.height = 600,
+#endif
+	 	.hWndParent = NULL};
 	
-	
-	const Window::CreateParams windowCreateParams {.className = "JEDWND", .title = "jed", .width = 1920, .height = 1080, .hWndParent = NULL};
 	if (!mainWindow.Create(windowCreateParams)) {
 		LogFatal("creating window failed");
-		return -1;
+		return false;
 	}
 	
 	if (!settings.Init(mainWindow.deviceContext)) {
@@ -70,7 +62,7 @@ int main(int argc, char** argv) {
 	
 	if (!InitGraphics(mainWindow.deviceContext)) {
 		LogFatal("init effects failed");
-		return -1;
+		return false;
 	}
 	
 	if (!Language::LoadLanguages(".\\config\\languages"))
@@ -78,16 +70,38 @@ int main(int argc, char** argv) {
 	
 	if (!fileWatcher.Init()) {
 		LogFatal("init file watcher failed");
-		return -1;
+		return false;
 	}
 		
 	if (!app.Init()) {
 		LogError("init main window failed");
-		return -1;
+		return false;
 	}
 	
+	return true;
+}
+
+void Shutdown() {
+	app.Shutdown();
+	mainWindow.CleanUp();
+	fileWatcher.Shutdown();
+	ShutdownGraphics();
+	ShutdownFactories();
+	CloseLogger();
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#ifndef _TESTING
+
+int main(int argc, char** argv) {
+	OpenLogger(LogLevel_Trace, LogOutput_Stdout);
+
+	LogInfo("application startup");
+	if (!Init()) return -1;
+	
+	LogInfo("showing window");
 	mainWindow.Show();
-		
+	
 	LogInfo("running message loop");
 
 	u64 ticksBefore = 0;
@@ -114,17 +128,14 @@ int main(int argc, char** argv) {
 			ticksBefore = GetPerformanceTimestamp();
 		}
 		
-		needsUpdate = false;		
+		needsUpdate = false;
 		app.PullEvent();
 		app.Update();
 		mouse.NextFrame(mainWindow.event);
 		mainWindow.ClearEvent();
 	}
 	
-	app.Shutdown();
-	mainWindow.CleanUp();
-	fileWatcher.Shutdown();
-	ShutdownGraphics();
-	ShutdownFactories();	
+	Shutdown();
 	return 0;
 }
+#endif

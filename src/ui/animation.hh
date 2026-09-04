@@ -3,6 +3,7 @@
 
 extern bool needsUpdate;
 extern f32 deltaTime;
+extern u64 ticksPerMs;
 
 // x=y; from 0 to 1
 namespace AnimationLinear {
@@ -24,3 +25,6 @@ namespace AnimationPulse {
 	bool Ended(f32 inValue);
 	f32  Value(f32 inValue);
 };
+
+bool InitPerformanceCounter();
+u64  GetPerformanceTimestamp();

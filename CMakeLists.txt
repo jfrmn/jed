@@ -75,18 +75,16 @@ install (FILES "$<TARGET_PDB_FILE:jed>" DESTINATION .)
 
 add_executable (jed-tests)
 
-target_compile_options (jed-tests PRIVATE "/EHsc")
-
-target_include_directories (jed-tests PRIVATE "deps/doctest")
 target_include_directories (jed-tests PRIVATE "src")
+target_include_directories (jed-tests PRIVATE "test")
 target_include_directories (jed-tests PRIVATE $<TARGET_PROPERTY:jed,INCLUDE_DIRECTORIES>)
 
-target_link_libraries(jed-tests PRIVATE $<TARGET_PROPERTY:jed,LINK_LIBRARIES>)
-set_target_properties(jed-tests PROPERTIES CXX_STANDARD 20)
+target_link_libraries (jed-tests PRIVATE $<TARGET_PROPERTY:jed,LINK_LIBRARIES>)
+set_target_properties (jed-tests PROPERTIES CXX_STANDARD 20)
+target_compile_definitions (jed-tests PRIVATE "_TESTING")
 
-file (GLOB_RECURSE TEST_SOURCES "src/*" "test/*")
-list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
-target_sources (jed-tests PRIVATE ${TEST_SOURCES})
+file (GLOB_RECURSE TEST_SOURCES "test/*")
+target_sources (jed-tests PRIVATE ${TEST_SOURCES} ${SOURCES})
 
 install (TARGETS jed-tests RUNTIME DESTINATION .)
 install (FILES "$<TARGET_PDB_FILE:jed-tests>" DESTINATION .)
