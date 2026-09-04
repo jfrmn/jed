@@ -212,7 +212,7 @@ static cJSON* LookupProperty(JsonObjectReader* self, std::string_view property, 
 	if (it == self->properties.end()) return nullptr;
 		
 	if (std::string err; !JsonExpectType(it->second, type, &err)) {
-		LogWarning("json: property '%%%' %", err, (self->object->string ? self->object->string : ""), (self->object->string ? "." : ""), property);
+		LogWarning("json: property '%s%s%s' %.*s", (self->object->string ? self->object->string : ""), (self->object->string ? "." : ""), property, SIZE_AND_DATA(err));
 		return nullptr;
 	}
 	
@@ -422,7 +422,7 @@ bool JsonExpectType(const cJSON* json, int types, /*out*/ std::string* errorStr 
 		.push_back(']');
 	
 	if (errorStr) *errorStr = std::move(errorString);
-	else LogError("json: '%s' %s", (json->string ? json->string : ""), errorString);
+	else LogError("json: '%s' %.*s", (json->string ? json->string : ""), SIZE_AND_DATA(errorString));
 	return false;
 }
 

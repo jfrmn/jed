@@ -182,14 +182,12 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	//
 	language = Language::GetLanguage(GetExtensionFromPath(path));
 	textDocumentIdentifier.uri = MakeUriFromPath(path);	
+	textDocumentIdentifier.version = 0;
 	this->path = std::move(path);
 	
-	if (!LoadFile(this)) {
-		this->path.clear();	
-		language = nullptr;
+	if (!LoadFile(this))
 		return FileResult_Failure;
-	}
-			
+		
 	//
 	// reset some stuff
 	//
@@ -1306,7 +1304,7 @@ bool Editor::HandleEvent(const Event& event) {
 Editor::~Editor() noexcept {
 
 	if (editorCaretAttached)
-	 	editorCaretAttached->RemoveReference();
+		editorCaretAttached->RemoveReference();
 
 	delete toolWindow;
 	

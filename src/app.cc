@@ -295,13 +295,6 @@ Editor* App::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBeha
 			
 			} else if (openBehavior == App::OpenBehavior_TabOnly) {
 				newTab.panelIndex = U64_MAX;
-			
-			} else if (panels.empty()) {
-				auto newPanel = panels.emplace_back();
-				newPanel.tabIndex = tabs.size() - 1;
-				newPanel.editor = newTab.editor;
-				focusedPanelIndex = 0u;
-				newTab.panelIndex = 0u;
 				
 			} else {
 				ASSERT_UNREACHABLE;
