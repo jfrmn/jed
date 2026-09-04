@@ -11,6 +11,10 @@
 #define TOML_IMPLEMENTATION 1
 #include <toml++/toml.hpp>
 
+#include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static const char* logLevelPrefix[] = {
 	nullptr /* OFF */,
@@ -47,12 +51,79 @@ void Logger::Log(LogLevel msgLevel, const char* fmt, va_list args) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static std::mutex mtxCout {};
+static std::mutex mtxLogger {};
 Logger logger {
 	.level = LogLevel_Trace,
 	.prefix = {},
-	.out = stdout,
-	.mtx = &mtxCout};
+	.out = NULL,
+	.mtx = &mtxLogger};
+	
+bool OpenLogger(LogLevel level, LogOutput logOutput, const char* filename) {
+	logger.level = level;
+	
+	if (logOutput == LogOutput_Stdout) {
+		logger.out = stdout;
+	
+	} else if (logOutput == LogOutput_Temporary) {
+		
+		SYSTEMTIME systemTime {0};
+		GetSystemTime(&systemTime);
+	
+		char fileName[_MAX_PATH] {0};
+		sprintf_s(fileName, ".\\%2d%2d_jed.tmp.log", systemTime.wHour, systemTime.wMinute);
+		
+        HANDLE hFile = CreateFileA(fileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+	    if (hFile == INVALID_HANDLE_VALUE) {
+		    fputs("CreateFileA() failed", stderr);
+		    return false;
+	    }
+	    
+	    int fileDescriptor = _open_osfhandle(reinterpret_cast<intptr_t>(hFile), _O_RDWR);
+    	if (fileDescriptor == -1) {
+        	CloseHandle(hFile);
+        	fputs("_open_osfhandle() failed", stderr);
+        	return false;
+    	}
+
+    	FILE* file = _fdopen(fileDescriptor, "w");
+    	if (!file) {
+    		_close(fileDescriptor);
+    		fputs("_fdopen() failed", stderr);
+    		return false;
+		}
+    	
+		logger.out = file;
+	
+	} else if (logOutput == LogOutput_File) {
+		char fileNameBuffer[_MAX_PATH] {0};
+		if (!filename) {
+			SYSTEMTIME systemTime {0};
+			GetSystemTime(&systemTime);
+
+			sprintf_s(fileNameBuffer, ".\\%2d%2d_jed.tmp.log", systemTime.wHour, systemTime.wMinute);
+			
+			filename = fileNameBuffer;
+		}
+		
+		FILE* file = NULL;
+		const errno_t err = fopen_s(&file, filename, "a");
+		if (err != 0 || !file) {
+			fputs("fopen() failed", stderr);
+			return false;
+		}
+		
+		logger.out = file;
+	
+	} else return false;
+	
+	return true;
+}
+
+void CloseLogger() {
+	fflush(logger.out);	
+	if (logger.out != stdout)
+		fclose(logger.out);
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void LogDev(const char* fmt, ...) {
@@ -156,55 +227,51 @@ static const char* WaitResultString(DWORD res) {
 	}
 }
 
+static char printBuffer[256] {0};
+
 const char* StrHr(long hResult) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
+	memset(printBuffer, 0, sizeof(printBuffer));
 	const _com_error comError {hResult};
-	sprintf_s(buffer, "0x%x %s %s", hResult, CommonHResultString(hResult), comError.ErrorMessage());
-	return buffer;
+	sprintf_s(printBuffer, "0x%x %s %s", hResult, CommonHResultString(hResult), comError.ErrorMessage());
+	return printBuffer;
 }
 
 const char* StrLastErr(unsigned long lastErr) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
+	memset(printBuffer, 0, sizeof(printBuffer));
 	const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
-	sprintf_s(buffer, "%d %s", lastErr, comError.ErrorMessage());
-	return buffer;
+	sprintf_s(printBuffer, "%d %s", lastErr, comError.ErrorMessage());
+	return printBuffer;
 }
 
 const char* StrWaitRes(unsigned long waitRes) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
+	memset(printBuffer, 0, sizeof(printBuffer));
 	const char* str = WaitResultString(waitRes);
-	sprintf_s(buffer, "0x%x %s", waitRes, str);
-	return buffer;
+	sprintf_s(printBuffer, "0x%x %s", waitRes, str);
+	return printBuffer;
 }
 
 const char* Str(const std::from_chars_result& fcr) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
+	memset(printBuffer, 0, sizeof(printBuffer));
 	const std::error_code code = std::make_error_code(fcr.ec);
-	sprintf_s(buffer, "(%d) %s", code.value(), code.message().c_str());
-	return buffer;
+	sprintf_s(printBuffer, "(%d) %s", code.value(), code.message().c_str());
+	return printBuffer;
 }
 
 const char* Str(const std::to_chars_result& tcr) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
+	memset(printBuffer, 0, sizeof(printBuffer));
 	const std::error_code code = std::make_error_code(tcr.ec);
-	sprintf_s(buffer, "(%d) %s", code.value(), code.message().c_str());
-	return buffer;
+	sprintf_s(printBuffer, "(%d) %s", code.value(), code.message().c_str());
+	return printBuffer;
 }
 
 const char* Str(const toml::source_region& srcRegion) {
-	static char buffer[64];
-	memset(buffer, 0, sizeof(buffer));
-	sprintf_s(buffer, "%s%s%d:%d-%d:%d",
+	memset(printBuffer, 0, sizeof(printBuffer));
+	sprintf_s(printBuffer, "%s%s%d:%d-%d:%d",
 		srcRegion.path ? srcRegion.path->c_str() : "",
 		srcRegion.path ? ": " : "",
 		srcRegion.begin.line,
 		srcRegion.begin.column,
 		srcRegion.end.line,
 		srcRegion.end.column);
-	return buffer;
+	return printBuffer;
 }

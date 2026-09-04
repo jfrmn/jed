@@ -184,10 +184,10 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 	Window* self = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	
 	if (!self)
-		return DefWindowProc(hWnd, nMSG, wParam, lParam);
+		return DefWindowProc(hWnd, nMSG, wParam, lParam);	
 
+#ifdef _TESTING
 	switch (nMSG) {
-
 		case WM_MOUSEMOVE: {
 			mouse.x = GetXFromLParam(lParam);
 			mouse.y = GetYFromLParam(lParam);
@@ -296,7 +296,7 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 				
 		default: break;
 	}
-	
+#endif	
 	
 	if (nMSG == wmUserUpdate) {
 		// we update after every message so don't have to do anything

@@ -1,9 +1,16 @@
 #include "animation.hh"
+#include "logging.hh"
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
 
 #include <cmath>
 
+
 bool needsUpdate = false;
 f32 deltaTime = 0.0f;
+u64 ticksPerMs = 0u;
 
 static bool Advance(f32* inValue, f32 speed, f32 max) {
 	*inValue += speed * deltaTime;
@@ -46,4 +53,22 @@ bool AnimationPulse::Ended(f32 inValue) {
 }
 f32 AnimationPulse::Value(f32 inValue) {
 	return std::sin(inValue);
+}
+
+bool InitPerformanceCounter() {
+	LARGE_INTEGER freq;
+	if (!QueryPerformanceFrequency(&freq)) {
+		LogError("QueryPerformanceFrequency() failed. Last Error: %s", StrLastErr(GetLastError()));
+		return false;
+	}
+	
+	ticksPerMs = (freq.QuadPart / 1000);
+	LogTrace("Performance Frequency: %zu/ms", ticksPerMs);
+	return true;
+}
+
+u64 GetPerformanceTimestamp() {
+	LARGE_INTEGER ticks;
+	QueryPerformanceCounter(&ticks);	
+	return ticks.QuadPart;
 }

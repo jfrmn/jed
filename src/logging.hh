@@ -14,16 +14,26 @@ enum LogLevel {
 	 LogLevel_Trace
 };
 
+enum LogOutput {
+	 LogOutput_Unknown = 0,
+	 LogOutput_Stdout,
+	 LogOutput_Temporary,
+	 LogOutput_File
+};
+
 struct Logger {
 	LogLevel level          = LogLevel_Off;
 	std::string_view prefix = {};
 	FILE* out               = nullptr;
 	std::mutex* mtx         = nullptr;
 
-	void Log(LogLevel level, const char* fmt, va_list list);
+	void Log(LogLevel level, const char* fmt, va_list list); 
 };
 
 extern Logger logger;
+
+bool OpenLogger(LogLevel level, LogOutput logOutput, const char* filename = nullptr);
+void CloseLogger();
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void LogDev(const char* fmt, ...);
