@@ -186,7 +186,7 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 	if (!self)
 		return DefWindowProc(hWnd, nMSG, wParam, lParam);	
 
-#ifdef _TESTING
+#ifndef _TESTING
 	switch (nMSG) {
 		case WM_MOUSEMOVE: {
 			mouse.x = GetXFromLParam(lParam);
