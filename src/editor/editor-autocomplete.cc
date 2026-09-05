@@ -210,13 +210,23 @@ bool EditorAutocomplete::HandleEvent(const Event& event) {
 				DecrementWrapAround(selectedItem, itemCount);
 	
 			return true;
-	
-		} else if ((event.keypress.vkc == VK_RETURN || event.keypress.vkc == VK_TAB) && event.keypress.mods == KM_None) {
+			
+		} else if (event.keypress.vkc == VK_RETURN && event.keypress.mods == KM_None) {
 			InsertItem(this);
 			RemoveReference();
 			return true;
 		}
 	
+	// @IMPROVE
+	// by default the IndentLine command is bound to the tab key.
+	// Because commands win agains hard coded keybinds we never 
+	// revieve the tab keypress.
+	// This solution is a hack to get around this
+	} else if (event.type == Event::Type_Command && event.cmd.id == Command::Id_Text_IndentLine) {
+		InsertItem(this);
+		RemoveReference();
+		return true;	
+		
 	} else if (signatureHelp) {
 		return signatureHelp->HandleEvent(event);
 	}
