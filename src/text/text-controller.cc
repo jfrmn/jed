@@ -900,7 +900,7 @@ static void UnindentLine(TextController* self, TextController::Caret& caret, Tex
 	const std::string_view line = self->buffer.GetLineAt(ln).GetText();
 		
 	u64 charsToRemove = 0;
-		
+	
 	// if we find a tab we can just remove the tab - easy
 	if (line.starts_with('\t')) {
 		charsToRemove = 1;
@@ -931,7 +931,7 @@ static void UnindentLine(TextController* self, TextController::Caret& caret, Tex
 
 static void CommandUnindentLine(TextController* self, TextChange** outChange) {
 
-	TextChange* change = *outChange = self->NewTextChange();
+	TextChange* change = self->NewTextChange();
 	
 	for (TextController::Caret& caret : self->carets) {
 
@@ -945,6 +945,13 @@ static void CommandUnindentLine(TextController* self, TextChange** outChange) {
 			UnindentLine(self, caret, change, caret.position.line);	
 		}
 	}
+	
+	// if there is nothing to unindent we end up with 0 operation
+	// we need to discard that change
+	if (change->count == 0u)
+		self->history.Pop();
+	else
+		*outChange = change;
 }	
 
 static void CommandDuplicateLine(TextController* self, TextChange** outChange) {

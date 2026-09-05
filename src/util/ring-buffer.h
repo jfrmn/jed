@@ -11,6 +11,7 @@ struct RingBuffer {
 	bool Init(usize capa);
 
 	T* Push();
+	void Pop();
 	void Reset();
 	usize UsedSize() const;
 
@@ -35,6 +36,12 @@ inline T* RingBuffer<T>::Push() {
 	written++;
 	
 	return item;
+}
+
+template <class T>
+inline void RingBuffer<T>::Pop() {
+	ASSERT(written > 0u);
+	written--;
 }
 
 template <class T>
