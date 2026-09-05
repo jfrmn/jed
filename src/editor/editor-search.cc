@@ -436,7 +436,7 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 	//
 	// check if the current selection corresponds to a search result
 	//
-	std::vector<EditorSearch::SearchResult>::iterator itSearchResult;
+	std::vector<EditorSearch::SearchResult>::iterator itSearchResult = self->threadData->results.end();
 	{
 		TextPosition selectionFrom, selectionTo;
 		const bool hasSelection = self->owner->textController.GetSelection(&selectionFrom, &selectionTo);
@@ -475,7 +475,6 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 		textBuffer.InsertInLine(itSearchResult->from, replacementText, replaceOperation);
 		
 		self->owner->ProcessTextChange(change);
-		self->owner->PrepareInsertAnimation();
 		self->owner->AddInsertAnimationData(replaceOperation->start, replaceOperation->insertionEnd);
 		self->owner->StartInsertAnimation();
 		
@@ -492,8 +491,10 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 				
 				if (it->from.line != replaceOperation->start.line) break;
 				
-				it->from.character -= replaceOperation->removalEnd.character - replaceOperation->start.character;
-				it->from.character += replaceOperation->insertionEnd.character - replaceOperation->start.character;	
+				replaceOperation->AdjustPosition(it->from);
+				replaceOperation->AdjustPosition(it->to);
+				//it->from.character -= replaceOperation->removalEnd.character - replaceOperation->start.character;
+				//it->from.character += replaceOperation->insertionEnd.character - replaceOperation->start.character;
 			}
 			
 			if (itNextResult == self->threadData->results.end())

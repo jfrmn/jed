@@ -348,7 +348,6 @@ void Editor::GetVisibleLines(/*out*/ u64* pfirst, /*out*/ u64* plast) const {
 }
 
 void Editor::PrepareInsertAnimation(u64 capacity /*= 0u*/) {	
-	insertAnimationData.clear();
 	insertAnimationData.reserve(capacity);
 }
 
