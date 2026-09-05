@@ -839,11 +839,12 @@ static void ActionClosePanel(App* self) {
 }
 
 static void CommandCloseTab(App* self) {
-	//if (self->tabs.size() <= 1u) return;
 	
 	App::Panel& panel = self->panels[self->focusedPanelIndex];
 	
+	//
 	// close old tab
+	//
 	{
 		App::Tab& oldTab = self->tabs[panel.tabIndex];
 		
@@ -859,24 +860,24 @@ static void CommandCloseTab(App* self) {
 		self->tabs.erase(self->tabs.begin() + panel.tabIndex);
 	}
 	
+	//
 	// find a new tab to display
-	{
-		for (u64 i = 0u; i < self->tabs.size(); i++) {
-			App::Tab& tab = self->tabs[i];
-			if (tab.panelIndex == U64_MAX) {
-				panel.editor = tab.editor;
-				goto found_new_tab;
-			}
+	//
+	for (u64 i = 0u; i < self->tabs.size(); i++) {
+		App::Tab& tab = self->tabs[i];
+		if (tab.panelIndex == U64_MAX) {
+			panel.editor = tab.editor;
+			goto found_new_tab;
 		}
 	}
 	
 	// no more tabs to display - close the panel as well
-	{
-		self->panels.erase(self->panels.begin() + self->focusedPanelIndex);
-		ASSERT(!self->panels.empty());
-		
-		if (self->focusedPanelIndex == self->panels.size())
-			self->focusedPanelIndex--;
+	self->panels.erase(self->panels.begin() + self->focusedPanelIndex);	
+	
+	if (self->focusedPanelIndex == self->panels.size()) {
+		// Underflows when panels are empty but that's fine.
+		// In that case we want focused panel to be U64_MAX anyway.
+		self->focusedPanelIndex--;
 	}
 	
 found_new_tab:
@@ -889,7 +890,9 @@ static void ActionCloseTabAndPanel(App* self) {
 	
 	App::Panel& panel = self->panels[self->focusedPanelIndex];
 	
+	//
 	// close old tab
+	//
 	{
 		App::Tab& oldTab = self->tabs[panel.tabIndex];
 		
@@ -905,15 +908,17 @@ static void ActionCloseTabAndPanel(App* self) {
 		self->tabs.erase(self->tabs.begin() + panel.tabIndex);
 	}
 	
+	//
 	// close panel
-	{
-		self->panels.erase(self->panels.begin() + self->focusedPanelIndex);
-		ASSERT(!self->panels.empty());
-		
-		if (self->focusedPanelIndex == self->panels.size())
-			self->focusedPanelIndex--;
-	}
+	//
+	self->panels.erase(self->panels.begin() + self->focusedPanelIndex);
 	
+	if (self->focusedPanelIndex == self->panels.size()) {
+		// Underflows when panels are empty but that's fine.
+		// In that case we want focused panel to be U64_MAX anyway.
+		self->focusedPanelIndex--;
+	}
+
 	RelinkPanelsAndTabs(self);
 	ResizePanels(self);
 }
