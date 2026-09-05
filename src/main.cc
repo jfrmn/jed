@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 	LogInfo("running message loop");
 
 	u64 ticksBefore = 0;
-	while (!mainWindow.quitReceived) {
+	while (!mainWindow.destroyReceived) {
 		
 		if (needsUpdate) {
 			if (MSG message; PeekMessage(&message, NULL, 0, 0, PM_REMOVE)) {

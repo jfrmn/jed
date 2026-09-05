@@ -34,7 +34,7 @@ struct Window {
 
 	f32 width  = .0f;
 	f32 height = .0f;
-	bool quitReceived = false;
+	bool destroyReceived = false;
 	
 	Event event = {};
 	

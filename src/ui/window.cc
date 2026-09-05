@@ -285,12 +285,8 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 		} break;
 		
 		case WM_DESTROY: {
+			self->destroyReceived = true;
 			PostQuitMessage(0);
-			return 0l;
-		} break;
-		
-		case WM_QUIT: {
-			self->quitReceived = true;
 			return 0l;
 		} break;
 				

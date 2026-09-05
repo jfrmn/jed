@@ -1066,9 +1066,9 @@ void App::HandleEvent(const Event& event) {
 				if (saveResult == Editor::FileResult_Failure)
 					return; // don't close
 			}
-			
-			mainWindow.Destroy();
 		}
+		
+		mainWindow.Destroy();
 	
 	} else if (event.type == Event::Type_Resize) {
 		ResizePanels(this);
