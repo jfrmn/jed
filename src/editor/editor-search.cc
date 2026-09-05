@@ -493,8 +493,6 @@ static void ActionReplaceNext(EditorSearch* self, bool prev) {
 				
 				replaceOperation->AdjustPosition(it->from);
 				replaceOperation->AdjustPosition(it->to);
-				//it->from.character -= replaceOperation->removalEnd.character - replaceOperation->start.character;
-				//it->from.character += replaceOperation->insertionEnd.character - replaceOperation->start.character;
 			}
 			
 			if (itNextResult == self->threadData->results.end())

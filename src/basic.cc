@@ -21,11 +21,12 @@ static void PrintAssertMessage(const char* expression, const char* file, int lin
 	
 	alignas(SYMBOL_INFO) u8 symbolBuffer[sizeof(SYMBOL_INFO) + 256] {0};
 	auto symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
-	symbol->SizeOfStruct = sizeof(SYMBOL_INFO),
+	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 	symbol->MaxNameLen = 256;
 	
 	for (u32 i = 0u; i < frameCount; i++) {
-		SymFromAddr(hProcess, reinterpret_cast<DWORD64>(frameAddresses[i]), 0, symbol);
+		const BOOL ok = SymFromAddr(hProcess, reinterpret_cast<DWORD64>(frameAddresses[i]), 0, symbol);
+		if (!ok) continue;
 		printf(" > 0x%0llX %.*s()\n", symbol->Address, static_cast<int>(symbol->NameLen), symbol->Name);
 	}
 #endif
