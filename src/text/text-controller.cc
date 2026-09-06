@@ -113,11 +113,12 @@ void TextController::SetCaretPosition(TextPosition pos) {
 
 void TextController::ToggleCaret() {
 	ASSERT(isEditCaretsMode);
-	
+		
 	for (auto it = carets.begin(); it != carets.end(); ++it) {
 		
 		// remove caret under the edit-caret
 		if (it->position == editCaretsPosition) {
+			if (carets.size() == 1u) return;
 			carets.erase(it);
 			return;
 		}

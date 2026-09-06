@@ -1223,6 +1223,7 @@ bool Editor::HandleEvent(const Event& event) {
 		
 		} else if (event.cmd.id == Command::Id_Editor_ShowGotoLocation) {
 			if (!language) return true;
+			if (textController.isEditCaretsMode) return true;
 				
 			if (editorCaretAttached) {
 				editorCaretAttached->RemoveReference();
@@ -1234,7 +1235,8 @@ bool Editor::HandleEvent(const Event& event) {
 		
 		} else if (event.cmd.id == Command::Id_Editor_ShowSignatureHelp) {
 			if (!language) return true;
-			
+			if (textController.isEditCaretsMode) return true;
+				
 			if (editorCaretAttached) {
 				editorCaretAttached->RemoveReference();
 				editorCaretAttached = nullptr;
@@ -1245,6 +1247,7 @@ bool Editor::HandleEvent(const Event& event) {
 	    	
 		} else if (event.cmd.id == Command::Id_Editor_ShowAutocomplete) {
 			if (!language) return true;
+			if (textController.isEditCaretsMode) return true;
 			
 			EditorSignatureHelp* signatureHelp = dynamic_cast<EditorSignatureHelp*>(editorCaretAttached);
 			if (signatureHelp) signatureHelp->AddReference();
