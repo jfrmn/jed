@@ -161,9 +161,8 @@ static f32 UpdateConsoleProgress(StatusBar* self, f32 posX, u64 i) {
 			.bottom = area.top + PADDING + settings.fontUi.lineHeight}),
 		settings.GetBrushUiText());
 	
-	GlyphRun run;
-	run.Shape(app.toolOutput.progressText, settings.fontUi);
-	run.DrawCenter(deviceContext,
+	staticGlyphRun.Shape(app.toolOutput.progressText, settings.fontUi);
+	staticGlyphRun.DrawCenter(deviceContext,
 		area.left,
 		area.top + PADDING,
 		RectWidth(area),
@@ -456,53 +455,81 @@ static f32 UpdateDiagnostics(StatusBar* self, f32 posX, u64 i) {
 // Caret Info
 
 struct CaretInfoText {
-	struct ColorArea {
+	
+	//-----------------------------------------------------
+	// types
+	//-----------------------------------------------------
+	
+	struct TextColorRange {
 		u64 from = 0u;
 		u64 to = 0u;
 		Color color = {};
 	};
 	
-	std::string text = {};
+	//-----------------------------------------------------
+	// data
+	//-----------------------------------------------------
 	
-	ColorArea textColor[3];
-	u64 textColorCount = 0u;
+	u64 textColorRangeCount = 0u;	
+	TextColorRange textColorRanges[3];
 	
-	u64 bgColorRangeIndex = U64_MAX;	 // index in textColor which contains the range
-	Color bgColor = {};
-};
-
-static constexpr u64 NUMBER_BUFFER_SIZE = 20u; // max value 18446744073709551615 so 20 digits
-
-static void AppendNumber(char* numberBuffer, CaretInfoText* info, u64 numberToFormat) {
-	memset(numberBuffer, 0, NUMBER_BUFFER_SIZE * sizeof(char));
+	bool  hasBackgroundColorRange = false; // first textColorRange can have an additional background color
+	Color backgroundColor = {};
 	
-	const std::to_chars_result result = std::to_chars(numberBuffer, numberBuffer + NUMBER_BUFFER_SIZE, numberToFormat);
-	if (result.ec != std::errc {}) {
-		LogError("std::to_chars() failed. Error: %", Str(result));
-		return;
+	static constexpr u64 TEXT_BUFFER_SIZE = 128u;
+	u64 textLength = 0u;
+	char textBuffer[TEXT_BUFFER_SIZE] {0}; // is enough for 3x U64_MAX (which is 20 digits) and more than enough space for some text
+	
+	//-----------------------------------------------------
+	// functions
+	//-----------------------------------------------------
+	
+	void AppendNumber(u64 number) {
+		
+		// see comment at CaretInfoText.textBuffer
+		// we should always have enough space for U64_MAX (20 digits) otherwise something went wrong
+		ASSERT(textLength < CaretInfoText::TEXT_BUFFER_SIZE - 20);
+		
+		const std::to_chars_result tcr = std::to_chars(textBuffer + textLength, textBuffer + CaretInfoText::TEXT_BUFFER_SIZE, number);
+		if (tcr.ec != std::errc {})
+			LogError("std::to_chars() failed. Error: %s", Str(tcr));
+		
+		textLength = (tcr.ptr - textBuffer);
+		ASSERT(textLength <= 128);
 	}
 	
-	info->text.append(numberBuffer, result.ptr);
-}
-
-static void AppendWithColor(CaretInfoText* info, const char* str, const Color& color) {
-	ASSERT(info->textColorCount < STATIC_ARRAY_SIZE(info->textColor));
-	const u64 i = info->textColorCount++;
-	info->textColor[i].from = info->text.size();
-	info->text.append(str);
-	info->textColor[i].to = info->text.size();
-	info->textColor[i].color = color;
-}
+	void AppendString(std::string_view text) {
+		ASSERT(textLength + text.size() < CaretInfoText::TEXT_BUFFER_SIZE);
+		
+		memcpy_s(textBuffer + textLength, CaretInfoText::TEXT_BUFFER_SIZE - textLength, text.data(), text.size());
+		textLength += text.size();
+	}
+	
+	void AppendChar(char ch) {
+		ASSERT(textLength + 1u < CaretInfoText::TEXT_BUFFER_SIZE);
+		textBuffer[textLength++] = ch;
+	}
+	
+	void AppendColoredString(std::string_view text, const Color& color) {
+		ASSERT(textColorRangeCount < STATIC_ARRAY_SIZE(textColorRanges));
+		
+		const u64 i = textColorRangeCount++;
+		textColorRanges[i].from = textLength;
+		
+		AppendString(text);
+		
+		textColorRanges[i].to = textLength;
+		textColorRanges[i].color = color;
+	}
+};
 
 static void GetCaretInfoTextNormal(StatusBar* self, const TextController& controller, /*out*/ CaretInfoText* info) {
 	ASSERT(controller.carets.size() == 1u);
 	
-	char numberBuffer[NUMBER_BUFFER_SIZE];
-	
 	if (TextPosition from, to; controller.carets.front().GetSelection(&from, &to)) {
 		
-		info->textColorCount++;
-		info->textColor[0].from = 0;
+		info->textColorRangeCount++;
+		info->textColorRanges[0].from = 0u;
 		
 		u64 selectedBytes = 0u;
 		u64 selectedLines = 0u;
@@ -519,64 +546,58 @@ static void GetCaretInfoTextNormal(StatusBar* self, const TextController& contro
 			selectedLines = (to.line - from.line) + 1;
 		}
 			
-		info->text.append(" ");
-		AppendNumber(numberBuffer, info, selectedBytes);
-		info->text.append(" chars ");
-		AppendNumber(numberBuffer, info, selectedLines);
-		info->text.append(" lines ");
+		info->AppendChar(' ');
+		info->AppendNumber(selectedBytes);
+		info->AppendString(" chars ");
+		info->AppendNumber(selectedLines);
+		info->AppendString(" lines ");
 		
-		info->textColor[0].to = info->text.size();
-		info->textColor[0].color = Color {0.0f, 0.0f, 0.0f, 1.0f};
+		info->textColorRanges[0].to = info->textLength;
+		info->textColorRanges[0].color = COLOR_BLACK;
 		
-		info->bgColorRangeIndex = 0u;
-		info->bgColor = settings.colors.selection;
+		info->hasBackgroundColorRange = true;
+		info->backgroundColor = settings.colors.selection;
 		
-		info->text.push_back(' ');
+		info->AppendChar(' ');
 	}
 		
-	AppendWithColor(info, "Line ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
+	info->AppendColoredString("Line ", settings.colors.uiTextInactive);
+	info->AppendNumber(controller.carets.front().position.line);
 	
-	AppendWithColor(info, " Char ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.character);
+	info->AppendColoredString(" Char ", settings.colors.uiTextInactive);
+	info->AppendNumber(controller.carets.front().position.character);
 	
 }
 
 static void GetCaretInfoTextEditCarets(StatusBar* self, const TextController& controller, /*out*/ CaretInfoText* info) {
 	ASSERT(controller.isEditCaretsMode);
 	
-	char numberBuffer[NUMBER_BUFFER_SIZE];
-
-	// @TODO(tempmem) for info->text
-	
-	info->textColorCount++;
-	info->textColor[0].from = 0;
+	info->textColorRangeCount++;
+	info->textColorRanges[0].from = 0;
 		
-	info->text.append(" edit ");
-	AppendNumber(numberBuffer, info, controller.carets.size());
-	info->text.append(" carets ");
+	info->AppendString(" edit ");
+	info->AppendNumber(controller.carets.size());
+	info->AppendString(" carets ");
 	
-	info->textColor[0].to = info->text.size();
-	info->textColor[0].color = Color {0.0f, 0.0f, 0.0f, 1.0f};
+	info->textColorRanges[0].to = info->textLength;
+	info->textColorRanges[0].color = COLOR_BLACK;
 	
-	info->bgColorRangeIndex = 0u;
-	info->bgColor = settings.colors.editorMultiCaretEdit;
+	info->hasBackgroundColorRange = true;
+	info->backgroundColor = settings.colors.editorMultiCaretEdit;
 	
-	info->text.push_back(' ');
+	info->AppendChar(' ');
 	
-	AppendWithColor(info, "Line ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.line);
+	info->AppendColoredString(" Line ", settings.colors.uiTextInactive);
+	info->AppendNumber(controller.editCaretsPosition.line);
 	
-	AppendWithColor(info, " Char ", settings.colors.uiTextInactive);
-	AppendNumber(numberBuffer, info, controller.carets.front().position.character);
+	info->AppendColoredString(" Char ", settings.colors.uiTextInactive);
+	info->AppendNumber(controller.editCaretsPosition.character);
 }
 
 
 static void GetCaretInfoTextMultiCarets(StatusBar* self, const TextController& controller, /*out*/ CaretInfoText* info) {
-	char numberBuffer[NUMBER_BUFFER_SIZE];
-	
-	AppendNumber(numberBuffer, info, controller.carets.size());
-	AppendWithColor(info, " carets ", settings.colors.uiTextInactive);
+	info->AppendNumber(controller.carets.size());
+	info->AppendColoredString(" carets ", settings.colors.uiTextInactive);
 }
 
 static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
@@ -595,18 +616,19 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		GetCaretInfoTextNormal(self, focusedEditor->textController, &caretInfoText);	
 	}
 	
-	GlyphRun run {};
-	run.Shape(caretInfoText.text, settings.fontUi);
+	staticGlyphRun.Shape(std::string_view {caretInfoText.textBuffer, caretInfoText.textLength}, settings.fontUi);
 	
 	const bool l2r = IsL2R(self, i);
-	const D2D_RECT_F area = GetArea(posX, run.width + PADDING_X2, l2r);
+	const D2D_RECT_F area = GetArea(posX, staticGlyphRun.width + PADDING_X2, l2r);
 	const D2D_SIZE_F areaSize = RectSize(area);
 		
-	if (caretInfoText.bgColorRangeIndex < U64_MAX) {
-		const CaretInfoText::ColorArea& clrArea = caretInfoText.textColor[caretInfoText.bgColorRangeIndex];
+	if (caretInfoText.hasBackgroundColorRange) {
+		ASSERT(caretInfoText.textColorRangeCount > 0);
+		
+		const CaretInfoText::TextColorRange& clrArea = caretInfoText.textColorRanges[0];
 		
 		f32 offsetFrom, offsetTo;
-		run.MeasureOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
+		staticGlyphRun.MeasureOffsetRange(clrArea.from, clrArea.to, &offsetFrom, &offsetTo);
 		
 		deviceContext->FillRoundedRectangle(ToRounded(
 			D2D_RECT_F {
@@ -614,7 +636,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 				.top = area.top + PADDING,
 				.right = area.left + PADDING + offsetTo,
 				.bottom = area.bottom - PADDING}),
-			UseColor(caretInfoText.bgColor));
+			UseColor(caretInfoText.backgroundColor));
 	}
 	
 	ID2D1Bitmap* bitmapText = nullptr, *bitmapColor = nullptr;
@@ -626,7 +648,7 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		renderTarget->BeginDraw();
 		renderTarget->Clear();
 	
-		run.Draw(renderTarget, PADDING, PADDING, settings.fontUi, alphaMaskBrush);
+		staticGlyphRun.Draw(renderTarget, PADDING, PADDING, settings.fontUi, alphaMaskBrush);
 		
 		if (HRESULT hr = renderTarget->EndDraw(); hr != S_OK)
 			LogError("EndDraw() failed for renderTargetColor. HRESULT: %", StrHr(hr));
@@ -641,11 +663,11 @@ static f32 UpdateCaretInfo(StatusBar* self, f32 posX, u64 i) {
 		renderTarget->Clear(settings.colors.uiText.ToD2D());
 		DEFER(renderTarget->Release());
 			
-		for (u64 i = 0u; i < caretInfoText.textColorCount; i++) {
-			const CaretInfoText::ColorArea& colorArea = caretInfoText.textColor[i];
+		for (u64 i = 0u; i < caretInfoText.textColorRangeCount; i++) {
+			const CaretInfoText::TextColorRange& colorArea = caretInfoText.textColorRanges[i];
 			
 			f32 offsetFrom, offsetTo;
-			run.MeasureOffsetRange(colorArea.from, colorArea.to, &offsetFrom, &offsetTo);
+			staticGlyphRun.MeasureOffsetRange(colorArea.from, colorArea.to, &offsetFrom, &offsetTo);
 						
 			renderTarget->FillRectangle(
 				D2D_RECT_F {
@@ -710,11 +732,11 @@ static f32 UpdateLineEndingSelector(StatusBar* self, f32 posX, u64 i) {
 	return l2r ? area.right : area.left;
 }
 
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// S T A U S   B A R
+// Status Bar
 //
-//#################################################################################################
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 static constexpr std::string_view elementTypeNames[] {
 	"none",
