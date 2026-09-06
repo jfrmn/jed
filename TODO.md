@@ -1,15 +1,26 @@
 # BUGS
 
-* find and replace -> Missing ProcessTextChange (lsp never recieves replacements)
 * delete line does not work with multiple cursors
+
 * delete line messes up tree sitter highlighting (and i think pasting text too) (*FIXED?*)
-* untab at beginning of produces textChange with 0 operations
+
 * multicursor let's you remove all cursors - leading to a crash
+
 * Opening both a searchbar and the tool panel blocks keyboard input
+
 * using the file search bar from start screen and selecting a file with Ctrl+/Shift+Enter crashes
+
 * multi cursor -> cut (maybe also other operation) only invalidate the first gylph run
+
 * explorer rename doesn't work
+
 * explorer pressing left in New-Item-dialog closes the dialog instead of moving the cursor
+
+* multi line cursor -> Cut causes crash
+
+* using alt+arrow with no open panels causes a crash
+
+* sending notifications: log entry looks off
 
 # MAJOR TASKS
 
@@ -26,6 +37,7 @@
 * get rid of OnMouseWheel and OnResize etc.
 * .clangd only really accepts absolute include paths. Relative paths are relative to eicher the current file or the compilation database. The compilation database has the msvc commands in it so that is not an option. Therefore generate .clangd from build.ps1
 * Remove settings.GetBrushXXX() functions. Switch to UseColor(settings.xyz)
+* Opening a new, unsaved file: should work with the language server. Document Uri should be untitled:// in that case
 
 # BACKLOG
 
