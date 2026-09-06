@@ -130,10 +130,9 @@ void TextController::ToggleCaret() {
 				return;
 		}
 	
-		// @FIXME should be > shoulld it not?
 		// Otherwise we insert a new caret. The carets are sorted by their position.
 		// check if this is the corret index to insert the new caret
-		if (it->position < editCaretsPosition) {
+		if (it->position > editCaretsPosition) {
 			carets.insert(it, TextController::Caret {
 				.position = editCaretsPosition,
 				.selection = TextPosition {},
@@ -160,7 +159,7 @@ TextChange* TextController::NewTextChange() {
 		
 	historyUndoIndex = USIZE_MAX;
 		
-	TextChange* newChange = 	history.Push();
+	TextChange* newChange = history.Push();
 	newChange->Clear();
 	
 	return newChange;
