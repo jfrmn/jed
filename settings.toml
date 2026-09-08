@@ -25,4 +25,25 @@ diagnostics = {
 		warning = [255, 255, 0],
 		note    = [0, 255, 0]}}
 	
-
+[[Tools]]
+name = "dnGREP"
+command = 'D:\Apps\dnGrep\dnGrep.exe .'
+open-console = "never"
+	
+[[Tools]]
+name = "run test tool"
+command = 'pwsh.exe -f .\test\testtool.ps1'
+open-console = "on-start"
+progress = {
+	regex = '^\[(\d+|X+)/(\d+)\]',
+	group-value = 1,
+	group-max = 2}
+diagnostics = {
+	regex = '^([A-Z]:[\w\.\\-]+)\((\d+)\): (\w+)(?: C\d+)?: .*$',
+	group-file = 1,
+	group-line = 2,
+	group-color = 3,
+	color-mapping = {
+		error   = [255, 0, 0],
+		warning = [255, 255, 0],
+		note    = [0, 255, 0]}}
