@@ -32,7 +32,6 @@ static void Reset(ToolOutput* self) {
 	ASSERT(!self->process || !self->process->IsRunning());
 	
 	self->toolDiagnostics.clear();
-	self->showToolDiagnostics = false;
 	self->selectedDiagnosticsRecord = U64_MAX;
 	
 	self->progressValue = 0.0f;
@@ -95,10 +94,14 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 	if (self->toolParameterValues.size() < self->tool->parameters.size()) {
 		self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
+			.type = ToolOutput::ToolDiagnosticsRecord::Type_Command,
 			.message = FormatString("Not enough parameters provided. Expected %u but got %u", self->toolParameterValues.size(), self->tool->parameters.size())});
 		return false;
 	}
-			
+		
+	//
+	// repalce parameters
+	//	
 	for (u64 pos, start = 0u; /**/; start = pos) {
 		pos = self->tool->command.find('%', start);
 		if (pos == std::string::npos) {
@@ -128,12 +131,14 @@ static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 			// we just checked if its a numeric char so this should come back as ok
 			ASSERT(fcr.ec == std::errc());
 			ASSERT(parameterIndex < U64_MAX);
+			const u64 foundEndPosition = static_cast<u64>(fcr.ptr - self->tool->command.data());
 			
 			if (parameterIndex >= self->toolParameterValues.size()) {
 				self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
-				 	.message  = FormatString("Parameter with index %u not found (%u parameters defined)", parameterIndex, self->toolParameterValues.size()),
-				 	.source   = self->tool->command,
-				 	.position = pos-1});
+				 	.type    = ToolOutput::ToolDiagnosticsRecord::Type_Command,
+				 	.message = FormatString("Parameter with index %u not found (%u parameters defined)", parameterIndex, self->toolParameterValues.size()),
+				 	.from    = pos-1,
+				 	.to      = foundEndPosition});
 				return false;
 			}
 					
@@ -141,7 +146,7 @@ static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 			const Parameter& paramDef = self->tool->parameters[parameterIndex];
 			AppendParameterValue(commandLine, paramValue, paramDef);
 		
-			pos = (fcr.ptr - self->tool->command.data());
+			pos = foundEndPosition;
 			continue;
 		}
 		
@@ -152,9 +157,10 @@ static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 			const u64 posEnd = self->tool->command.find(')', pos);
 			if (posEnd == std::string::npos) {
 				self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
+					.type     = ToolOutput::ToolDiagnosticsRecord::Type_Command,
 					.message  = "Missing closing ')' for parameter-reference by name",
-					.source   = self->tool->command,
-					.position = pos-1});
+					.from     = pos-2,
+					.to       = self->tool->command.size()});
 				return false;
 			}
 			
@@ -171,15 +177,37 @@ static bool CompileCommand(ToolOutput* self, /*out*/ std::string* commandLine) {
 			}
 			
 			self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
+				.type     = ToolOutput::ToolDiagnosticsRecord::Type_Command,
 				.message  = FormatString("Parameter with name '%.*s' not found", SIZE_AND_DATA(parameterName)),
-				.source   = self->tool->command,
-				.position = pos-1});
+				.from     = pos-2,
+				.to       = posEnd});
 			return false;
 			
 		found:
 			AppendParameterValue(commandLine, *paramValue, *paramDef);
 			pos = posEnd+1;
 		}
+	}
+	
+	//
+	// check capture groups
+	//
+	{
+		auto funcCheckCaptureGroups = [self] (std::string_view name, const Regex& regex, u32 requestedGroup) {
+			if (!regex.isOk) return;
+			if (requestedGroup == U32_MAX) return;
+			if (requestedGroup < regex.TotalCaptureGroupCount()) return;
+			
+			self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
+				.type    = ToolOutput::ToolDiagnosticsRecord::Type_Command,
+				.message = FormatString("capture group '%.*s' (index %u) is out of range. Regex provided only %u capture groups", SIZE_AND_DATA(name), requestedGroup, regex.additionalCaptureGroupCount+1u)});
+		};
+		
+		funcCheckCaptureGroups("progress.group-value",    self->tool->progress.regex,    self->tool->progress.captureGroupValue);
+		funcCheckCaptureGroups("progress.group-max",      self->tool->progress.regex,    self->tool->progress.captureGroupMax);
+		funcCheckCaptureGroups("diagnostics.group-file",  self->tool->diagnostics.regex, self->tool->diagnostics.captureGroupFile);
+		funcCheckCaptureGroups("diagnostics.group-line",  self->tool->diagnostics.regex, self->tool->diagnostics.captureGroupLine);
+		funcCheckCaptureGroups("diagnostics.group-color", self->tool->diagnostics.regex, self->tool->diagnostics.captureGroupColor);
 	}
 	
 	return true;
@@ -194,39 +222,33 @@ bool ToolOutput::StartProcess() {
 	
 	Reset(this);
 	
-	//
-	// start process
-	//
-	{
-		std::string commandLine {};
-		if (!CompileCommand(this, &commandLine)) {
-			showToolDiagnostics = true;
-			isOpen = true;
-			return false;
-		}
-		
-		LogInfo("Running: %s", commandLine.c_str());
-		
-		Process::StartInfo startInfo {
-			.application = {},
-			.commandLine = std::move(commandLine),
-			.environment = tool->environment,
-			.flags = tool->flags};
-		
-		ASSERT(!process);
-		process = new Process();
-		process->observer = this;
-		
-		if (!process->Start(std::move(startInfo))) {
-			delete process;
-			process = nullptr;
-			toolDiagnostics.clear();
-			toolDiagnostics.push_back(ToolDiagnosticsRecord {
-				.message = FormatString("Failed to start process. Last Error: %s", StrLastErr(GetLastError()))});
-			isOpen = true;
-			showToolDiagnostics = true;
-			return false;
-		}
+	std::string commandLine {};
+	if (!CompileCommand(this, &commandLine)) {
+		isOpen = true;
+		return false;
+	}
+	
+	LogInfo("Running: %s", commandLine.c_str());
+	
+	Process::StartInfo startInfo {
+		.application = {},
+		.commandLine = std::move(commandLine),
+		.environment = tool->environment,
+		.flags = tool->flags};
+	
+	ASSERT(!process);
+	process = new Process();
+	process->observer = this;
+	
+	if (!process->Start(std::move(startInfo))) {
+		delete process;
+		process = nullptr;
+		toolDiagnostics.clear();
+		toolDiagnostics.push_back(ToolDiagnosticsRecord {
+			.type    = ToolDiagnosticsRecord::Type_Command,
+			.message = FormatString("Failed to start process. Last Error: %s", StrLastErr(GetLastError()))});
+		isOpen = true;
+		return false;
 	}
 	
 	return true;
@@ -238,7 +260,7 @@ bool ToolOutput::StartProcess() {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static f32 GetToolbarHeight() {
+static f32 ToolbarHeight() {
 	return MARGIN_X2 + settings.fontUi.lineHeight;
 }
 
@@ -263,337 +285,10 @@ static void OnClickedKillProcess(void* ud, u64) {
 
 static void OnRerunProcess(void* ud, u64) {}
 
-static void OnClickToggleShowToolDiagnostics(void* ud, u64) {
+static void OnClickToolDiagnostics(void* ud, u64) {
 	auto self = static_cast<ToolOutput*>(ud);
-	self->showToolDiagnostics = !self->showToolDiagnostics;
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void RenderOutput(ToolOutput* self) {
-	
-	const f32 toolbarHeight = GetToolbarHeight();
-	
-	//
-	// prepare offscreen render targets
-	//
-	const D2D_SIZE_F areaSize {
-		.width = RectWidth(self->area),
-		.height = RectHeight(self->area) - toolbarHeight};
-	
-	ID2D1BitmapRenderTarget* foreground = CreateCompatibleRenderTarget(deviceContext, areaSize);
-	if (!foreground) return;
-	DEFER(foreground->Release());
-	
-	ID2D1BitmapRenderTarget* text = CreateCompatibleRenderTarget(deviceContext, areaSize);
-	if (!text) return;
-	DEFER(text->Release());
-	
-	ID2D1RenderTarget* background = deviceContext;
-	
-	foreground->BeginDraw();
-	foreground->Clear(settings.colors.editorText.ToD2D());
-
-	text->BeginDraw();
-	text->Clear();
-	
-	//
-	// draw styles
-	//	
-	if (!self->styleChanges.empty()) {
-	
-		background->SetTransform(D2D1::Matrix3x2F::Translation(self->area.left, self->area.top + toolbarHeight));
-		DEFER(background->SetTransform(D2D1::Matrix3x2F::Identity()));
-		
-		foreground->SetTransform(D2D1::Matrix3x2F::Translation(self->scrollarea.vpX, -self->scrollarea.vpY));
-		
-		ID2D1SolidColorBrush* brushForeground = nullptr;
-		foreground->CreateSolidColorBrush(settings.colors.editorText.ToD2D(), &brushForeground);
-		if (!brushForeground) return;
-		DEFER(brushForeground->Release());
-		
-		ID2D1SolidColorBrush* brushBackground = nullptr;
-		background->CreateSolidColorBrush(D2D_COLOR_F {0.0f, 0.0f, 0.0f, 0.0f}, &brushBackground);
-		if (!brushBackground) return;
-		DEFER(brushBackground->Release());
-		
-		struct {
-			bool hasBackgroundColor = false;
-			bool hasForegroundColor = false;
-			bool hasUnderline = false;
-			bool hasNegative = false;
-		} state;
-		TextPosition start = {0u, 0u};
-		
-		const auto ApplyStyle = [&] (u64 ln, u64 fromCp, u64 toCp) {
-			const GlyphRun& run = self->glyphRunCache[ln];
-								
-			f32 from = .0f, to = .0f;
-			run.MeasureOffsetRange(fromCp, toCp, &from, &to);
-			
-			const D2D_RECT_F rect {
-				.left   = PADDING + from,
-				.top    = ln * settings.fontEditor.lineHeight,
-				.right  = PADDING + to,
-				.bottom = (ln+1) * settings.fontEditor.lineHeight};
-		
-			if (state.hasBackgroundColor)
-				background->FillRectangle(rect, (state.hasNegative ? brushForeground : brushBackground));
-				
-			if (state.hasForegroundColor)
-				foreground->FillRectangle(rect, (state.hasNegative ? brushBackground : brushForeground));
-				
-			if (state.hasUnderline)
-				text->DrawLine(
-					D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
-					D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
-					alphaMaskBrush);
-		};
-		
-		for (u64 i = 0u; i < self->styleChanges.size(); i++) {
-			
-			const ToolOutput::StyleChange* styleChange = &self->styleChanges[i];
-			
-			IterateTextRange(start, styleChange->position, ApplyStyle);
-			
-			// do the style change
-			switch (styleChange->type) {
-				case ToolOutput::StyleChangeType_Bold: break; // @TODO
-				case ToolOutput::StyleChangeType_Underline: state.hasUnderline = styleChange->value; break;
-				case ToolOutput::StyleChangeType_Negative: {
-					state.hasNegative = styleChange->value;
-				} break;
-				case ToolOutput::StyleChangeType_Foreground: {
-					brushForeground->SetColor(styleChange->color.ToD2D());
-					state.hasForegroundColor = true;
-				} break;
-				case ToolOutput::StyleChangeType_ForegroundDefault: {
-					state.hasForegroundColor = false;
-				} break;
-				case ToolOutput::StyleChangeType_Background: {
-					brushBackground->SetColor(styleChange->color.ToD2D());
-					state.hasBackgroundColor = true;
-				} break;
-				case ToolOutput::StyleChangeType_BackgroundDefault: {
-					state.hasBackgroundColor = false;
-				} break;
-				case ToolOutput::StyleChangeType_Reset: {
-					state.hasUnderline = false;
-					state.hasNegative = false;
-					state.hasForegroundColor = false;
-					state.hasBackgroundColor = false;
-				} break;
-				default: break;
-			}
-			start = styleChange->position;
-		}
-	}
-	
-	//
-	// draw glyph runs
-	//
-	{
-		text->SetTransform(D2D1::Matrix3x2F::Translation(self->scrollarea.vpX, -self->scrollarea.vpY));
-		
-		for (u64 i = 0; i < self->glyphRunCache.size(); i++) {
-			const GlyphRun& run = self->glyphRunCache[i];
-			run.Draw(text, PADDING , (i * settings.fontEditor.lineHeight), settings.fontEditor, alphaMaskBrush);
-		}
-	}
-	
-	foreground->EndDraw();
-	text->EndDraw();
-	
-	//
-	// blend images
-	//
-	{
-		ID2D1Bitmap* bmForeground, *bmText;
-		foreground->GetBitmap(&bmForeground);
-		text->GetBitmap(&bmText);
-		
-		//const D2D_RECT_F dest {.left = area.left, .top = area.top, .right = }
-		//deviceContext->DrawBitmap(bmForeground, &area);
-		BlendImages(deviceContext, {self->area.left, self->area.top + toolbarHeight}, bmForeground, bmText);
-		
-		bmForeground->Release();
-		bmText->Release();
-	}
-	
-	deviceContext->PushAxisAlignedClip(
-		D2D_RECT_F {
-			.left = self->area.left,
-			.top = self->area.top + toolbarHeight,
-			.right = self->area.right,
-			.bottom = self->area.bottom},
-		D2D1_ANTIALIAS_MODE_ALIASED);
-	
-	//
-	// draw matched diagnostics
-	//
-	{		
-		for (u64 i = 0; i < self->diagnosticsRecords.size(); i++) {
-			const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
-			
-			ASSERT(record.originLine < self->glyphRunCache.size());
-			const GlyphRun& run = self->glyphRunCache[record.originLine];
-			
-			ASSERT(record.originFromColumn < record.originToColumn);
-			
-			f32 offsetFrom = .0f, offsetTo = .0f;
-			run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
-			
-			deviceContext->DrawRectangle(
-				D2D_RECT_F {
-					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - self->scrollarea.vpY,
-					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - self->scrollarea.vpY},
-				UseColor(record.color));
-		}
-	}
-	
-	//
-	// draw selection
-	//
-	if (self->selectionStart != self->selectionEnd) {
-		
-		const TextPosition* from = nullptr, *to  = nullptr;
-		if (self->selectionStart < self->selectionEnd) from = &self->selectionStart, to = &self->selectionEnd;
-		else from = &self->selectionEnd, to = &self->selectionStart;
-		
-		IterateTextRange(*from, *to, [self, toolbarHeight](u64 ln, u64 fromCp, u64 toCp) {
-			const GlyphRun& run = self->glyphRunCache[ln];
-								
-			f32 offsetFrom = .0f, offsetTo = .0f;
-			run.MeasureOffsetRange(fromCp, toCp, &offsetFrom, &offsetTo);
-			
-			deviceContext->FillRectangle(
-				D2D_RECT_F {
-					.left   = self->area.left + PADDING + offsetFrom,
-					.top    = self->area.top  + toolbarHeight + (settings.fontEditor.lineHeight * ln)     - self->scrollarea.vpY,
-					.right  = self->area.left + PADDING + offsetTo,
-					.bottom = self->area.top  + toolbarHeight + (settings.fontEditor.lineHeight * (ln+1)) - self->scrollarea.vpY},
-				settings.GetBrushSelection());
-		});
-	}
-	
-	//
-	// hittest to change selection
-	//
-	{
-		const D2D_RECT_F outputArea {
-			.left = self->area.left,
-			.top = self->area.top + toolbarHeight,
-			.right = self->area.right,
-			.bottom = self->area.bottom};
-		
-		if (mouse.Hittest(outputArea, self, nullptr)) {
-			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
-			
-			const u64 hitLine = std::clamp<u64>(
-				static_cast<u64>((relativePoistion.y + self->scrollarea.vpY) / settings.fontEditor.lineHeight),
-				0u,
-				self->glyphRunCache.size() - 1u);
-			const GlyphRun& hitRun = self->glyphRunCache[hitLine];
-			const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
-			
-			if (mainWindow.event.type == Event::Type_MouseDown) {				
-				
-				// check if we hit a matched diagnostic record
-				for (u64 i = 0u; i < self->diagnosticsRecords.size(); i++) {
-					const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[i];
-					
-					const bool hitThisRecord = record.originLine == hitLine &&
-				                           	record.originFromColumn <= hitColumn &&
-				                           	record.originToColumn >= hitColumn;
-					if (hitThisRecord) {
-						UpdateFilePreview(self, record);
-						self->selectedDiagnosticsRecord = i;
-						goto hit_record;
-					}
-				}
-			
-				mouse.StartDragging();
-				self->selectionStart = self->selectionEnd = TextPosition {hitLine, hitColumn};
-				self->selectedDiagnosticsRecord = U64_MAX;
-				
-			hit_record: __noop;
-			} else if (mouse.isDragging) {
-				self->selectionEnd = TextPosition {hitLine, hitColumn};
-			}
-		}
-	}
-	
-	deviceContext->PopAxisAlignedClip();
-	
-	//
-	// update file preview
-	//
-	if (self->selectedDiagnosticsRecord != U64_MAX) {
-		const ToolOutput::EditorDiagnosticsRecord& record = self->diagnosticsRecords[self->selectedDiagnosticsRecord];
-	
-		self->filePreview.x = self->area.left - self->filePreview.width;
-		self->filePreview.y = self->area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - self->scrollarea.vpY;
-		self->filePreview.OnUpdate();
-			
-		deviceContext->DrawRectangle(self->filePreview.GetArea(), UseColor(record.color));
-	}
-		
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static void RenderToolDiagnostics(ToolOutput* self) {
-	
-	const f32 toolbarHeight = GetToolbarHeight();	
-	
-	deviceContext->PushAxisAlignedClip(
-	D2D_RECT_F {
-		.left = self->area.left,
-		.top = self->area.top + toolbarHeight,
-		.right = self->area.right,
-		.bottom = self->area.bottom},
-	D2D1_ANTIALIAS_MODE_ALIASED);
-	DEFER(deviceContext->PopAxisAlignedClip());
-	
-	GlyphRun run;
-	f32 offsetTop = 0.0f;
-	for (u64 i = 0; i < self->toolDiagnostics.size(); i++) {
-		const ToolOutput::ToolDiagnosticsRecord& record = self->toolDiagnostics[i];
-		
-		run.Shape(record.message, settings.fontEditor);
-		
-		const D2D_POINT_2F position {
-			.x = self->area.left + PADDING,
-			.y = self->area.top + toolbarHeight + offsetTop - self->scrollarea.vpY};
-
-		brush->SetColor(Diagnostics::SEVERITY_COLORS[self->process
-			? Diagnostics::Severity_Error
-			: Diagnostics::Severity_Warning].ToD2D());
-
-		run.Draw(deviceContext, position.x, position.y, settings.fontEditor, brush);
-		
-		if (!record.source.empty()) {
-			run.Shape(record.source, settings.fontEditor);
-			
-			if (record.position < U64_MAX) {
-				f32 from = .0f, to = .0f;
-				run.MeasureOffsetRange(record.position, record.position+1, &from, &to);
-				
-				deviceContext->FillRectangle(
-					D2D_RECT_F {
-						.left   = position.x + from,
-						.top    = position.y,
-						.right  = position.x + to,
-						.bottom = position.y + settings.fontEditor.lineHeight},
-					brush);
-			}
-			
-			run.Draw(deviceContext, position.x, position.y + settings.fontEditor.lineHeight, settings.fontEditor, settings.GetBrushEditorText());
-			offsetTop += settings.fontEditor.lineHeight;
-		}
-		
-		offsetTop += settings.fontEditor.lineHeight + PADDING;
-	}
+	// should open the source of the tool or something
+	ASSERT_NOT_IMPLEMENTED;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -627,7 +322,7 @@ void ToolOutput::Update() {
 			.left = area.left,
 			.top = area.top,
 			.right = area.right,
-			.bottom = area.top + GetToolbarHeight()};
+			.bottom = area.top + ToolbarHeight()};
 		
 		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
 	
@@ -638,16 +333,6 @@ void ToolOutput::Update() {
 			{
 				run.Shape(tool->name, settings.fontUi);
 				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
-				
-				// underline
-				deviceContext->DrawLine(
-					D2D_POINT_2F {
-						.x = toolbarArea.left + MARGIN,
-						.y = toolbarArea.top  + MARGIN + settings.fontUi.underlineOffset},
-					D2D_POINT_2F {
-						.x = toolbarArea.left + MARGIN + run.width,
-						.y = toolbarArea.top  + MARGIN + settings.fontUi.underlineOffset},
-					settings.GetBrushUiText());
 				
 				offsetX = run.width + MARGIN_X2;
 				
@@ -737,11 +422,8 @@ void ToolOutput::Update() {
 					.top   = toolbarArea.top + MARGIN - PADDING,
 					.right = toolbarArea.left + offsetX + settings.fontUi.lineHeight + PADDING_X2,
 					.bottom = toolbarArea.bottom - MARGIN + PADDING};
-				
-				if (showToolDiagnostics)
-					deviceContext->FillRoundedRectangle(ToRounded(areaBothIcons), settings.GetBrushUiBackground(false));
 					
-				if (mouse.Hittest(areaBothIcons, this, OnClickToggleShowToolDiagnostics))
+				if (mouse.Hittest(areaBothIcons, this, OnClickToolDiagnostics))
 					deviceContext->FillRoundedRectangle(ToRounded(areaBothIcons), settings.GetBrushHover(mouse.isDown));
 				
 				deviceContext->DrawBitmap(
@@ -757,7 +439,7 @@ void ToolOutput::Update() {
 			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
 		}
 		
-		offsetTop += GetToolbarHeight();
+		offsetTop += ToolbarHeight();
 	}
 	
 	//
@@ -777,18 +459,10 @@ void ToolOutput::Update() {
 	// update scrollarea (but don't render yet)
 	//
 	{
-		f32 height = 0.0f;
-		if (showToolDiagnostics) {
-			height = toolDiagnostics.size() * settings.fontEditor.lineHeight;
-			for (const ToolDiagnosticsRecord& rec : toolDiagnostics)
-				if (rec.source.empty()) height += settings.fontEditor.lineHeight;
-		} else {
-			height = glyphRunCache.size() * settings.fontEditor.lineHeight;
-		}
-		
 		scrollarea.totalSize = D2D_SIZE_F {
 			.width  = RectWidth(area),
-			.height = height};
+			.height = glyphRunCache.size() * settings.fontEditor.lineHeight};
+		
 		if (!disableAutoScroll)
 			scrollarea.vpY = scrollarea.GetMaxPositionY();
 	}
@@ -796,17 +470,308 @@ void ToolOutput::Update() {
 	//
 	// render lines
 	//
-	if (showToolDiagnostics)
-		RenderToolDiagnostics(this);
-	else
-		RenderOutput(this);
+	{
+		const f32 toolbarHeight = ToolbarHeight();
+
+		//
+		// prepare offscreen render targets
+		//
+		const D2D_SIZE_F areaSize {
+			.width = RectWidth(area),
+			.height = RectHeight(area) - toolbarHeight};
+		
+		ID2D1BitmapRenderTarget* foreground = CreateCompatibleRenderTarget(deviceContext, areaSize);
+		if (!foreground) return;
+		DEFER(foreground->Release());
+		
+		ID2D1BitmapRenderTarget* text = CreateCompatibleRenderTarget(deviceContext, areaSize);
+		if (!text) return;
+		DEFER(text->Release());
+		
+		ID2D1RenderTarget* background = deviceContext;
+		
+		foreground->BeginDraw();
+		foreground->Clear(settings.colors.editorText.ToD2D());
+	
+		text->BeginDraw();
+		text->Clear();
+		
+		//
+		// draw styles
+		//	
+		if (!styleChanges.empty()) {
+		
+			background->SetTransform(D2D1::Matrix3x2F::Translation(area.left, area.top + toolbarHeight));
+			DEFER(background->SetTransform(D2D1::Matrix3x2F::Identity()));
+			
+			foreground->SetTransform(D2D1::Matrix3x2F::Translation(scrollarea.vpX, -scrollarea.vpY));
+			
+			ID2D1SolidColorBrush* brushForeground = nullptr;
+			foreground->CreateSolidColorBrush(settings.colors.editorText.ToD2D(), &brushForeground);
+			if (!brushForeground) return;
+			DEFER(brushForeground->Release());
+			
+			ID2D1SolidColorBrush* brushBackground = nullptr;
+			background->CreateSolidColorBrush(D2D_COLOR_F {0.0f, 0.0f, 0.0f, 0.0f}, &brushBackground);
+			if (!brushBackground) return;
+			DEFER(brushBackground->Release());
+			
+			struct {
+				bool hasBackgroundColor = false;
+				bool hasForegroundColor = false;
+				bool hasUnderline = false;
+				bool hasNegative = false;
+			} state;
+			TextPosition start = {0u, 0u};
+			
+			const auto ApplyStyle = [&] (u64 ln, u64 fromCp, u64 toCp) {
+				const GlyphRun& run = glyphRunCache[ln];
+									
+				f32 from = .0f, to = .0f;
+				run.MeasureOffsetRange(fromCp, toCp, &from, &to);
+				
+				const D2D_RECT_F rect {
+					.left   = PADDING + from,
+					.top    = ln * settings.fontEditor.lineHeight,
+					.right  = PADDING + to,
+					.bottom = (ln+1) * settings.fontEditor.lineHeight};
+			
+				if (state.hasBackgroundColor)
+					background->FillRectangle(rect, (state.hasNegative ? brushForeground : brushBackground));
+					
+				if (state.hasForegroundColor)
+					foreground->FillRectangle(rect, (state.hasNegative ? brushBackground : brushForeground));
+					
+				if (state.hasUnderline)
+					text->DrawLine(
+						D2D_POINT_2F {.x = PADDING + rect.left,  .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
+						D2D_POINT_2F {.x = PADDING + rect.right, .y = toolbarHeight + rect.top + settings.fontEditor.baselineOffset},
+						alphaMaskBrush);
+			};
+			
+			for (u64 i = 0u; i < styleChanges.size(); i++) {
+				
+				const ToolOutput::StyleChange* styleChange = &styleChanges[i];
+				
+				IterateTextRange(start, styleChange->position, ApplyStyle);
+				
+				// do the style change
+				switch (styleChange->type) {
+					case ToolOutput::StyleChangeType_Bold: break; // @TODO
+					case ToolOutput::StyleChangeType_Underline: state.hasUnderline = styleChange->value; break;
+					case ToolOutput::StyleChangeType_Negative: {
+						state.hasNegative = styleChange->value;
+					} break;
+					case ToolOutput::StyleChangeType_Foreground: {
+						brushForeground->SetColor(styleChange->color.ToD2D());
+						state.hasForegroundColor = true;
+					} break;
+					case ToolOutput::StyleChangeType_ForegroundDefault: {
+						state.hasForegroundColor = false;
+					} break;
+					case ToolOutput::StyleChangeType_Background: {
+						brushBackground->SetColor(styleChange->color.ToD2D());
+						state.hasBackgroundColor = true;
+					} break;
+					case ToolOutput::StyleChangeType_BackgroundDefault: {
+						state.hasBackgroundColor = false;
+					} break;
+					case ToolOutput::StyleChangeType_Reset: {
+						state.hasUnderline = false;
+						state.hasNegative = false;
+						state.hasForegroundColor = false;
+						state.hasBackgroundColor = false;
+					} break;
+					default: break;
+				}
+				start = styleChange->position;
+			}
+		}
+		
+		//
+		// draw glyph runs
+		//
+		{
+			text->SetTransform(D2D1::Matrix3x2F::Translation(scrollarea.vpX, -scrollarea.vpY));
+			
+			for (u64 i = 0; i < glyphRunCache.size(); i++) {
+				const GlyphRun& run = glyphRunCache[i];
+				run.Draw(text, PADDING , (i * settings.fontEditor.lineHeight), settings.fontEditor, alphaMaskBrush);
+			}
+		}
+		
+		foreground->EndDraw();
+		text->EndDraw();
+		
+		//
+		// blend images
+		//
+		{
+			ID2D1Bitmap* bmForeground, *bmText;
+			foreground->GetBitmap(&bmForeground);
+			text->GetBitmap(&bmText);
+			
+			//const D2D_RECT_F dest {.left = area.left, .top = area.top, .right = }
+			//deviceContext->DrawBitmap(bmForeground, &area);
+			BlendImages(deviceContext, {area.left, area.top + toolbarHeight}, bmForeground, bmText);
+			
+			bmForeground->Release();
+			bmText->Release();
+		}
+		
+		deviceContext->PushAxisAlignedClip(
+			D2D_RECT_F {
+				.left = area.left,
+				.top = area.top + toolbarHeight,
+				.right = area.right,
+				.bottom = area.bottom},
+			D2D1_ANTIALIAS_MODE_ALIASED);
+		DEFER(deviceContext->PopAxisAlignedClip());
+		
+		//
+		// draw matched diagnostics
+		//
+		{		
+			for (u64 i = 0; i < diagnosticsRecords.size(); i++) {
+				const EditorDiagnosticsRecord& record = diagnosticsRecords[i];
+				
+				ASSERT(record.originLine < glyphRunCache.size());
+				const GlyphRun& run = glyphRunCache[record.originLine];
+				
+				ASSERT(record.originFromColumn < record.originToColumn);
+				
+				f32 offsetFrom = .0f, offsetTo = .0f;
+				run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
+				
+				deviceContext->DrawRectangle(
+					D2D_RECT_F {
+						.left   = area.left + PADDING + offsetFrom,
+						.top    = area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - scrollarea.vpY,
+						.right  = area.left + PADDING + offsetTo,
+						.bottom = area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - scrollarea.vpY},
+					UseColor(record.color));
+			}
+		}
+		
+		//
+		// draw tool diagnostics
+		//
+		{
+			for (u64 i = 0; i < toolDiagnostics.size(); i++) {
+				const ToolDiagnosticsRecord& record = toolDiagnostics[i];
+				if (record.type == ToolDiagnosticsRecord::Type_Command) continue;
+				
+				ASSERT(record.line < glyphRunCache.size());
+				const GlyphRun& run = glyphRunCache[record.line];
+				
+				ASSERT(record.from < record.to);
+				
+				f32 offsetFrom = .0f, offsetTo = .0f;
+				run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
+				
+				deviceContext->DrawLine(
+					D2D_POINT_2F {
+						.x = area.left + PADDING + offsetFrom,
+						.y = area.top + toolbarHeight + (record.line * settings.fontEditor.lineHeight) - scrollarea.vpY + settings.fontEditor.underlineOffset},
+					D2D_POINT_2F {
+						.x = area.left + PADDING + offsetTo,
+						.y = area.top + toolbarHeight + (record.line * settings.fontEditor.lineHeight) - scrollarea.vpY + settings.fontEditor.underlineOffset},
+					UseColor(COLOR_YELLOW),
+					2.0f,
+					strokeStyleDashed);
+			}
+		}
+		
+		//
+		// draw selection
+		//
+		if (selectionStart != selectionEnd) {
+			
+			const TextPosition* from = nullptr, *to  = nullptr;
+			if (selectionStart < selectionEnd) from = &selectionStart, to = &selectionEnd;
+			else from = &selectionEnd, to = &selectionStart;
+			
+			IterateTextRange(*from, *to, [this, toolbarHeight](u64 ln, u64 fromCp, u64 toCp) {
+				const GlyphRun& run = glyphRunCache[ln];
+									
+				f32 offsetFrom = .0f, offsetTo = .0f;
+				run.MeasureOffsetRange(fromCp, toCp, &offsetFrom, &offsetTo);
+				
+				deviceContext->FillRectangle(
+					D2D_RECT_F {
+						.left   = area.left + PADDING + offsetFrom,
+						.top    = area.top  + toolbarHeight + (settings.fontEditor.lineHeight * ln)     - scrollarea.vpY,
+						.right  = area.left + PADDING + offsetTo,
+						.bottom = area.top  + toolbarHeight + (settings.fontEditor.lineHeight * (ln+1)) - scrollarea.vpY},
+					settings.GetBrushSelection());
+			});
+		}
+		
+		//
+		// hittest to change selection
+		//
+		{
+			const D2D_RECT_F outputArea {
+				.left = area.left,
+				.top = area.top + toolbarHeight,
+				.right = area.right,
+				.bottom = area.bottom};
+			
+			if (mouse.Hittest(outputArea, this, nullptr)) {
+				const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
+				
+				const u64 hitLine = std::clamp<u64>(
+					static_cast<u64>((relativePoistion.y + scrollarea.vpY) / settings.fontEditor.lineHeight),
+					0u,
+					glyphRunCache.size() - 1u);
+				const GlyphRun& hitRun = glyphRunCache[hitLine];
+				const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
+				
+				if (mainWindow.event.type == Event::Type_MouseDown) {				
+					
+					// check if we hit a matched diagnostic record
+					for (u64 i = 0u; i < diagnosticsRecords.size(); i++) {
+						const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[i];
+						
+						const bool hitThisRecord = record.originLine == hitLine &&
+				                           		record.originFromColumn <= hitColumn &&
+				                           		record.originToColumn >= hitColumn;
+						if (hitThisRecord) {
+							UpdateFilePreview(this, record);
+							selectedDiagnosticsRecord = i;
+							goto hit_record;
+						}
+					}
+				
+					mouse.StartDragging();
+					selectionStart = selectionEnd = TextPosition {hitLine, hitColumn};
+					selectedDiagnosticsRecord = U64_MAX;
+					
+				hit_record: __noop;
+				} else if (mouse.isDragging) {
+					selectionEnd = TextPosition {hitLine, hitColumn};
+				}
+			}
+		}
+	}
+	
+	//
+	// update file preview
+	//
+	if (selectedDiagnosticsRecord != U64_MAX) {
+		const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
+	
+		filePreview.x = area.left - filePreview.width;
+		filePreview.y = area.top  + ToolbarHeight() + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
+		filePreview.OnUpdate();
+			
+		deviceContext->DrawRectangle(filePreview.GetArea(), UseColor(record.color));
+	}
 	
 	//
 	// scrollarea
 	//
-	{
-		scrollarea.OnUpdate();
-	}
+	scrollarea.OnUpdate();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -824,10 +789,10 @@ void ToolOutput::OnResize(f32 newWidth, f32 newHeight) {
 	
 	scrollarea.position = D2D_POINT_2F {
 		.x = area.left,
-		.y = area.top + GetToolbarHeight()};	
+		.y = area.top + ToolbarHeight()};	
 	scrollarea.vpSize = D2D_SIZE_F {
 		.width = RectWidth(area),
-		.height = RectHeight(area) - GetToolbarHeight()};
+		.height = RectHeight(area) - ToolbarHeight()};
 }
 
 void ToolOutput::OnMouseWheel(f32 distance) {
@@ -899,11 +864,14 @@ bool ToolOutput::HandleEvent(const Event& event) {
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void WarnMatchedTextParseErr(ToolOutput* self, std::string_view groupName, std::string_view text, std::from_chars_result fcr) {
+static void PushFailedToParseDiagnostics(ToolOutput* self, std::string_view groupName, std::from_chars_result fcr, u64 from, u64 to) {
+	ASSERT(!self->lines.empty());
 	self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
-		.message  = FormatString("failed to parse matched text for capture group '%.*s': '%s'", SIZE_AND_DATA(groupName), Str(fcr)),
-		.source   = text,
-		.position = U64_MAX});
+		.type     = ToolOutput::ToolDiagnosticsRecord::Type_Output,
+		.message  = FormatString("failed to parse matched text for capture group '%.*s': %s", SIZE_AND_DATA(groupName), Str(fcr)),
+		.from     = from,
+		.to       = to,
+		.line     = self->lines.size()-1u});
 }
 
 static void MatchProgress(ToolOutput* self, const std::string* line) {
@@ -911,28 +879,24 @@ static void MatchProgress(ToolOutput* self, const std::string* line) {
 	
 	RegexMatch match;
 	if (!self->tool->progress.regex.Match(*line, &match)) return;
-	if (self->tool->progress.captureGroupValue >= match.groupCount) {
-		LogError("capture group 'value' (index %u) is out of range. Regex only provided only %u capture groups", self->tool->progress.captureGroupValue, self->tool->progress.regex.captureGroupCount);
-		return;
-	}
-	
-	const RegexMatch::Group groupValue = match.GetGroup(self->tool->progress.captureGroupValue);
+	if (self->tool->progress.captureGroupValue >= match.groupCount) return;
 	
 	s64 newValue = 0;
+	const RegexMatch::Group groupValue = match.GetGroup(self->tool->progress.captureGroupValue);
+	
 	const std::from_chars_result fcrValue = std::from_chars(groupValue.begin, groupValue.end, newValue);
 	if (fcrValue.ec != std::errc()) {
-		WarnMatchedTextParseErr(self, "group-value", groupValue.GetText(), fcrValue);
+		PushFailedToParseDiagnostics(self, "progress.group-value", fcrValue, groupValue.begin-line->data(), groupValue.end-line->data());
 		return;
 	}
-	
+		
 	s64 newMax = self->tool->progress.maxValue;
 	if (self->tool->progress.captureGroupMax < match.groupCount) {
-		
 		const RegexMatch::Group groupMax = match.GetGroup(self->tool->progress.captureGroupMax);
 		
 		const std::from_chars_result fcrMax = std::from_chars(groupMax.begin, groupMax.end, newMax);
 		if (fcrMax.ec != std::errc()) {
-			WarnMatchedTextParseErr(self, "group-max", groupMax.GetText(), fcrMax);
+			PushFailedToParseDiagnostics(self, "progress.group-max", fcrMax, groupMax.begin-line->data(), groupMax.end-line->data());
 			// not aborting, using the default max
 		}
 	}
@@ -985,7 +949,7 @@ static void MatchProgress(ToolOutput* self, const std::string* line) {
 		}
 	
 	} else {
-		ASSERT_UNREACHABLE
+		ASSERT_UNREACHABLE;
 	}
 }
 
@@ -997,25 +961,35 @@ static void MatchDiagnostics(ToolOutput* self, const std::string* line) {
 	if (!self->tool->diagnostics.regex.Match(*line, &match)) return;
 
 	ToolOutput::EditorDiagnosticsRecord record {};
-	record.color = settings.colors.editorText;
+	//record.color = settings.colors.editorText;
 	record.originLine = self->lines.size() - 1u;
 	
 	const RegexMatch::Group fullMatch = match.GetFullMatch();
 	record.originFromColumn = fullMatch.begin - line->data();
 	record.originToColumn = fullMatch.end - line->data();
 	
-	// color
-	if (self->tool->diagnostics.captureGroupColor < match.groupCount) {
-		const RegexMatch::Group& group = match.GetGroup(self->tool->diagnostics.captureGroupColor);
-		
-		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnostics.colorMapping) {
-			if (StringEqualsCaseInsen(entry.key, group.GetText())) {
-				record.color = entry.color;
-				break;
-			}
-		}
-	}
+	// I'm usually not a fan using lambdas this way
+	// but this makes this code so much nicer
 	
+	// color	
+	record.color = ([&]() -> Color {
+		if (self->tool->diagnostics.captureGroupColor >= match.groupCount)
+			return settings.colors.editorText;
+		
+		const RegexMatch::Group group = match.GetGroup(self->tool->diagnostics.captureGroupColor);	
+		for (const Tool::DiagnosticsMatcher::ColorMapping& entry : self->tool->diagnostics.colorMapping) {
+			if (StringEqualsCaseInsen(entry.key, group.GetText()))
+				return entry.color;
+		}
+		self->toolDiagnostics.push_back(ToolOutput::ToolDiagnosticsRecord {
+			.type    = ToolOutput::ToolDiagnosticsRecord::Type_Output,
+			.message = FormatString("No mapping for color '%s'"),
+			.from    = static_cast<u64>(group.begin - line->data()),
+			.to      = static_cast<u64>(group.end - line->data()),
+			.line    = self->lines.size() - 1u});
+		return settings.colors.editorText;
+	})();
+		
 	// file
 	if (self->tool->diagnostics.captureGroupFile < match.groupCount) {
 		const RegexMatch::Group group = match.GetGroup(self->tool->diagnostics.captureGroupFile);
@@ -1028,7 +1002,7 @@ static void MatchDiagnostics(ToolOutput* self, const std::string* line) {
 		const std::from_chars_result fcr = std::from_chars(group.begin, group.end, record.line);
 		
 		if (fcr.ec != std::errc()) {
-			WarnMatchedTextParseErr(self, "group-line", group.GetText(), fcr);
+			PushFailedToParseDiagnostics(self, "group-line", fcr, group.begin-line->data(), group.end-line->data());
 			record.line = 0u;
 		}
 		

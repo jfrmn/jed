@@ -5,6 +5,7 @@ struct IDWriteFactory;
 struct IWICImagingFactory;
 struct ID2D1DeviceContext;
 struct ID2D1SolidColorBrush;
+struct ID2D1StrokeStyle;
 struct ID2D1Bitmap;
 struct ID2D1BitmapRenderTarget;
 struct D2D_RECT_F;
@@ -37,6 +38,9 @@ void ShutdownGraphics();
 
 // actice device context
 extern ID2D1DeviceContext* deviceContext;
+
+// needed to draw dashed lines
+extern ID2D1StrokeStyle* strokeStyleDashed;
 
 //-----------------------------------------------------
 // effects
@@ -78,5 +82,3 @@ extern ID2D1SolidColorBrush* brush;
 
 // set the color of the global brush and return that brush
 ID2D1SolidColorBrush* UseColor(const Color& clr);
-
-

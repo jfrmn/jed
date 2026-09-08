@@ -26,7 +26,7 @@ if (-not $env:_VSDEVSHELL) {
 }
 
 function Write-Step($message) {
-	Write-Output "`e[1;36m > $message`e[0m";
+	Write-Output "`e[36m > $message`e[0m";
 }
 
 # set tab color and title

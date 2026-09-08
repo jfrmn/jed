@@ -28,6 +28,9 @@ extern const Color COLOR_TRANSPARENT;
 extern const Color COLOR_RED;
 extern const Color COLOR_GREEN;
 extern const Color COLOR_BLUE;
+extern const Color COLOR_CYAN;
+extern const Color COLOR_YELLOW;
+extern const Color COLOR_MAGENTA;
 extern const Color COLOR_WHITE;
 extern const Color COLOR_BLACK;
 

@@ -34,7 +34,7 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 		
 		const toml::value<std::string>* regex = table->get_as<std::string>("regex");
 		if (!regex) {
-			LogWarning("%s: 'regex' is missing", table->source());
+			LogWarning("%s: 'regex' is missing", Str(table->source()));
 			continue;
 		}
 		
@@ -67,8 +67,8 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 	
 	u32 maxCaptureGroupCount = 0;
 	for (const Rule& rule : rules) {
-		if (maxCaptureGroupCount < rule.regex.captureGroupCount)
-			maxCaptureGroupCount = rule.regex.captureGroupCount;
+		if (maxCaptureGroupCount < rule.regex.additionalCaptureGroupCount)
+			maxCaptureGroupCount = rule.regex.additionalCaptureGroupCount;
 	}
 	match.Reserve(maxCaptureGroupCount);
 	

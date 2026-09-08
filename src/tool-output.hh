@@ -47,9 +47,17 @@ struct ToolOutput : public Process::Observer {
 	};
 		
 	struct ToolDiagnosticsRecord {
+		enum Type {
+			 Type_Unknown,
+			 Type_Command, // errors during command compilation
+			 Type_Output   // errors during matching of the tools output
+		};                 // we could seperate the records in 2 different lists but idk...
+		
+		Type type = Type_Unknown;
 		std::string message = {};
-		std::string_view source = {};
-		u64 position = 0u;
+		u64 from = 0u;
+		u64 to   = 0u;
+		u64 line = 0u;
 	};
 	
 	struct EditorDiagnosticsRecord {
@@ -74,10 +82,9 @@ struct ToolOutput : public Process::Observer {
 	const Tool* tool = nullptr;
 	std::vector<ParameterValue> toolParameterValues = {};
 	
-	// anything that wen't wrong with the tool itself
+	// anything that went wrong with the tool itself
 	// not to be confused with diagnosticsRecords which contains the matched records
 	std::vector<ToolDiagnosticsRecord> toolDiagnostics = {};
-	bool showToolDiagnostics = false;
 	
 	f32         progressValue = 0.0f;
 	std::string progressText = {};
