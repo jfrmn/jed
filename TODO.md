@@ -2,13 +2,9 @@
 
 * delete line does not work with multiple cursors
 
-* delete line messes up tree sitter highlighting (and i think pasting text too) (*FIXED?*)
+* ~~delete line messes up tree sitter highlighting (and i think pasting text too)~~ (*FIXED?*)
 
-* multicursor let's you remove all cursors - leading to a crash
-
-* Opening both a searchbar and the tool panel blocks keyboard input
-
-* using the file search bar from start screen and selecting a file with Ctrl+/Shift+Enter crashes
+* ~~Opening both a searchbar and the tool panel blocks keyboard input~~ (*FIXED?*)
 
 * multi cursor -> cut (maybe also other operation) only invalidate the first gylph run
 
