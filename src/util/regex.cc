@@ -4,9 +4,6 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 
-
-
-
 static const char* GetErrorMessage(int errorNumber) {
 	static char errorBuffer[128] {0};
 	memset(errorBuffer, 0, sizeof(errorBuffer));
@@ -45,6 +42,8 @@ RegexMatch::Group RegexMatch::GetFullMatch() const {
 }
 
 RegexMatch::Group RegexMatch::GetGroup(u32 index) const {
+	ASSERT(index < groupCount);
+
 	u64* ovector = pcre2_get_ovector_pointer(data);
 	const u64 offsetBegin = ovector[(index*2)];
 	const u64 offsetEnd   = ovector[(index*2)+1];	
@@ -101,7 +100,7 @@ bool Regex::Compile(std::string_view expression, /*out*/ RegexError* error) {
 		return false;
 	}
 	
-	errorNum = pcre2_pattern_info(code, PCRE2_INFO_CAPTURECOUNT, &captureGroupCount);
+	errorNum = pcre2_pattern_info(code, PCRE2_INFO_CAPTURECOUNT, &additionalCaptureGroupCount);
 	if (errorNum < 0) {
 		LogError("pcre2_pattern_info() failed. %d %s", errorNum, GetErrorMessage(errorNum));
 		return false;
@@ -123,7 +122,7 @@ void Regex::Reset() {
 		pcre2_code_free(code);
 		code = nullptr;
 	}
-	captureGroupCount = 0u;
+	additionalCaptureGroupCount = 0u;
 	isOk = false;
 	isJitCompiled = false;
 }
@@ -135,15 +134,15 @@ bool Regex::Match(std::string_view subject, /*out*/ RegexMatch* match) const {
 	
 	if (match->subject.empty()) {
 		
-		match->Reserve(captureGroupCount);
+		match->Reserve(additionalCaptureGroupCount);
 		
 		match->subject = subject;
 		match->offset = 0;
-		match->groupCount = captureGroupCount + 1;
+		match->groupCount = additionalCaptureGroupCount + 1;
 		
 	} else {
 		ASSERT(subject == match->subject);
-		ASSERT(captureGroupCount + 1 <= match->capacity);
+		ASSERT(additionalCaptureGroupCount + 1 <= match->capacity);
 		
 		u32 options = 0;
 		if (!pcre2_next_match(match->data, &match->offset, &options))
@@ -178,19 +177,23 @@ u64 Regex::GetCaptureGroupByName(const char* name) const {
 	return static_cast<u64>(result); 
 }
 
+u64 Regex::TotalCaptureGroupCount() const {
+	return additionalCaptureGroupCount + 1u;
+}
+
 Regex::Regex(const Regex& other) noexcept 
 	: code(other.code ? pcre2_code_copy(other.code) : nullptr)
-	, captureGroupCount(other.captureGroupCount)
+	, additionalCaptureGroupCount(other.additionalCaptureGroupCount)
 	, isOk(other.isOk)
 	, isJitCompiled(other.isJitCompiled) {}
 	
 Regex::Regex(Regex&& other) noexcept
 	: code(other.code)
-	, captureGroupCount(other.captureGroupCount)
+	, additionalCaptureGroupCount(other.additionalCaptureGroupCount)
 	, isOk(other.isOk)
 	, isJitCompiled(other.isJitCompiled) {
 	other.code = nullptr;
-	other.captureGroupCount = 0u;
+	other.additionalCaptureGroupCount = 0u;
 	other.isOk = false;
 	other.isJitCompiled = false;
 }

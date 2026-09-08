@@ -172,8 +172,10 @@ Editor::FileResult Editor::CloseFile() {
 }
 
 Editor::FileResult Editor::OpenFile(std::string path) {
-
+	
+	//
 	// close old file first
+	//
 	if (auto fileResult = CloseFile(); fileResult != FileResult_Success)
 		return fileResult;
 			
@@ -638,14 +640,13 @@ static void OnClickScrollArea(void* ud, u64 i) {
 	auto self = static_cast<Editor*>(ud);
 	
 	const std::scoped_lock lock {self->editorDiagnostics.mutex};
-	// in the time between Editor::OnUpdate() and the Click-Execution
+	// in the time between Editor::Update() and the Click-Execution
 	// the diagnostics may have been updated, so it is not guaranteed
 	// that "i" is valid.
 	if (i >= self->editorDiagnostics.RecordCount()) return;
 	
 	// @IMPROVE even if i is valid - it might an entirly different
-	// record from what the user clicked
-	
+	// record from what the user clicked	
 	
 	const EditorDiagnostics::Record& record = self->editorDiagnostics.records[i];
 	self->ScrollToLine(record.from.line);
@@ -666,7 +667,7 @@ void Editor::Update() {
 				const TextPosition mouseTextPosition = Hittest(this, mouse.x, mouse.y);
 				textController.SetCaretPosition(mouseTextPosition);
 			
-			// @CHECK does this still work!
+			// @CHECK does this still work?
 			} else if (mouse.isDragging) {
 				ASSERT(textController.carets.size() == 1u);
 				

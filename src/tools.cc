@@ -19,8 +19,8 @@ std::vector<Tool> Tool::tools {};
 static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, std::string_view key, /*out*/ u32* captureGroup) {
 	auto valGroup = table->get_as<s64>(key);
 	if (!valGroup) return;
-	if (valGroup->get() >= regex.captureGroupCount + 1u || valGroup->get() < 0u) {
-		LogWarning("%s: value is out of range. regex only provides %u groups", Str(valGroup->source()), regex.captureGroupCount + 1u);
+	if (valGroup->get() >= regex.TotalCaptureGroupCount() || valGroup->get() < 0u) {
+		LogWarning("%s: value is out of range. regex only provides %u groups", Str(valGroup->source()), regex.TotalCaptureGroupCount());
 		return;
 	}
 			

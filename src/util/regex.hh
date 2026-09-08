@@ -60,7 +60,7 @@ struct Regex {
 	//------------------------------------------	
 	
 	pcre2_real_code_8* code = nullptr;
-	u32 captureGroupCount = 0u; // these are ADDITIONAL groups (group at 0 is always the full match)
+	u32 additionalCaptureGroupCount = 0u; // ADDITIONAL because group at 0 is the full match and always present
 	bool isOk = false;
 	bool isJitCompiled = false;
 
@@ -73,6 +73,8 @@ struct Regex {
 
 	bool Match(std::string_view subject, RegexMatch* match) const;
 	u64 GetCaptureGroupByName(const char* name) const; // needs to be zero terminated
+	
+	u64 TotalCaptureGroupCount() const;
 
 	//------------------------------------------	
 	// construction	
