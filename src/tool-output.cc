@@ -311,137 +311,6 @@ void ToolOutput::Update() {
 	
 	const std::scoped_lock lock {mtx};
 	
-	GlyphRun run = {};
-	f32 offsetTop = 0.0f;
-	
-	//
-	// draw toolbar
-	//
-	{
-		const D2D_RECT_F toolbarArea {
-			.left = area.left,
-			.top = area.top,
-			.right = area.right,
-			.bottom = area.top + ToolbarHeight()};
-		
-		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
-	
-		if (tool) {
-			f32 offsetX = 0.0f;
-						
-			// draw tool name
-			{
-				run.Shape(tool->name, settings.fontUi);
-				run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
-				
-				offsetX = run.width + MARGIN_X2;
-				
-				const D2D_RECT_F toolNameArea {
-					.left = toolbarArea.left,
-					.top = toolbarArea.top,
-					.right = toolbarArea.left + offsetX,
-					.bottom = toolbarArea.bottom};
-			}
-			
-			constexpr f32 PROGRESS_AREA_WIDTH = 200.0f;
-			const D2D_RECT_F progressArea {
-				.left   = toolbarArea.left + offsetX,
-				.top    = toolbarArea.top + MARGIN - PADDING,
-				.right  = toolbarArea.left + offsetX + PROGRESS_AREA_WIDTH,
-				.bottom = toolbarArea.bottom - MARGIN + PADDING};
-								
-			// draw progress bar
-			if (tool->progress.regex.isOk) {
-				
-				deviceContext->FillRoundedRectangle(ToRounded(
-					MakeRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea))),
-					UseColor(Color::FromKnown(D2D1::ColorF::Green)));
-				
-				deviceContext->DrawRoundedRectangle(ToRounded(
-					progressArea),
-					settings.GetBrushUiText());
-			} else {
-				deviceContext->FillRoundedRectangle(ToRounded(
-					progressArea),
-					settings.GetBrushUiBackground(false));
-			}
-				
-			// draw prgress text
-			{
-				std::string_view label = progressText;
-				std::string_view hoverLabel;
-				MouseState::Callback onClickFunc;
-				Color labelColor, hoverLabelColor;
-				
-				char exitCodeBuffer[32] {'\0'};
-				const u64 exitCode = process ? process->GetExitCode() : 0;
-				
-				if (!process) {
-					onClickFunc = OnRerunProcess;
-					label = "Error";
-					hoverLabel = "Retry";
-					labelColor = Color::FromKnown(D2D1::ColorF::Red);
-					hoverLabelColor = settings.colors.uiText;
-				
-				} else if (exitCode == STILL_ACTIVE) {
-					onClickFunc = OnClickedKillProcess;
-					labelColor = settings.colors.uiText;
-					hoverLabel = "Terminate";
-					hoverLabelColor = Color::FromKnown(D2D1::ColorF::Crimson);
-				
-				} else {
-					onClickFunc = OnRerunProcess;
-					labelColor = (exitCode == 0)
-						? settings.colors.uiText
-						: Color::FromKnown(D2D1::ColorF::Crimson);
-					hoverLabel = "Restart";
-					hoverLabelColor = settings.colors.uiText;
-				}
-				
-				if (mouse.Hittest(progressArea, this, onClickFunc)) {
-					deviceContext->FillRoundedRectangle(ToRounded(progressArea), settings.GetBrushHover(mouse.isDown));
-					
-					brush->SetColor(hoverLabelColor.ToD2D());
-					run.Shape(hoverLabel, settings.fontUi);
-				
-				} else {
-					brush->SetColor(labelColor.ToD2D());
-					run.Shape(label, settings.fontUi);
-				}
-				
-				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (run.width / 2.0f);
-				run.Draw(deviceContext, x, area.top + MARGIN, settings.fontUi, brush);
-				
-				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
-			}
-			
-			// draw error and warning icons
-			if (!toolDiagnostics.empty()) {
-				D2D_RECT_F areaBothIcons {
-					.left  = toolbarArea.left + offsetX,
-					.top   = toolbarArea.top + MARGIN - PADDING,
-					.right = toolbarArea.left + offsetX + settings.fontUi.lineHeight + PADDING_X2,
-					.bottom = toolbarArea.bottom - MARGIN + PADDING};
-					
-				if (mouse.Hittest(areaBothIcons, this, OnClickToolDiagnostics))
-					deviceContext->FillRoundedRectangle(ToRounded(areaBothIcons), settings.GetBrushHover(mouse.isDown));
-				
-				deviceContext->DrawBitmap(
-					settings.icons.editorDiagnosticsWarning,
-					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
-				
-				offsetX += settings.fontUi.lineHeight + PADDING_X2;
-			}
-			
-		// no tool
-		} else {
-			run.Shape("No tool run yet.", settings.fontUi);
-			run.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
-		}
-		
-		offsetTop += ToolbarHeight();
-	}
-	
 	//
 	// reshape glyphs
 	//	
@@ -654,35 +523,6 @@ void ToolOutput::Update() {
 		}
 		
 		//
-		// draw tool diagnostics
-		//
-		{
-			for (u64 i = 0; i < toolDiagnostics.size(); i++) {
-				const ToolDiagnosticsRecord& record = toolDiagnostics[i];
-				if (record.type == ToolDiagnosticsRecord::Type_Command) continue;
-				
-				ASSERT(record.line < glyphRunCache.size());
-				const GlyphRun& run = glyphRunCache[record.line];
-				
-				ASSERT(record.from < record.to);
-				
-				f32 offsetFrom = .0f, offsetTo = .0f;
-				run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
-				
-				deviceContext->DrawLine(
-					D2D_POINT_2F {
-						.x = area.left + PADDING + offsetFrom,
-						.y = area.top + toolbarHeight + (record.line * settings.fontEditor.lineHeight) - scrollarea.vpY + settings.fontEditor.underlineOffset},
-					D2D_POINT_2F {
-						.x = area.left + PADDING + offsetTo,
-						.y = area.top + toolbarHeight + (record.line * settings.fontEditor.lineHeight) - scrollarea.vpY + settings.fontEditor.underlineOffset},
-					UseColor(COLOR_YELLOW),
-					2.0f,
-					strokeStyleDashed);
-			}
-		}
-		
-		//
 		// draw selection
 		//
 		if (selectionStart != selectionEnd) {
@@ -756,6 +596,55 @@ void ToolOutput::Update() {
 	}
 	
 	//
+	// draw tool diagnostics
+	//
+	{
+		for (u64 i = 0; i < toolDiagnostics.size(); i++) {
+			const ToolDiagnosticsRecord& record = toolDiagnostics[i];
+			if (record.type == ToolDiagnosticsRecord::Type_Command) continue;
+			
+			ASSERT(record.line < glyphRunCache.size());
+			const GlyphRun& run = glyphRunCache[record.line];
+			
+			ASSERT(record.from < record.to);
+			
+			f32 offsetFrom = .0f, offsetTo = .0f;
+			run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
+			
+			const D2D_RECT_F areaRecord {
+				.left   = area.left + PADDING + offsetFrom,
+				.top    = area.top + ToolbarHeight() + (record.line *  settings.fontEditor.lineHeight) - scrollarea.vpY,
+				.right  = area.left + PADDING + offsetTo,
+				.bottom = area.top + ToolbarHeight() + (record.line * (settings.fontEditor.lineHeight+1)) - scrollarea.vpY};
+			
+			deviceContext->DrawLine(
+				D2D_POINT_2F {
+					.x = areaRecord.left,
+					.y = areaRecord.top + settings.fontEditor.underlineOffset},
+				D2D_POINT_2F {
+					.x = areaRecord.right,
+					.y = areaRecord.top + settings.fontEditor.underlineOffset},
+				UseColor(COLOR_YELLOW),
+				2.0f,
+				strokeStyleDashed);
+				
+			if (mouse.Hittest(areaRecord, this, nullptr, i)) {
+				staticGlyphRun.Shape(record.message, settings.fontUi);
+				
+				const D2D_RECT_F tooltipArea = MakeRect(
+					mouse.x - staticGlyphRun.width - PADDING_X2,
+					mouse.y + PADDING_X2,
+					PADDING_X2 + staticGlyphRun.width,
+					PADDING_X2 + settings.fontUi.lineHeight);
+				deviceContext->FillRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.uiBackground));
+				deviceContext->DrawRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.dropShadow));
+				
+				staticGlyphRun.Draw(deviceContext, mouse.x - staticGlyphRun.width - PADDING, mouse.y + PADDING_X3, settings.fontUi, UseColor(settings.colors.uiText));
+			}
+		}
+	}
+	
+	//
 	// update file preview
 	//
 	if (selectedDiagnosticsRecord != U64_MAX) {
@@ -772,6 +661,156 @@ void ToolOutput::Update() {
 	// scrollarea
 	//
 	scrollarea.OnUpdate();
+	
+	//
+	// draw toolbar
+	//
+	{
+		const D2D_RECT_F toolbarArea {
+			.left = area.left,
+			.top = area.top,
+			.right = area.right,
+			.bottom = area.top + ToolbarHeight()};
+		
+		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
+	
+		if (tool) {
+			f32 offsetX = 0.0f;
+						
+			// draw tool name
+			{
+				staticGlyphRun.Shape(tool->name, settings.fontUi);
+				staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
+				
+				offsetX = staticGlyphRun.width + MARGIN_X2;
+				
+				const D2D_RECT_F toolNameArea {
+					.left = toolbarArea.left,
+					.top = toolbarArea.top,
+					.right = toolbarArea.left + offsetX,
+					.bottom = toolbarArea.bottom};
+			}
+			
+			constexpr f32 PROGRESS_AREA_WIDTH = 200.0f;
+			const D2D_RECT_F progressArea {
+				.left   = toolbarArea.left + offsetX,
+				.top    = toolbarArea.top + MARGIN - PADDING,
+				.right  = toolbarArea.left + offsetX + PROGRESS_AREA_WIDTH,
+				.bottom = toolbarArea.bottom - MARGIN + PADDING};
+								
+			// draw progress bar
+			if (tool->progress.regex.isOk) {
+				
+				deviceContext->FillRoundedRectangle(ToRounded(
+					MakeRect(progressArea.left, progressArea.top, (PROGRESS_AREA_WIDTH * progressValue), RectHeight(progressArea))),
+					UseColor(Color::FromKnown(D2D1::ColorF::Green)));
+				
+				deviceContext->DrawRoundedRectangle(ToRounded(
+					progressArea),
+					settings.GetBrushUiText());
+			} else {
+				deviceContext->FillRoundedRectangle(ToRounded(
+					progressArea),
+					settings.GetBrushUiBackground(false));
+			}
+				
+			// draw prgress text
+			{
+				std::string_view label = progressText;
+				std::string_view hoverLabel;
+				MouseState::Callback onClickFunc;
+				Color labelColor, hoverLabelColor;
+				
+				char exitCodeBuffer[32] {'\0'};
+				const u64 exitCode = process ? process->GetExitCode() : 0;
+				
+				if (!process) {
+					onClickFunc = OnRerunProcess;
+					label = "Error";
+					hoverLabel = "Retry";
+					labelColor = Color::FromKnown(D2D1::ColorF::Red);
+					hoverLabelColor = settings.colors.uiText;
+				
+				} else if (exitCode == STILL_ACTIVE) {
+					onClickFunc = OnClickedKillProcess;
+					labelColor = settings.colors.uiText;
+					hoverLabel = "Terminate";
+					hoverLabelColor = Color::FromKnown(D2D1::ColorF::Crimson);
+				
+				} else {
+					onClickFunc = OnRerunProcess;
+					labelColor = (exitCode == 0)
+						? settings.colors.uiText
+						: Color::FromKnown(D2D1::ColorF::Crimson);
+					hoverLabel = "Restart";
+					hoverLabelColor = settings.colors.uiText;
+				}
+				
+				if (mouse.Hittest(progressArea, this, onClickFunc)) {
+					deviceContext->FillRoundedRectangle(ToRounded(progressArea), settings.GetBrushHover(mouse.isDown));
+					
+					brush->SetColor(hoverLabelColor.ToD2D());
+					staticGlyphRun.Shape(hoverLabel, settings.fontUi);
+				
+				} else {
+					brush->SetColor(labelColor.ToD2D());
+					staticGlyphRun.Shape(label, settings.fontUi);
+				}
+				
+				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (staticGlyphRun.width / 2.0f);
+				staticGlyphRun.Draw(deviceContext, x, area.top + MARGIN, settings.fontUi, brush);
+				
+				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
+			}
+			
+			// draw warning icon
+			if (!toolDiagnostics.empty()) {
+				const D2D_RECT_F areaWarningIcon {
+					.left   = toolbarArea.left + offsetX,
+					.top    = toolbarArea.top + MARGIN - PADDING,
+					.right  = toolbarArea.left + offsetX + settings.fontUi.lineHeight + PADDING_X2,
+					.bottom = toolbarArea.bottom - MARGIN + PADDING};
+				
+				deviceContext->DrawBitmap(
+					settings.icons.editorDiagnosticsWarning,
+					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
+					
+				if (mouse.Hittest(areaWarningIcon, this, OnClickToolDiagnostics)) {
+					
+					// @FIXME we do this every frame. Performance...
+					std::vector<GlyphRun> toolDiagnosticsRuns {};
+					f32 longestLine = 0.0f;
+					for (const ToolDiagnosticsRecord& record : toolDiagnostics) {
+					//	if (record.type != ToolDiagnosticsRecord::Type_Command) continue;
+						
+						GlyphRun& run = toolDiagnosticsRuns.emplace_back();
+						run.Shape(record.message, settings.fontUi);
+						
+						if (longestLine < run.width)
+							longestLine = run.width;
+					}
+					
+					const D2D_RECT_F areaTooltip = MakeRect(
+						mouse.x - longestLine - PADDING_X2,
+						mouse.y + PADDING_X3,
+						PADDING_X2 + longestLine,
+						PADDING_X2 + (toolDiagnosticsRuns.size() * settings.fontUi.lineHeight));
+					deviceContext->FillRoundedRectangle(ToRounded(areaTooltip), UseColor(settings.colors.uiBackground));
+					deviceContext->DrawRoundedRectangle(ToRounded(areaTooltip), UseColor(settings.colors.dropShadow));
+					
+					for (const GlyphRun& run : toolDiagnosticsRuns)
+						run.Draw(deviceContext, areaTooltip.left + PADDING, areaTooltip.top + PADDING, settings.fontUi, UseColor(settings.colors.uiText));
+				}
+				
+				offsetX += settings.fontUi.lineHeight + PADDING_X2;
+			}
+			
+		// no tool
+		} else {
+			staticGlyphRun.Shape("No tool run yet.", settings.fontUi);
+			staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText(false));
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
