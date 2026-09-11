@@ -270,7 +270,10 @@ static void UpdateFilePreview(ToolOutput* self, const ToolOutput::EditorDiagnost
 	self->filePreview.Load(FilePreview::LoadArgs {
 		.path = record.file,
 		.mode = FilePreview::LoadMode_TargetLine,
-		.targetLine = record.line});
+		.targetLine = record.line,
+		.hasSelection = true,
+		.selectionFrom = self->selectionStart,
+		.selectionTo = self->selectionEnd});
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -283,7 +286,10 @@ static void OnClickedKillProcess(void* ud, u64) {
 	self->process->Terminate();
 }
 
-static void OnRerunProcess(void* ud, u64) {}
+static void OnRerunProcess(void* ud, u64) {
+	auto self = static_cast<ToolOutput*>(ud);
+	ASSERT_NOT_IMPLEMENTED;
+}
 
 static void OnClickToolDiagnostics(void* ud, u64) {
 	auto self = static_cast<ToolOutput*>(ud);
@@ -310,7 +316,8 @@ void ToolOutput::Update() {
 	}
 	
 	const std::scoped_lock lock {mtx};
-	
+	const f32 toolbarHeight = ToolbarHeight();
+		
 	//
 	// reshape glyphs
 	//	
@@ -335,7 +342,7 @@ void ToolOutput::Update() {
 		if (!disableAutoScroll)
 			scrollarea.vpY = scrollarea.GetMaxPositionY();
 	}
-	
+		
 	//
 	// render lines
 	//
@@ -487,7 +494,16 @@ void ToolOutput::Update() {
 			bmForeground->Release();
 			bmText->Release();
 		}
+	}
 		
+	
+	// we need to draw the tooltip outside of the clip rect
+	const ToolDiagnosticsRecord* toolDiagnosticsRecordUnderCursor = nullptr;
+	
+	//
+	// draw diagnostics + selection
+	//
+	{
 		deviceContext->PushAxisAlignedClip(
 			D2D_RECT_F {
 				.left = area.left,
@@ -496,32 +512,66 @@ void ToolOutput::Update() {
 				.bottom = area.bottom},
 			D2D1_ANTIALIAS_MODE_ALIASED);
 		DEFER(deviceContext->PopAxisAlignedClip());
-		
+	
 		//
 		// draw matched diagnostics
 		//
-		{		
-			for (u64 i = 0; i < diagnosticsRecords.size(); i++) {
-				const EditorDiagnosticsRecord& record = diagnosticsRecords[i];
-				
-				ASSERT(record.originLine < glyphRunCache.size());
-				const GlyphRun& run = glyphRunCache[record.originLine];
-				
-				ASSERT(record.originFromColumn < record.originToColumn);
-				
-				f32 offsetFrom = .0f, offsetTo = .0f;
-				run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
-				
-				deviceContext->DrawRectangle(
-					D2D_RECT_F {
-						.left   = area.left + PADDING + offsetFrom,
-						.top    = area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - scrollarea.vpY,
-						.right  = area.left + PADDING + offsetTo,
-						.bottom = area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - scrollarea.vpY},
-					UseColor(record.color));
-			}
+		for (u64 i = 0; i < diagnosticsRecords.size(); i++) {
+			const EditorDiagnosticsRecord& record = diagnosticsRecords[i];
+			
+			ASSERT(record.originLine < glyphRunCache.size());
+			const GlyphRun& run = glyphRunCache[record.originLine];
+			
+			ASSERT(record.originFromColumn < record.originToColumn);
+			
+			f32 offsetFrom = .0f, offsetTo = .0f;
+			run.MeasureOffsetRange(record.originFromColumn, record.originToColumn, &offsetFrom, &offsetTo);
+			
+			deviceContext->DrawRectangle(
+				D2D_RECT_F {
+					.left   = area.left + PADDING + offsetFrom,
+					.top    = area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - scrollarea.vpY,
+					.right  = area.left + PADDING + offsetTo,
+					.bottom = area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - scrollarea.vpY},
+				UseColor(record.color));
 		}
-		
+	
+		//
+		// draw tool diagnostics
+		//
+		for (u64 i = 0; i < toolDiagnostics.size(); i++) {
+			const ToolDiagnosticsRecord& record = toolDiagnostics[i];
+			if (record.type == ToolDiagnosticsRecord::Type_Command) continue;
+			
+			ASSERT(record.line < glyphRunCache.size());
+			const GlyphRun& run = glyphRunCache[record.line];
+			
+			ASSERT(record.from < record.to);
+			
+			f32 offsetFrom = .0f, offsetTo = .0f;
+			run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
+			
+			const D2D_RECT_F areaRecord {
+				.left   = area.left + PADDING + offsetFrom,
+				.top    = area.top + toolbarHeight + (record.line *  settings.fontEditor.lineHeight) - scrollarea.vpY,
+				.right  = area.left + PADDING + offsetTo,
+				.bottom = area.top + toolbarHeight + (record.line * (settings.fontEditor.lineHeight+1)) - scrollarea.vpY};
+			
+			deviceContext->DrawLine(
+				D2D_POINT_2F {
+					.x = areaRecord.left,
+					.y = areaRecord.top + settings.fontEditor.underlineOffset},
+				D2D_POINT_2F {
+					.x = areaRecord.right,
+					.y = areaRecord.top + settings.fontEditor.underlineOffset},
+				UseColor(COLOR_YELLOW),
+				2.0f,
+				strokeStyleDashed);
+				
+			if (mouse.Hittest(areaRecord, this, OnClickToolDiagnostics, i)) 
+				toolDiagnosticsRecordUnderCursor = &record;
+		}
+	
 		//
 		// draw selection
 		//
@@ -546,102 +596,76 @@ void ToolOutput::Update() {
 					settings.GetBrushSelection());
 			});
 		}
-		
-		//
-		// hittest to change selection
-		//
-		{
-			const D2D_RECT_F outputArea {
-				.left = area.left,
-				.top = area.top + toolbarHeight,
-				.right = area.right,
-				.bottom = area.bottom};
+	}
 			
-			if (mouse.Hittest(outputArea, this, nullptr)) {
-				const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
+	//
+	// hittest to change selection
+	//
+	{
+		const D2D_RECT_F outputArea {
+			.left = area.left,
+			.top = area.top + toolbarHeight,
+			.right = area.right,
+			.bottom = area.bottom};
+		
+		if (mouse.Hittest(outputArea, this, nullptr)) {
+			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
+			
+			const u64 hitLine = std::clamp<u64>(
+				static_cast<u64>((relativePoistion.y + scrollarea.vpY) / settings.fontEditor.lineHeight),
+				0u,
+				glyphRunCache.size() - 1u);
+			const GlyphRun& hitRun = glyphRunCache[hitLine];
+			const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
+			
+			if (mainWindow.event.type == Event::Type_MouseDown) {				
 				
-				const u64 hitLine = std::clamp<u64>(
-					static_cast<u64>((relativePoistion.y + scrollarea.vpY) / settings.fontEditor.lineHeight),
-					0u,
-					glyphRunCache.size() - 1u);
-				const GlyphRun& hitRun = glyphRunCache[hitLine];
-				const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
-				
-				if (mainWindow.event.type == Event::Type_MouseDown) {				
+				// check if we hit a matched diagnostic record
+				for (u64 i = 0u; i < diagnosticsRecords.size(); i++) {
+					const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[i];
 					
-					// check if we hit a matched diagnostic record
-					for (u64 i = 0u; i < diagnosticsRecords.size(); i++) {
-						const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[i];
-						
-						const bool hitThisRecord = record.originLine == hitLine &&
-				                           		record.originFromColumn <= hitColumn &&
-				                           		record.originToColumn >= hitColumn;
-						if (hitThisRecord) {
-							UpdateFilePreview(this, record);
-							selectedDiagnosticsRecord = i;
-							goto hit_record;
-						}
+					const bool hitThisRecord = record.originLine == hitLine &&
+			                           		record.originFromColumn <= hitColumn &&
+			                           		record.originToColumn >= hitColumn;
+					if (hitThisRecord) {
+						UpdateFilePreview(this, record);
+						selectedDiagnosticsRecord = i;
+						goto hit_record;
 					}
-				
-					mouse.StartDragging();
-					selectionStart = selectionEnd = TextPosition {hitLine, hitColumn};
-					selectedDiagnosticsRecord = U64_MAX;
-					
-				hit_record: __noop;
-				} else if (mouse.isDragging) {
-					selectionEnd = TextPosition {hitLine, hitColumn};
 				}
+			
+				mouse.StartDragging();
+				selectionStart = selectionEnd = TextPosition {hitLine, hitColumn};
+				selectedDiagnosticsRecord = U64_MAX;
+				
+			hit_record: __noop;
+			} else if (mouse.isDragging) {
+				selectionEnd = TextPosition {hitLine, hitColumn};
 			}
 		}
 	}
 	
 	//
-	// draw tool diagnostics
+	// draw tooltip for tool diagnostics
 	//
-	{
-		for (u64 i = 0; i < toolDiagnostics.size(); i++) {
-			const ToolDiagnosticsRecord& record = toolDiagnostics[i];
-			if (record.type == ToolDiagnosticsRecord::Type_Command) continue;
-			
-			ASSERT(record.line < glyphRunCache.size());
-			const GlyphRun& run = glyphRunCache[record.line];
-			
-			ASSERT(record.from < record.to);
-			
-			f32 offsetFrom = .0f, offsetTo = .0f;
-			run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
-			
-			const D2D_RECT_F areaRecord {
-				.left   = area.left + PADDING + offsetFrom,
-				.top    = area.top + ToolbarHeight() + (record.line *  settings.fontEditor.lineHeight) - scrollarea.vpY,
-				.right  = area.left + PADDING + offsetTo,
-				.bottom = area.top + ToolbarHeight() + (record.line * (settings.fontEditor.lineHeight+1)) - scrollarea.vpY};
-			
-			deviceContext->DrawLine(
-				D2D_POINT_2F {
-					.x = areaRecord.left,
-					.y = areaRecord.top + settings.fontEditor.underlineOffset},
-				D2D_POINT_2F {
-					.x = areaRecord.right,
-					.y = areaRecord.top + settings.fontEditor.underlineOffset},
-				UseColor(COLOR_YELLOW),
-				2.0f,
-				strokeStyleDashed);
-				
-			if (mouse.Hittest(areaRecord, this, nullptr, i)) {
-				staticGlyphRun.Shape(record.message, settings.fontUi);
-				
-				const D2D_RECT_F tooltipArea = MakeRect(
-					mouse.x - staticGlyphRun.width - PADDING_X2,
-					mouse.y + PADDING_X2,
-					PADDING_X2 + staticGlyphRun.width,
-					PADDING_X2 + settings.fontUi.lineHeight);
-				deviceContext->FillRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.uiBackground));
-				deviceContext->DrawRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.dropShadow));
-				
-				staticGlyphRun.Draw(deviceContext, mouse.x - staticGlyphRun.width - PADDING, mouse.y + PADDING_X3, settings.fontUi, UseColor(settings.colors.uiText));
-			}
-		}
+	if (toolDiagnosticsRecordUnderCursor) {
+		
+		ASSERT(toolDiagnosticsRecordUnderCursor->line < glyphRunCache.size());
+		const GlyphRun& run = glyphRunCache[toolDiagnosticsRecordUnderCursor->line];
+		
+		ASSERT(toolDiagnosticsRecordUnderCursor->from < toolDiagnosticsRecordUnderCursor->to);
+		
+		staticGlyphRun.Shape(toolDiagnosticsRecordUnderCursor->message, settings.fontUi);
+		
+		const D2D_RECT_F tooltipArea = MakeRect(
+			mouse.x - staticGlyphRun.width - PADDING_X2,
+			mouse.y + PADDING_X2,
+			PADDING_X2 + staticGlyphRun.width,
+			PADDING_X2 + settings.fontUi.lineHeight);
+		deviceContext->FillRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.uiBackground));
+		deviceContext->DrawRoundedRectangle(ToRounded(tooltipArea), UseColor(settings.colors.dropShadow));
+		
+		staticGlyphRun.Draw(deviceContext, mouse.x - staticGlyphRun.width - PADDING, mouse.y + PADDING_X3, settings.fontUi, UseColor(settings.colors.uiText));
 	}
 	
 	//
@@ -651,7 +675,7 @@ void ToolOutput::Update() {
 		const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
 	
 		filePreview.x = area.left - filePreview.width;
-		filePreview.y = area.top  + ToolbarHeight() + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
+		filePreview.y = area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
 		filePreview.OnUpdate();
 			
 		deviceContext->DrawRectangle(filePreview.GetArea(), UseColor(record.color));
@@ -670,7 +694,7 @@ void ToolOutput::Update() {
 			.left = area.left,
 			.top = area.top,
 			.right = area.right,
-			.bottom = area.top + ToolbarHeight()};
+			.bottom = area.top + toolbarHeight};
 		
 		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
 	

@@ -1038,7 +1038,14 @@ static void OnFileChanged(App* self, FileChangedEvent* fileChangedEvent) {
 
 void App::HandleEvent(const Event& event) {
 	
-	if (event.type == Event::Type_MouseWheel) {
+	if (event.type == Event::Type_MouseMove || event.type == Event::Type_MouseDown || event.type == Event::Type_MouseUp) {
+		mouse.x = event.mouse.x;
+		mouse.y = event.mouse.y;
+		if      (event.type == Event::Type_MouseDown) mouse.isDown = true;
+		else if (event.type == Event::Type_MouseUp)   mouse.isDown = false;
+		return;
+		
+	} else if (event.type == Event::Type_MouseWheel) {
 		
 		if (searchBar && RectContains(searchBar->area, mouse.x, mouse.y)) {
 			searchBar->OnMouseWheel(event.wheelDistance);

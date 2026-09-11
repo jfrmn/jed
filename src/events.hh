@@ -66,6 +66,7 @@ struct Event {
 		 Type_None = 0,
 		 Type_KeyPress,
 		 Type_Text,
+		 Type_MouseMove,
 		 Type_MouseDown,
 		 Type_MouseUp,
 		 Type_MouseWheel,
@@ -95,7 +96,7 @@ struct Event {
 			u64 len = 0u;
 		} text;
 		
-		// MouseDown, MouseUp
+		// MouseMove, MouseDown, MouseUp
 		struct {
 			f32 x;
 			f32 y;

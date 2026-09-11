@@ -4,6 +4,10 @@
 #include "logging.hh"
 #include "ui/window.hh"
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include <stdarg.h>
 
 // defined in src/main.cc
@@ -57,10 +61,17 @@ X_TESTS(FORWARD_DECLARE_TEST)
 int main(int argc, char** argv) {
 	OpenLogger(LogLevel_Trace, LogOutput_Temporary);		
 	CHECK_TRUE(Init());
+	
 	mainWindow.Show();
+	RECT cl;
+	GetClientRect(mainWindow.hWnd, &cl);
+	PushEvent(Event {
+		.type = Event::Type_Resize,
+		.newSize {.w = static_cast<f32>(cl.right - cl.left), .h = static_cast<f32>(cl.bottom - cl.top)}});
 	
 	X_TESTS(RUN_TEST);
-			
+
+	mainWindow.Destroy();			
 	Shutdown();
 	CloseLogger();
 	printf("\nPassed: \x1b[32m%d\x1b[0m  Failed: \x1b[31m%d\x1b[0m  Skipped: \x1b[90m%d\x1b[0m\n", successCount, failureCount, skipCount);

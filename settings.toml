@@ -31,8 +31,8 @@ command = 'D:\Apps\dnGrep\dnGrep.exe .'
 open-console = "never"
 	
 [[Tools]]
-name = "run test tool"
-command = 'pwsh.exe -f .\test\testtool.ps1'
+name = "test tool"
+command = 'pwsh.exe -f .\test\testtool.ps1 %0'
 open-console = "on-start"
 progress = {
 	regex = '^\[(\d+|X+)/(\d+)\]',
@@ -47,3 +47,12 @@ diagnostics = {
 		error   = [255, 0, 0],
 		warning = [255, 255, 0],
 		note    = [0, 255, 0]}}
+parameters = [
+	{
+		type = "bool",
+		name = "skip delays",
+		default = false,
+		if-true = "-skipDelays",
+		if-false = ""
+	}
+]

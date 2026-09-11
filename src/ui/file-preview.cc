@@ -224,6 +224,8 @@ void FilePreview::OnUpdate() {
 		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.GetBrushEditorText());
 	}
 	
+	// @TODO draw selection etc.
+		
 	deviceContext->PopAxisAlignedClip();
 }
 

@@ -39,8 +39,8 @@ bool DoCheck(bool passed, const char* left, const char* op, const char* right, s
 #define CHECK_IS_NULL(_a)  { const auto a = _a; DoCheck(a == nullptr, #_a, "is", "nullptr",     stringify(a), __FILE__, __LINE__, false); }
 #define CHECK_NOT_NULL(_a) { const auto a = _a; DoCheck(a != nullptr, #_a, "is not", "nullptr", stringify(a), __FILE__, __LINE__, false); }
 
-// REQUIRE_XXX macros perform a check and if that check failes, the test gets aborted
-// can be used if some precondition or initialization failed without which the remaining check
+// REQUIRE_XXX macros perform a check and if that check fails, the test gets aborted.
+// Can be used if some precondition or initialization failed without which the remaining checks
 // do not make any sense and should not be attempted to run
 
 #define REQUIRE_EQ(_a, _b)   if (const auto a = _a; !DoCheck(a == _b, #_a, "==", #_b,                stringify(a), __FILE__, __LINE__, true)) return
@@ -75,11 +75,26 @@ void SetTestResult(TestResult testRes, const char* message);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Misc
+// App and window handling
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Event;
+struct Editor;
+
+#define REQUIRE_INIT_EDITOR(_text, _editor) REQUIRE_TRUE(InitEditor(__FUNCTION__, _text, _editor))
+#define REQUIRE_CLOSE_EDITOR() REQUIRE_TRUE(CloseEditor())
+
+// add a table with an empty editor
+// this function should be replaced as soon as the NewFile command works
+bool InitEditor(std::string_view tabTitle, std::string_view text, /*out*/ Editor** editor);
+bool CloseEditor();
+
+// set the text of the editor
+void SetEditorText(Editor* editor, std::string_view text);
 
 // push event to the main window
 void PushEvent(const Event& event);
+
+// simulate one frame
+void Update();

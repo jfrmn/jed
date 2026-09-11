@@ -2,6 +2,8 @@
 #include "app.hh"
 #include "events.hh"
 #include "logging.hh"
+#include "settings.hh"
+#include "editor/editor.hh"
 
 #include <stdio.h>
 
@@ -40,8 +42,58 @@ void SetTestResult(TestResult testRes, const char* message) {
 	testResult = testRes;
 }
 
+bool InitEditor(std::string_view title, std::string_view text, /*out*/ Editor** editor) {
+	Editor* newEditor = *editor = new Editor();
+	App::Tab& tab = app.tabs.emplace_back();
+	tab.editor = newEditor;
+	tab.editor->Init();
+	tab.panelIndex = 0u;
+	tab.title.Shape(title, settings.fontUi);
+	
+	App::Panel& panel = app.panels.emplace_back();
+	panel.editor = tab.editor;
+	panel.tabIndex = app.tabs.size() - 1u;
+	
+	app.focusedPanelIndex = app.panels.size() - 1u;
+	
+	std::string* string = tab.editor->textController.buffer.Clear();
+	*string = text;
+	
+	tab.editor->textController.buffer.RecreateLines();
+	tab.editor->textController.Reset();
+	
+	newEditor->glyphRuns.resize(newEditor->textController.buffer.LineCount());
+	return GlyphRun::ShapeBatch(newEditor->textController.buffer, settings.fontEditor, newEditor->glyphRuns);	
+};
+
+bool CloseEditor() {
+	if (app.tabs.empty()) return false;
+	if (app.panels.empty()) return false;
+	
+	App::Tab& tab = app.tabs.back();
+	delete tab.editor;
+	app.tabs.pop_back();
+	app.panels.pop_back();
+	app.focusedPanelIndex = U64_MAX;
+	return true;
+}
+
+void SetEditorText(Editor* editor, std::string_view text) {
+	std::string* string = editor->textController.buffer.Clear();
+	*string = text;
+	editor->textController.buffer.RecreateLines();
+	editor->textController.Reset();
+	editor->glyphRuns.resize(editor->textController.buffer.LineCount());
+	REQUIRE_TRUE(GlyphRun::ShapeBatch(editor->textController.buffer, settings.fontEditor, editor->glyphRuns));
+}
+
 void PushEvent(const Event& event) {
 	app.HandleEvent(event);
 	app.Update();
 	mouse.NextFrame(event);
+}
+
+void Update() {
+	app.Update();
+	mouse.NextFrame(Event {.type = Event::Type_None});
 }

@@ -2,58 +2,23 @@
 #include "events.hh"
 #include "app.hh"
 #include "commands.hh"
-#include "settings.hh"
 #include "editor/editor.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 
-static bool InitEditor(std::string_view title) {
-	Editor* editor = new Editor();
-	App::Tab& tab = app.tabs.emplace_back();
-	tab.editor = editor;
-	tab.editor->Init();
-	tab.panelIndex = 0u;
-	tab.title.Shape(title, settings.fontUi);
-	
-	App::Panel& panel = app.panels.emplace_back();
-	panel.editor = tab.editor;
-	panel.tabIndex = 0u;
-	
-	app.focusedPanelIndex = 0u;
-	
-	std::string* string = tab.editor->textController.buffer.Clear();
-	*string =
-		"the quick brown\n"
-		"fox jumps over the\n"
-		"lazy dog!";
-	
-	tab.editor->textController.buffer.RecreateLines();
-	tab.editor->textController.Reset();
-	
-	editor->glyphRuns.resize(editor->textController.buffer.LineCount());
-	return GlyphRun::ShapeBatch(editor->textController.buffer, settings.fontEditor, editor->glyphRuns);
-};
-
-static void SetEditorText(Editor& editor, std::string_view text) {
-	std::string* string = editor.textController.buffer.Clear();
-	*string = text;
-	editor.textController.buffer.RecreateLines();
-	editor.textController.Reset();
-	editor.glyphRuns.resize(editor.textController.buffer.LineCount());
-	REQUIRE_TRUE(GlyphRun::ShapeBatch(editor.textController.buffer, settings.fontEditor, editor.glyphRuns));
-}
-
 void Test_TextController_Movements() {
-	REQUIRE_TRUE(InitEditor("Movements"));
+	Editor* editor = nullptr;
+	REQUIRE_INIT_EDITOR("The quick brown\n"
+                        "fox jumps over the\n"
+                        "lazy dog!", &editor);
 	
 	TextController& textController = app.tabs.front().editor->textController;
-	Editor& editor = *app.tabs.front().editor;
 	
 	auto Move = [&](u32 key, u32 mods, TextPosition start, TextPosition expected) {
 		textController.SetCaretPosition(start);
-		editor.scrollarea.vpY = 0.0f;
+		editor->scrollarea.vpY = 0.0f;
 		PushEvent(Event {
 			.type = Event::Type_KeyPress,
 			.keypress = {key, mods}});
@@ -78,7 +43,7 @@ void Test_TextController_Movements() {
 
 	auto Select = [&](u32 key, u32 mods, TextPosition start, TextPosition expected) {
 		textController.SetCaretPosition(start);
-		editor.scrollarea.vpY = 0.0f;
+		editor->scrollarea.vpY = 0.0f;
 		PushEvent(Event {
 			.type = Event::Type_KeyPress,
 			.keypress = {key, mods}});
@@ -102,13 +67,15 @@ void Test_TextController_Movements() {
 	Select(VK_END, KM_Ctrl | KM_Shift, {0u, 8u}, {2u, 9u});
 	Select(VK_PRIOR, KM_Shift, {1u, 8u}, {0u, 0u});
 	Select(VK_NEXT, KM_Shift, {0u, 8u}, {2u, 9u});
+	
+	REQUIRE_CLOSE_EDITOR();
 }
 
 void Test_TextController_Commands() {
-	REQUIRE_TRUE(InitEditor("Commands"));
+	Editor* editor = nullptr;
+	REQUIRE_INIT_EDITOR({}, &editor);
 
-	Editor& editor = *app.tabs.front().editor;
-	TextController& textController = editor.textController;
+	TextController& textController = editor->textController;
 
 	auto RunCommand = [&](Command::Id id, std::vector<ParameterValue> parameters = {}) {
 		PushEvent(Event {
@@ -212,5 +179,6 @@ void Test_TextController_Commands() {
 
 	RunCommand(Command::Id_MultiCaret_ToggleEditMode);
 	CHECK_TRUE(textController.isEditCaretsMode);
-
+	
+	REQUIRE_CLOSE_EDITOR();
 }

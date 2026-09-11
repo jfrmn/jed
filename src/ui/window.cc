@@ -188,29 +188,16 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 
 #ifndef _TESTING
 	switch (nMSG) {
-		case WM_MOUSEMOVE: {
-			mouse.x = GetXFromLParam(lParam);
-			mouse.y = GetYFromLParam(lParam);
-			return 0l;
-		} break;
-		
+		case WM_MOUSEMOVE:
 		case WM_LBUTTONDOWN:
 		case WM_LBUTTONUP: {
-			const f32 x = GetXFromLParam(lParam);
-			const f32 y = GetYFromLParam(lParam);
-			mouse.x = x;
-			mouse.y = y;
-			self->event.mouse.x = x;
-			self->event.mouse.y = y;
+			self->event.mouse.x = GetXFromLParam(lParam);
+			self->event.mouse.y = GetYFromLParam(lParam);
 			
-			if (nMSG == WM_LBUTTONDOWN) {
-				mouse.isDown = true;
-				self->event.type = Event::Type_MouseDown;
-			
-			} else if (nMSG == WM_LBUTTONUP) {
-				mouse.isDown = false;
-				self->event.type = Event::Type_MouseUp;
-			}
+			if      (nMSG == WM_MOUSEMOVE)   self->event.type = Event::Type_MouseMove;
+			else if (nMSG == WM_LBUTTONDOWN) self->event.type = Event::Type_MouseDown;
+			else if (nMSG == WM_LBUTTONUP)   self->event.type = Event::Type_MouseUp;
+			else ASSERT_UNREACHABLE
 			
 			return 0l;	
 		} break;
