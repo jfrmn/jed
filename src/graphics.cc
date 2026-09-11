@@ -163,6 +163,11 @@ void ShutdownGraphics() {
 		brush->Release();
 		brush = nullptr;
 	}
+	
+	if (strokeStyleDashed) {
+		strokeStyleDashed->Release();
+		strokeStyleDashed = nullptr;
+	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
