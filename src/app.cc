@@ -374,6 +374,7 @@ static void OnClickStartPage(void* ud, u64 btn) {
 	auto self = static_cast<App*>(ud);
 	if (btn == 0) { // search file
 		if (self->searchBar) return;
+		self->searchBarFiles.Open();
 		self->searchBar = &self->searchBarFiles;
 		needsUpdate = true;
 	
@@ -1109,6 +1110,7 @@ void App::HandleEvent(const Event& event) {
 	} else if (event.type == Event::Type_Command) {
 	
 		if (event.cmd.id == Command::Id_OpenFileSearch) {
+			searchBarFiles.Open();
 			searchBar = &searchBarFiles;
 			searchBar->shouldClose = false;
 		} else if (event.cmd.id == Command::Id_OpenToolSearch) {

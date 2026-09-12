@@ -1,12 +1,10 @@
 #pragma once
 #include "ui/text-box.hh"
 #include "ui/scrollarea.hh"
-#include "util/rc.h"
 #include "commands.hh"
 #include "util.hh"
 
 #include <atomic>
-#include <mutex>
 #include <string_view>
 
 struct Event;
@@ -63,6 +61,7 @@ protected:
 
 public:
 	void OnUpdate();
+	virtual void Open();
 	
 	void UpdateItem(u64 i, const UpdateItemParams& params);
 	void SetItemCount(u64 newItemCount);
@@ -95,24 +94,29 @@ struct SearchBarFiles : public SearchBar {
 		FuzzyMatchResult fuzzyMatchResult = {};
 	};
 	
-	struct ThreadData {
-		SearchBarFiles* searchBar = nullptr;
-		
-		std::string searchTerm = {};
+	struct IndexEntry {
+		std::string_view filename = {};
+		u64  parent      : 63 = 0u;
+		bool isDirectory : 1  = false;
+	};
 	
-		std::mutex mtxResults = {};		
-		std::vector<Item> results = {};
-		
-		std::atomic_bool isCancelled = false;
-		std::atomic_bool isComplete = false;
+	struct Page {
+		static constexpr u64 SIZE = 4096 - sizeof(Page*);
+		Page* next = nullptr;
+		char data[SIZE];
 	};
 
 	//-----------------------------------------------------
 	// data
 	//-----------------------------------------------------
+
+	Page* head = nullptr;
+	std::vector<IndexEntry> index = {};
 	
+	std::atomic_bool cancel = false;	
 	void* hThread = nullptr;
-	Rc<ThreadData> threadData = {};	
+	
+	std::vector<Item> filteredItems = {};
 		
 	//-----------------------------------------------------
 	// functions
@@ -120,6 +124,7 @@ struct SearchBarFiles : public SearchBar {
 
 	void Init();
 	virtual ~SearchBarFiles() noexcept;
+	virtual void Open() override;
 	
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;
 	
