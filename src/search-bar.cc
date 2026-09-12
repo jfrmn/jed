@@ -49,6 +49,15 @@ static void OnClickItem(void* ud, u64 i) {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void SearchBar::Open() {
+	spawnAnimationValue = 0.0f;
+	itemHighlightAnimationValue = 0.0f;
+	textBox.textController.SetSelection(
+		TextPosition {0, 0},
+		TextPosition {0, textBox.textController.buffer.lines.front().length});
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBar::OnUpdate() {
 
 	if (parameterConfigurator) {
@@ -68,11 +77,12 @@ void SearchBar::OnUpdate() {
 	// spawn animation
 	//
 	const f32 halfWidth = RectWidth(area) / 2.0f;
+	const f32 height = RectHeight(area);
 	const D2D_RECT_F animatedArea {
 		.left   = area.left + halfWidth - (halfWidth * AnimationLinear::Value(spawnAnimationValue)),
 		.top    = area.top,
 		.right  = area.right - halfWidth + (halfWidth * AnimationLinear::Value(spawnAnimationValue)),
-		.bottom = area.bottom};
+		.bottom = area.top + (height * AnimationLinear::Value(spawnAnimationValue))};
 	
 	//
 	// draw background
@@ -257,18 +267,34 @@ void SearchBar::OnMouseWheel(f32 distance) {
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+static void CancelIndexing(SearchBarFiles* self) {
+	if (!self->hThread) return;
+	
+	self->cancel = true;
+	
+	const DWORD res = WaitForSingleObject(self->hThread, 5000);
+	if (res != WAIT_OBJECT_0) {
+		LogError("failed to cancel search thread: %s", StrWaitRes(res));
+		TerminateThread(self->hThread, -1);
+	}
+	
+	CloseHandle(self->hThread);
+	
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBarFiles::Init() {
 	__super::Init("find file...");
 }
 
 SearchBarFiles::~SearchBarFiles() noexcept {
-	if (threadData) {
-		ASSERT(hThread);	
-		threadData->isCancelled = true;
-		
-		CloseHandle(hThread);
-		hThread = NULL;
+	CancelIndexing(this);
+	
+	Page* page = head;
+	while (page) {
+		Page* next = page->next;
+		delete page;
+		page = next;
 	}
 }
 
@@ -299,12 +325,44 @@ static bool CompareItems(const SearchBarFiles::Item& litem, const SearchBarFiles
 	return litem.fullPath < ritem.fullPath;
 }
 
-static void SearchDirectory(SearchBarFiles::ThreadData* td, DirectoryIterator& iterator) {
+static void IndexDirectory(SearchBarFiles* self, DirectoryIterator& iterator, u64 parent, SearchBarFiles::Page*& currentPage, u64& occupied) {
 		
 	while (iterator.Next()) {
 		
-		if (td->isCancelled)
+		if (self->cancel)
 			return;
+		
+		if (occupied + iterator.filename.size() >= SearchBarFiles::Page::SIZE) {
+			
+			if (currentPage->next) {
+				SearchBarFiles::Page* nextPage = currentPage->next;
+				// NOTE: do not memset the whole page, because the page may also have next page
+				// the whould get lost!
+				memset(nextPage->data, 0, sizeof(nextPage->data));
+				currentPage = nextPage;	
+			
+			} else {
+				auto newPage = new SearchBarFiles::Page;
+				memset(newPage, 0, sizeof(*newPage));
+				currentPage->next = newPage;
+				currentPage = newPage;
+			}
+			
+			occupied = 0u;
+		}
+		
+		memcpy_s(
+			currentPage->data + occupied,
+			SearchBarFiles::Page::SIZE - occupied,
+			iterator.filename.data(),
+			iterator.filename.size());
+			
+		self->index.push_back(SearchBarFiles::IndexEntry {
+			.filename = std::string_view {currentPage->data + occupied, iterator.filename.size()},
+			.parent = parent,
+			.isDirectory = iterator.IsDirectory()});
+		
+		occupied += iterator.filename.size();
 		
 		if (iterator.IsDirectory()) {
 			
@@ -313,40 +371,19 @@ static void SearchDirectory(SearchBarFiles::ThreadData* td, DirectoryIterator& i
 			char* searchPathTail = strrchr(subDirIterator.searchPath, '*');
 			ASSERT(searchPathTail);
 			
-			memcpy(searchPathTail, iterator.filename.data(), iterator.filename.size());
+			u64 remainingSize = sizeof(DirectoryIterator::searchPath) - (searchPathTail - subDirIterator.searchPath);
+			
+			memcpy_s(searchPathTail, remainingSize, iterator.filename.data(), iterator.filename.size());
 			searchPathTail += iterator.filename.size();
+			remainingSize  -= iterator.filename.size();
+			
+			ASSERT(remainingSize >= 3u);
 			*searchPathTail++ = '\\';
 			*searchPathTail++ = '*';
-			*searchPathTail++ = '\0'; // the debug version of strcpy_s fills the buffer with 0xfe before copying
+			*searchPathTail++ = '\0'; // the debug version of strcpy_s fills the buffer with 0xfe before copying			
 			
-			SearchDirectory(td, subDirIterator);
-			continue;
+			IndexDirectory(self, subDirIterator, self->index.size()-1u, currentPage, occupied);
 		}
-		
-		FuzzyMatchResult matchResult {};
-		if (!FuzzyMatch(td->searchTerm, iterator.filename, &matchResult))
-			continue;
-		
-		if (matchResult.matchedCount < 3)
-			continue;
-				
-		const std::string_view path = iterator.GetSearchPath();
-		
-		SearchBarFiles::Item item {};
-		item.fullPath.reserve(path.size() + 1 + iterator.filename.size()); // +1 for the \ before the filename
-		item.fullPath.append(path);
-		item.fullPath.push_back('\\');
-		item.fullPath.append(iterator.filename);
-		
-		item.filenameLength = iterator.filename.size();
-		item.fuzzyMatchResult = matchResult;	
-		
-		const std::scoped_lock lock {td->mtxResults};
-		auto itWhere = std::find_if(td->results.begin(), td->results.end(), [&item] (const SearchBarFiles::Item& other) {
-			return CompareItems(item, other);
-		});
-		
-		td->results.insert(itWhere, std::move(item));
 	}
 		
 	if (iterator.Failed())
@@ -354,59 +391,97 @@ static void SearchDirectory(SearchBarFiles::ThreadData* td, DirectoryIterator& i
 }
 
 static DWORD WINAPI ThreadProc(LPVOID param) {
-	auto threadData = Rc<SearchBarFiles::ThreadData>::AdoptVoidPtr(param);
+	auto self = static_cast<SearchBarFiles*>(param);
 	
+	if (!self->head)
+		 self->head = new SearchBarFiles::Page {.next = nullptr};
+	memset(self->head->data, 0, sizeof(self->head->data));
+	u64 occupied = 0u;
+		
 	DirectoryIterator iter {"."};
-	SearchDirectory(threadData, iter);
+	IndexDirectory(self, iter, U64_MAX, self->head, occupied);
 	
-	mainWindow.SendUpdate();
-	
-	threadData->isComplete = true;
+	LogTrace("Building index is complete. Size: %zu", self->index.size());
 	return 0;
+}
+
+
+void SearchBarFiles::Open() {
+	__super::Open();
+	CancelIndexing(this);
+	cancel = false;
+	index.clear();
+	hThread = CreateThread(NULL, 0, ThreadProc, this, 0, nullptr);
+	if (hThread == NULL) {
+		LogError("failed to start indexing thread. Last Error: %s", StrLastErr(GetLastError()));
+		return;
+	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBarFiles::FilterItems(std::string_view searchText) {
-
-	if (threadData) {
-		ASSERT(hThread);	
-		
-		threadData->isCancelled = true;
-		threadData.Unreference();
-		
-		CloseHandle(hThread);
-		hThread = NULL;
-	}
-	
+	filteredItems.clear();
 	SetItemCount(0u);
 	
 	if (searchText.size() < 3u) return;
-		
-	threadData = Rc<ThreadData>::New(2);
-	threadData->searchBar = this;
-	threadData->searchTerm = searchText;
 	
-	hThread = CreateThread(NULL, 0, ThreadProc, threadData.ptr, 0, nullptr);
-	if (hThread == NULL) {
-		LogError("CreateThread() failed. Last Error: %s", StrLastErr(GetLastError()));
-		threadData.ForceDelete();
+	DWORD exitCode = 0;
+	if (!GetExitCodeThread(hThread, &exitCode)) return; // can happen if hThread is NULL. Something else went wrong beforehand
+	if (exitCode == STILL_ACTIVE) return;
+
+	for (const IndexEntry& indexEntry : index) {
+		if (indexEntry.isDirectory) continue;
+		
+		FuzzyMatchResult matchResult {};
+		if (!FuzzyMatch(searchText, indexEntry.filename, &matchResult))
+			continue;
+
+		// Keep the existing minimum number of matched characters behavior.
+		if (matchResult.matchedCount < 3)
+			continue;
+		
+		
+		std::string fullPath {indexEntry.filename};
+		
+		const IndexEntry* currentIndexEntry = &indexEntry;
+		
+		// we need to compare with S64_MAX because the 'parent' member only uses 63 bits!
+		while (currentIndexEntry->parent != S64_MAX) {
+			currentIndexEntry = &index[currentIndexEntry->parent];
+			
+			const u64 extraSize = currentIndexEntry->filename.size() + 1u;
+			fullPath.insert(fullPath.begin(), extraSize, '\0');
+			
+			fullPath[currentIndexEntry->filename.size()] = '\\';
+			
+			memcpy_s(
+				fullPath.data(),
+				fullPath.size(),
+				currentIndexEntry->filename.data(),
+				currentIndexEntry->filename.size());
+		}
+		
+		Item item {
+			.fullPath = std::move(fullPath),
+			.filenameLength = indexEntry.filename.size(),
+			.fuzzyMatchResult = matchResult};
+			
+		auto itWhere = std::find_if(filteredItems.begin(), filteredItems.end(), [&item] (const Item& other) {
+			return CompareItems(item, other);
+		});
+		filteredItems.insert(itWhere, std::move(item));
 	}
+
+	SetItemCount(filteredItems.size());
 }
 
 void SearchBarFiles::OnUpdateItems(u64 firstVisible, u64 lastVisible) {
-	if (!threadData) return;
-	
-	const std::scoped_lock lock {threadData->mtxResults};
+
 	ASSERT(firstVisible <= lastVisible)
-	ASSERT(lastVisible <= threadData->results.size())
-	
-	if (!threadData->isComplete) {
-		SetItemCount(threadData->results.size());
-		needsUpdate = true;
-	}
-	
+	ASSERT(lastVisible <= filteredItems.size())
+
 	for (u64 i = firstVisible; i < lastVisible; i++) {
-		const Item& item = threadData->results[i];
+		const Item& item = filteredItems[i];
 				
 		UpdateItem(i, UpdateItemParams {
 			.text = GetFilename(item),
@@ -419,11 +494,9 @@ void SearchBarFiles::OnUpdateItems(u64 firstVisible, u64 lastVisible) {
 void SearchBarFiles::OnPickItem(u64 i, const Event* event) {
 	ASSERT(!event || (event->type == Event::Type_KeyPress));
 	
-	const std::scoped_lock lock {threadData->mtxResults};
-	ASSERT(threadData);
-	ASSERT(i < threadData->results.size());
+	ASSERT(i < filteredItems.size());
 	
-	const Item& item = threadData->results[i];
+	const Item& item = filteredItems[i];
 	
 	App::OpenBehavior openBehav = event
 		? OpenBehaviorFromModifiers(event->keypress.mods)
@@ -592,10 +665,10 @@ void SearchBarCommands::OnPickItem(u64 itemIdx, const Event* event) {
 	ParameterDefinition::GetDefaultValues(commandDef.parameters, &defaultValues);
 	
 	app.HandleEvent(Event {
-			.type = Event::Type_Command,
-			.cmd = Command {
-				.id = item.commandId,
-				.parameters = defaultValues}});
+		.type = Event::Type_Command,
+		.cmd = Command {
+			.id = item.commandId,
+			.parameters = defaultValues}});
 	
 	shouldClose = true;
 }
@@ -638,4 +711,3 @@ void SearchBarCommands::OnFinishedParameterConfiguration() {
 		shouldClose = false;
 	}
 }
-
