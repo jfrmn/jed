@@ -37,13 +37,13 @@ void Test_ToolOutput_RunTestTool() {
 		.type = Event::Type_Command,
 		.cmd = Command {
 			.id = Command::Id_ToggleToolOutput}});
-	CHECK_TRUE(app.toolOutput.isOpen);
+	CHECK_TRUE(app.toolOutput.open);
 	DEFER({
 		PushEvent(Event {
 		.type = Event::Type_Command,
 		.cmd = Command {
 			.id = Command::Id_ToggleToolOutput}});
-		CHECK_FALSE(app.toolOutput.isOpen);
+		CHECK_FALSE(app.toolOutput.open);
 	});
 	
 	CHECK_TRUE(app.toolOutput.StartProcess());

@@ -4,7 +4,7 @@
 MouseState mouse {};
 
 bool MouseState::Hittest(const D2D_RECT_F& area, void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
-	if (isDragging) return false;
+//	if (isDragging) return false;
 	
 	const Element newElement {callback, userdata, userint};
 	

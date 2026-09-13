@@ -7,6 +7,7 @@
 #include "util/diagnostics.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
+#include "ui/animation.hh"
 #include "graphics.hh"
 
 #include <charconv>
@@ -18,7 +19,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Init + reset
+// Init
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,27 +29,9 @@ bool ToolOutput::Init() {
 	return true;
 }
 
-static void Reset(ToolOutput* self) {
-	ASSERT(!self->process || !self->process->IsRunning());
-	
-	self->toolDiagnostics.clear();
-	self->selectedDiagnosticsRecord = U64_MAX;
-	
-	self->progressValue = 0.0f;
-	self->progressText.clear();
-	
-	self->diagnosticsRecords.clear();
-	
-	delete self->process;
-	self->process = nullptr;
-	
-	self->styleChanges.clear();
-	self->lines.clear();
-	
-	self->glyphRunCacheIsValid = false;
-	self->glyphRunCache.clear();
-	
-	self->selectionStart = self->selectionEnd = TextPosition {};
+
+bool ToolOutput::IsOpen() const {
+	return open || spawnAnimationValue < 1.0f;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,11 +203,29 @@ bool ToolOutput::StartProcess() {
 		return false;
 	}
 	
-	Reset(this);
+	toolDiagnostics.clear();
+	selectedDiagnosticsRecord = U64_MAX;
+	
+	progressValue = 0.0f;
+	progressText.clear();
+	
+	diagnosticsRecords.clear();
+	
+	delete process;
+	process = nullptr;
+	
+	styleChanges.clear();
+	lines.clear();
+	
+	glyphRunCacheIsValid = false;
+	glyphRunCache.clear();
+	
+	selectionStart = selectionEnd = TextPosition {};
+	
 	
 	std::string commandLine {};
 	if (!CompileCommand(this, &commandLine)) {
-		isOpen = true;
+		open = true;
 		return false;
 	}
 	
@@ -247,7 +248,7 @@ bool ToolOutput::StartProcess() {
 		toolDiagnostics.push_back(ToolDiagnosticsRecord {
 			.type    = ToolDiagnosticsRecord::Type_Command,
 			.message = FormatString("Failed to start process. Last Error: %s", StrLastErr(GetLastError()))});
-		isOpen = true;
+		open = true;
 		return false;
 	}
 	
@@ -299,20 +300,31 @@ static void OnClickToolDiagnostics(void* ud, u64) {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void ToolOutput::Update() {
-		
+
+	//
+	// advance animation
+	//
+	AnimationLinear::Advance(&spawnAnimationValue, 0.008f);
+	
+	const f32 width = open
+		? spawnAnimationValue * RectWidth(area)
+		: (1.0f - spawnAnimationValue) * RectWidth(area);
+	
+	const D2D_RECT_F animatedArea {
+		.left   = area.right - width,
+		.top    = area.top,
+		.right  = area.right,
+		.bottom = area.bottom};
+
 	//
 	// draw backgound
 	//
 	{
-		ID2D1Bitmap* bitmap = CopyFromRenderTarget(deviceContext, area);
+		ID2D1Bitmap* bitmap = CopyFromRenderTarget(deviceContext, animatedArea);
 		if (!bitmap) return;
-		DrawGlow(deviceContext, bitmap, area);
-		
-		PushLayer(deviceContext, area);	
-		BlurArea(deviceContext, area, bitmap);
-		
+		DrawGlow(deviceContext, bitmap, animatedArea);
+		BlurArea(deviceContext, animatedArea, bitmap);	
 		bitmap->Release();
-		PopLayer(deviceContext);
 	}
 	
 	const std::scoped_lock lock {mtx};
@@ -353,8 +365,8 @@ void ToolOutput::Update() {
 		// prepare offscreen render targets
 		//
 		const D2D_SIZE_F areaSize {
-			.width = RectWidth(area),
-			.height = RectHeight(area) - toolbarHeight};
+			.width  = RectWidth(animatedArea),
+			.height = RectHeight(animatedArea) - toolbarHeight};
 		
 		ID2D1BitmapRenderTarget* foreground = CreateCompatibleRenderTarget(deviceContext, areaSize);
 		if (!foreground) return;
@@ -506,10 +518,10 @@ void ToolOutput::Update() {
 	{
 		deviceContext->PushAxisAlignedClip(
 			D2D_RECT_F {
-				.left = area.left,
-				.top = area.top + toolbarHeight,
-				.right = area.right,
-				.bottom = area.bottom},
+				.left   = animatedArea.left,
+				.top    = animatedArea.top + toolbarHeight,
+				.right  = animatedArea.right,
+				.bottom = animatedArea.bottom},
 			D2D1_ANTIALIAS_MODE_ALIASED);
 		DEFER(deviceContext->PopAxisAlignedClip());
 	
@@ -529,10 +541,10 @@ void ToolOutput::Update() {
 			
 			deviceContext->DrawRectangle(
 				D2D_RECT_F {
-					.left   = area.left + PADDING + offsetFrom,
-					.top    = area.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - scrollarea.vpY,
-					.right  = area.left + PADDING + offsetTo,
-					.bottom = area.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - scrollarea.vpY},
+					.left   = animatedArea.left + PADDING + offsetFrom,
+					.top    = animatedArea.top  + toolbarHeight + ( record.originLine    * settings.fontEditor.lineHeight) - scrollarea.vpY,
+					.right  = animatedArea.left + PADDING + offsetTo,
+					.bottom = animatedArea.top  + toolbarHeight + ((record.originLine+1) * settings.fontEditor.lineHeight) - scrollarea.vpY},
 				UseColor(record.color));
 		}
 	
@@ -552,10 +564,10 @@ void ToolOutput::Update() {
 			run.MeasureOffsetRange(record.from, record.to, &offsetFrom, &offsetTo);
 			
 			const D2D_RECT_F areaRecord {
-				.left   = area.left + PADDING + offsetFrom,
-				.top    = area.top + toolbarHeight + (record.line *  settings.fontEditor.lineHeight) - scrollarea.vpY,
-				.right  = area.left + PADDING + offsetTo,
-				.bottom = area.top + toolbarHeight + (record.line * (settings.fontEditor.lineHeight+1)) - scrollarea.vpY};
+				.left   = animatedArea.left + PADDING + offsetFrom,
+				.top    = animatedArea.top + toolbarHeight + (record.line *  settings.fontEditor.lineHeight) - scrollarea.vpY,
+				.right  = animatedArea.left + PADDING + offsetTo,
+				.bottom = animatedArea.top + toolbarHeight + (record.line * (settings.fontEditor.lineHeight+1)) - scrollarea.vpY};
 			
 			deviceContext->DrawLine(
 				D2D_POINT_2F {
@@ -601,44 +613,49 @@ void ToolOutput::Update() {
 	//
 	// hittest to change selection
 	//
-	{
+	if (!lines.empty()) {
 		const D2D_RECT_F outputArea {
-			.left = area.left,
-			.top = area.top + toolbarHeight,
-			.right = area.right,
-			.bottom = area.bottom};
+			.left   = animatedArea.left,
+			.top    = animatedArea.top + toolbarHeight,
+			.right  = animatedArea.right,
+			.bottom = animatedArea.bottom};
 		
 		if (mouse.Hittest(outputArea, this, nullptr)) {
+		
 			const D2D_POINT_2F relativePoistion {mouse.x - outputArea.left, mouse.y - outputArea.top};
-			
-			const u64 hitLine = std::clamp<u64>(
+			const u64 hitLine = std::clamp(
 				static_cast<u64>((relativePoistion.y + scrollarea.vpY) / settings.fontEditor.lineHeight),
-				0u,
-				glyphRunCache.size() - 1u);
+				0ull, 
+				lines.size()-1u);
+			
+			ASSERT(hitLine < lines.size());
+			ASSERT(hitLine < glyphRunCache.size());
+			
 			const GlyphRun& hitRun = glyphRunCache[hitLine];
 			const u64 hitColumn    = hitRun.HitTest(relativePoistion.x);
 			
 			if (mainWindow.event.type == Event::Type_MouseDown) {				
+				
+				mouse.StartDragging();
+				selectionStart = selectionEnd = TextPosition {hitLine, hitColumn};
+				selectedDiagnosticsRecord = U64_MAX;
+			
+			} else if (mainWindow.event.type == Event::Type_MouseUp && selectionStart == selectionEnd) {
 				
 				// check if we hit a matched diagnostic record
 				for (u64 i = 0u; i < diagnosticsRecords.size(); i++) {
 					const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[i];
 					
 					const bool hitThisRecord = record.originLine == hitLine &&
-			                           		record.originFromColumn <= hitColumn &&
-			                           		record.originToColumn >= hitColumn;
+											   record.originFromColumn <= hitColumn &&
+											   record.originToColumn >= hitColumn;
 					if (hitThisRecord) {
 						UpdateFilePreview(this, record);
 						selectedDiagnosticsRecord = i;
-						goto hit_record;
+						break;
 					}
 				}
 			
-				mouse.StartDragging();
-				selectionStart = selectionEnd = TextPosition {hitLine, hitColumn};
-				selectedDiagnosticsRecord = U64_MAX;
-				
-			hit_record: __noop;
 			} else if (mouse.isDragging) {
 				selectionEnd = TextPosition {hitLine, hitColumn};
 			}
@@ -674,8 +691,8 @@ void ToolOutput::Update() {
 	if (selectedDiagnosticsRecord != U64_MAX) {
 		const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
 	
-		filePreview.x = area.left - filePreview.width;
-		filePreview.y = area.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
+		filePreview.x = animatedArea.left - filePreview.width;
+		filePreview.y = animatedArea.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
 		filePreview.OnUpdate();
 			
 		deviceContext->DrawRectangle(filePreview.GetArea(), UseColor(record.color));
@@ -691,10 +708,10 @@ void ToolOutput::Update() {
 	//
 	{
 		const D2D_RECT_F toolbarArea {
-			.left = area.left,
-			.top = area.top,
-			.right = area.right,
-			.bottom = area.top + toolbarHeight};
+			.left   = animatedArea.left,
+			.top    = animatedArea.top,
+			.right  = animatedArea.right,
+			.bottom = animatedArea.top + toolbarHeight};
 		
 		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
 	
@@ -704,14 +721,14 @@ void ToolOutput::Update() {
 			// draw tool name
 			{
 				staticGlyphRun.Shape(tool->name, settings.fontUi);
-				staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
+				staticGlyphRun.Draw(deviceContext, animatedArea.left + MARGIN, animatedArea.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
 				
 				offsetX = staticGlyphRun.width + MARGIN_X2;
 				
 				const D2D_RECT_F toolNameArea {
-					.left = toolbarArea.left,
-					.top = toolbarArea.top,
-					.right = toolbarArea.left + offsetX,
+					.left   = toolbarArea.left,
+					.top    = toolbarArea.top,
+					.right  = toolbarArea.left + offsetX,
 					.bottom = toolbarArea.bottom};
 			}
 			
@@ -781,8 +798,8 @@ void ToolOutput::Update() {
 					staticGlyphRun.Shape(label, settings.fontUi);
 				}
 				
-				const f32 x = area.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (staticGlyphRun.width / 2.0f);
-				staticGlyphRun.Draw(deviceContext, x, area.top + MARGIN, settings.fontUi, brush);
+				const f32 x = animatedArea.left + offsetX + (PROGRESS_AREA_WIDTH / 2.0f) - (staticGlyphRun.width / 2.0f);
+				staticGlyphRun.Draw(deviceContext, x, animatedArea.top + MARGIN, settings.fontUi, brush);
 				
 				offsetX += PROGRESS_AREA_WIDTH + MARGIN;
 			}
@@ -832,7 +849,7 @@ void ToolOutput::Update() {
 		// no tool
 		} else {
 			staticGlyphRun.Shape("No tool run yet.", settings.fontUi);
-			staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.GetBrushUiText(false));
+			staticGlyphRun.Draw(deviceContext, animatedArea.left + MARGIN, animatedArea.top + MARGIN, settings.fontUi, settings.GetBrushUiText(false));
 		}
 	}
 }
@@ -1191,8 +1208,10 @@ void ToolOutput::OnStarted() {
 		? "0%"
 		: "Running";
 	
-	if (tool->consoleOpenFlags & Tool::ConsoleOpenFlags_OnStart)
-		isOpen = true;
+	if (tool->consoleOpenFlags & Tool::ConsoleOpenFlags_OnStart && !open) {
+		open = true;
+		spawnAnimationValue = 1.0f - spawnAnimationValue;
+	}
 		
 	mainWindow.PostUpdate();
 }
@@ -1208,8 +1227,10 @@ void ToolOutput::OnExited(int exitCode) {
 		? tool->consoleOpenFlags & Tool::ConsoleOpenFlags_OnExitSuccess
 		: tool->consoleOpenFlags & Tool::ConsoleOpenFlags_OnExitError;
 	
-	if (tool->consoleOpenFlags & flagToTest)
-		isOpen = true;
+	if (tool->consoleOpenFlags & flagToTest && !open) {
+		open = true;
+		spawnAnimationValue = 1.0f - spawnAnimationValue;
+	}
 		
 	mainWindow.PostUpdate();
 }

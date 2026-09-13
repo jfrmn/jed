@@ -712,7 +712,7 @@ void App::Update() {
 	//
 	 // draw console
 	//
-	if (toolOutput.isOpen)
+	if (toolOutput.IsOpen())
 		toolOutput.Update();
 	
 	//
@@ -1053,7 +1053,7 @@ void App::HandleEvent(const Event& event) {
 			return;
 		}
 		
-		if (toolOutput.isOpen && RectContains(toolOutput.area, mouse.x, mouse.y)) {
+		if (toolOutput.IsOpen() && RectContains(toolOutput.area, mouse.x, mouse.y)) {
 			toolOutput.OnMouseWheel(event.wheelDistance);
 			return;
 		}
@@ -1101,7 +1101,7 @@ void App::HandleEvent(const Event& event) {
 			explorer = nullptr;
 		}
 	
-	} else if (toolOutput.isOpen && toolOutput.HandleEvent(event)) {
+	} else if (toolOutput.IsOpen() && toolOutput.HandleEvent(event)) {
 		return;
 	
 	} else if (Editor* editor = GetFocusedEditor(); editor && editor->HandleEvent(event)) {
@@ -1120,7 +1120,8 @@ void App::HandleEvent(const Event& event) {
 			searchBar = &searchBarCommands;
 			searchBar->shouldClose = false;
 		} else if (event.cmd.id == Command::Id_ToggleToolOutput) {
-			toolOutput.isOpen = !toolOutput.isOpen;
+			toolOutput.open = !toolOutput.open;
+			toolOutput.spawnAnimationValue = 1.0f - toolOutput.spawnAnimationValue;
 		} else if (event.cmd.id == Command::Id_ToggleExplorer) {
 			if (explorer) {
 				delete explorer;

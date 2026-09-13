@@ -75,8 +75,9 @@ struct ToolOutput : public Process::Observer {
 	//------------------------------------------
 	
 	D2D_RECT_F area = {};
-	bool isOpen = false;
-	
+	bool open = false;
+	f32 spawnAnimationValue = 1.0f;
+		
 	std::mutex mtx = {};
 	
 	const Tool* tool = nullptr;
@@ -112,6 +113,7 @@ struct ToolOutput : public Process::Observer {
 	//------------------------------------------
 	
 	bool Init();
+	bool IsOpen() const;
 	
 	bool StartProcess();
 	void Update();
