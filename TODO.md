@@ -18,6 +18,12 @@
 
 * sending notifications: log entry looks off
 
+* *easy* make sure to close parameter-confgurator when closing the tool search bar!
+
+* check keybinding in parameter-configurator. acts funky
+
+* *check:* "Every entry with the directory attribute is recursively visited [src/search-bar.cc](src/search-bar.cc#L353], while IsDirectory() only checks FILE_ATTRIBUTE_DIRECTORY util.cc:537. Junctions and directory symlinks can point back to an ancestor. The scan can then recurse indefinitely until stack exhaustion or memory exhaustion. Reparse points should be skipped, or directory identity should be tracked."
+
 # MAJOR TASKS
 
 * ~~refactor process so that it no longer spawns a thread; language server should spawn its own thread~~
@@ -27,13 +33,13 @@
 
 # MINOR TASKS
 
-* add LogDevVariable() to quickly log out the name + value of a local variable. Problem with that is that we need to know the format specifier. Possible solution: some typeid-magic hidden behind the makro
 * refactor animation so that all animations use the same logic
 * refactor statu-bar to utilize the new glyph run better (e.g. use draw partial at text pos)
 * get rid of OnMouseWheel and OnResize etc.
 * .clangd only really accepts absolute include paths. Relative paths are relative to eicher the current file or the compilation database. The compilation database has the msvc commands in it so that is not an option. Therefore generate .clangd from build.ps1
 * Remove settings.GetBrushXXX() functions. Switch to UseColor(settings.xyz)
 * Opening a new, unsaved file: should work with the language server. Document Uri should be untitled:// in that case
+* Print/Scan logfile after each test
 
 # BACKLOG
 
