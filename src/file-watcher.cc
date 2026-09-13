@@ -216,20 +216,15 @@ void FileWatcher::Shutdown() {
 }
 
 bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
-	const u64 posDelimiter = filepath.find_last_of("/\\");
 	
-	// @TODO could be improved
-	// if no delimiter is found than the entire path is the filename and the directory is the cwd
-	ASSERT(posDelimiter != std::string::npos)
-	ASSERT(posDelimiter + 1u <= filepath.length());
+	std::string_view directory = GetDirectoryFromPath(filepath);
+	if (directory.empty()) directory = ".";
 	
 	// need to copy the directory to a buffer because the CreateFile() function takes a null-terminated string
 	char directoryBuffer[_MAX_PATH] {0};
-	memcpy(directoryBuffer, filepath.data(), posDelimiter);
-	directoryBuffer[posDelimiter] = '\0';
-	
-	const std::string_view directory {directoryBuffer, posDelimiter};
-	
+	memcpy(directoryBuffer, directory.data(), directory.size());
+	directoryBuffer[directory.size()] = '\0';
+		
 	for (WatchedDirectory* watchedDirectory : watchedDirectories) {
 		if (watchedDirectory->path == directory) {
 			watchedDirectory->references++;
@@ -273,15 +268,8 @@ bool FileWatcher::SubscribeDirectoryOfFile(std::string_view filepath) {
 
 bool FileWatcher::UnsubscribeDirectoryOfFile(std::string_view filepath) {
 	
-	const u64 posDelimiter = filepath.find_last_of("/\\");
-	
-	// @TODO see above -- could be improved
-	// if no delimiter is found than the entire path is the filename and the directory is the cwd
-	ASSERT(posDelimiter != std::string::npos)
-	ASSERT(posDelimiter + 1u < filepath.length());
-	
-	const std::string_view directory = filepath.substr(0u, posDelimiter);
-	const std::string_view filename = filepath.substr(posDelimiter + 1u);
+	std::string_view directory = GetDirectoryFromPath(filepath);
+	if (directory.empty()) directory = ".";
 	
 	for (u64 i = 0u; i < watchedDirectories.size(); i++) {
 		WatchedDirectory* watchedDirectory = watchedDirectories[i];
