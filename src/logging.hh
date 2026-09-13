@@ -50,6 +50,8 @@ void LogWarning(Logger* logger, const char* fmt, ...);
 void LogInfo(Logger* logger, const char* fmt, ...);
 void LogTrace(Logger* logger, const char* fmt, ...);
 
+#define LogDevVariable(_specifier, _expr) LogDev(#_expr ": " _specifier, _expr);
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #define MeasureTime(label, statment) {\
 	LARGE_INTEGER _before, _after, _freq;\
