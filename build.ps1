@@ -11,6 +11,9 @@ param(
 	
 	[Alias("r")]
 	[switch] $run = $false,
+	
+	[Alias("rd")]
+	[switch] $runDetached = $false,
 
 	[Alias("t")]
 	[switch] $test = $false,
@@ -81,4 +84,8 @@ if ($test) {
 if ($run) {
 	Write-Step "running";
 	& ./out/$profile/jed.exe
+
+} elseif ($runDetached) {
+	Write-Step "running detached";
+	Start-Process -FilePath ./out/$profile/jed.exe;
 }

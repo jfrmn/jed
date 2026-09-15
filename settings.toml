@@ -13,7 +13,7 @@ ui = {
 
 [[Tools]]
 name = "build project"
-command = 'pwsh.exe -f .\build.ps1'
+command = 'pwsh.exe -f .\build.ps1 %0 %1 %2'
 open-console = "on-start"
 diagnostics = {
 	regex = '^([A-Z]:[\w\.\\-]+)\((\d+)\): (\w+)(?: C\d+)?: .*$',
@@ -24,6 +24,32 @@ diagnostics = {
 		error   = [255, 0, 0],
 		warning = [255, 255, 0],
 		note    = [0, 255, 0]}}
+parameters = [
+	{
+		type = "enum",
+		name = "profile",
+		default = "debug",
+		values = [
+			"debug",
+			"stable",
+			"release"
+		]
+	},
+	{
+		type = "bool",
+		name = "reconfigure",
+		default = false,
+		if-true = "-reconfigure",
+		if-false = ""
+	},
+	{
+		type = "bool",
+		name = "run",
+		default = true,
+		if-true = "-runDetached",
+		if-false = ""
+	}
+]
 	
 [[Tools]]
 name = "dnGREP"
