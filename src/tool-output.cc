@@ -59,15 +59,13 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 		} break;
 		case Parameter::Type_Bool: {
 			if (value.boolValue) {
-				if (definition.hasIfTrue)
-					builder->append(definition.ifTrue);
-				else 
-					builder->append("true");
+				builder->append(definition.hasIfTrue
+					? definition.ifTrue
+					: std::string_view("true"));
 			} else {
-				if (definition.hasIfFalse)
-					builder->append(definition.ifFalse);
-				else 
-					builder->append("false");
+				builder->append(definition.hasIfFalse
+					? definition.ifTrue
+					: std::string_view("false"));
 			}
 		} break;
 		default: ASSERT_UNREACHABLE;
@@ -501,7 +499,7 @@ void ToolOutput::Update() {
 			
 			//const D2D_RECT_F dest {.left = area.left, .top = area.top, .right = }
 			//deviceContext->DrawBitmap(bmForeground, &area);
-			BlendImages(deviceContext, {area.left, area.top + toolbarHeight}, bmForeground, bmText);
+			BlendImages(deviceContext, {animatedArea.left, animatedArea.top + toolbarHeight}, bmForeground, bmText);
 			
 			bmForeground->Release();
 			bmText->Release();
