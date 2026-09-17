@@ -128,12 +128,12 @@ struct Event {
 struct MouseState {
 	using Callback = void (*)(void* userdata, u64 userint);
 	
-	struct Element {
-		Callback callback = nullptr;
+	struct HotZone {
+		Callback onClick = nullptr;
 		void* userdata = nullptr;
 		u64 userint = 0u;
 		
-		bool operator==(const Element& other) const = default;
+		bool operator==(const HotZone& other) const = default;
 	};
 	
 	f32 x = 0.0f;
@@ -141,17 +141,17 @@ struct MouseState {
 	bool isDown = false;
 	bool isDragging = false;
 	
-	Element nextHotElement = {};
-	Element currentHotElement = {};
+	HotZone nextHotZone = {};
+	HotZone currHotZone = {};
 	f32 dragDeltaX = 0.0f;
 	f32 dragDeltaY = 0.0f;
 	
 	// preform a hittest and, if successfull, calls Hot()
 	bool Hittest(const D2D_RECT_F& area, void* userdata, Callback onClick = nullptr, u64 userint = 0u);
-	// Set as the nextHotElement. Return if true if the current Hot element
 	bool Hot(void* userdata, Callback onClick = nullptr, u64 userint = 0u);
 	
 	void StartDragging(f32 dx = 0.0f, f32 dy = 0.0f);
+	bool IsDragging(void* userdata, u64 userint = 0u);
 	
 	void NextFrame(const Event& event);
 };

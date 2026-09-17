@@ -4,31 +4,32 @@
 MouseState mouse {};
 
 bool MouseState::Hittest(const D2D_RECT_F& area, void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
-//	if (isDragging) return false;
 	
-	const Element newElement {callback, userdata, userint};
-	
+	const HotZone newHotZone {callback, userdata, userint};	
 	if (RectContains(area, x, y)) {
-		nextHotElement = newElement;
-		return currentHotElement == newElement;
+		nextHotZone = newHotZone;
+		return currHotZone == newHotZone;
 	}
 	
 	return false;
 }
 
 bool MouseState::Hot(void* userdata, MouseState::Callback callback /*= nullptr*/, u64 userint /*= 0*/) {
-	if (isDragging) return false;
-	
-	const Element newElement {callback, userdata, userint};
-	nextHotElement = newElement;
-	return currentHotElement == newElement;
+	const HotZone newHotZone {callback, userdata, userint};
+	nextHotZone = newHotZone;
+	return currHotZone == newHotZone;
 }
 
 void MouseState::StartDragging(f32 dx /*= 0.0f*/, f32 dy /*= 0.0f*/) {
 	isDragging = true;
 	dragDeltaX = dx;
 	dragDeltaY = dy;
-	nextHotElement = {};
+	nextHotZone = {};
+}
+
+bool MouseState::IsDragging(void* userdata, u64 userint /*= 0u*/) {
+	const HotZone hotZone {nullptr, userdata, userint};
+	return isDragging && (currHotZone == hotZone);
 }
 
 void MouseState::NextFrame(const Event& event) {
@@ -37,13 +38,13 @@ void MouseState::NextFrame(const Event& event) {
 		if (isDragging) {
 			isDragging = false;
 			dragDeltaX = dragDeltaY = 0.0f;
-		} else if (currentHotElement.callback) {
-			currentHotElement.callback(currentHotElement.userdata, currentHotElement.userint);
+		} else if (currHotZone.onClick) {
+			currHotZone.onClick(currHotZone.userdata, currHotZone.userint);
 		}
 	}
 
 	if (!isDragging) {
-		currentHotElement = nextHotElement;
-		nextHotElement = Element {};
+		currHotZone = nextHotZone;
+		nextHotZone = HotZone {};
 	}
 }

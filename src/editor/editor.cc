@@ -660,14 +660,13 @@ void Editor::Update() {
 	{
 		scrollarea.totalSize.height = glyphRuns.size() * settings.fontEditor.lineHeight;
 		
-		if (mouse.Hot(this)) {
+		if (mouse.Hittest(area, this)) {
 			if (mainWindow.event.type == Event::Type_MouseDown) {
 				mouse.StartDragging();
 				
 				const TextPosition mouseTextPosition = Hittest(this, mouse.x, mouse.y);
 				textController.SetCaretPosition(mouseTextPosition);
 			
-			// @CHECK does this still work?
 			} else if (mouse.isDragging) {
 				ASSERT(textController.carets.size() == 1u);
 				

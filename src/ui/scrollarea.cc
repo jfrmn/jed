@@ -67,23 +67,24 @@ void Scrollarea::OnUpdate() {
 		.bottom = position.y + ((vpY + vpSize.height) * ratio)};
 	
 	deviceContext->FillRectangle(vertBar, settings.GetBrushUiBackground());
-
+	
+	// Don't do a hittest here - this would cause the scrolling to stop when the cursor leaves the vertBar
 	if (mouse.Hittest(vertBar, this)) {
-		if (mainWindow.event.type == Event::Type_MouseDown)
+		if (mainWindow.event.type == Event::Type_MouseDown) {
 			mouse.StartDragging(mouse.x - vertBar.left,
 			                    mouse.y - vertBar.top);
-		
-		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(mouse.isDragging));
-		
-		if (mouse.isDragging) {
-			//const f32 newVpY = -(mouse.dragArg - mouse.y + position.y) / ratio;
-			const f32 newVpY = -(mouse.dragDeltaY + position.y) / ratio;
-			const f32 max = GetMaxPositionY();
-			//LogDevVar(mouse.dragArg);
-			
-			vpY = std::clamp(newVpY, 0.0f, max);				
 		}
-	}
+		
+		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(mouse.isDown));
+	
+	} else if (mouse.IsDragging(this)) {
+		const f32 newVpY = (mouse.y - mouse.dragDeltaY - position.y) / ratio;
+		const f32 max = GetMaxPositionY();
+				
+		vpY = std::clamp(newVpY, 0.0f, max);
+		
+		deviceContext->FillRectangle(vertBar, settings.GetBrushHover(true));
+	}	
 }
 
 void Scrollarea::OnResize(D2D_RECT_F hostRect) {
