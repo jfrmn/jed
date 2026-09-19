@@ -53,7 +53,7 @@ ID2D1Bitmap* CopyFromRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_R
 void BlurArea(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& area, ID2D1Bitmap* background = nullptr);
 
 // draw glow/drop shadow. unlike BlurArea the background must be provided
-void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area);
+void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area, const Color* color = nullptr);
 
 ID2D1BitmapRenderTarget* CreateCompatibleRenderTarget(ID2D1DeviceContext* deviceContext, const D2D_SIZE_F& size);
 void BlendImages(ID2D1DeviceContext* deviceContext, const D2D_POINT_2F& pos, ID2D1Bitmap* first, ID2D1Bitmap* second);

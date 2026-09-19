@@ -221,9 +221,11 @@ void BlurArea(ID2D1DeviceContext* deviceContext, const D2D_RECT_F& area, ID2D1Bi
 	background->Release();
 }
 
-void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area) {
+void DrawGlow(ID2D1DeviceContext* deviceContext, ID2D1Bitmap* background, const D2D_RECT_F& area, const Color* color /*= nullptr*/) {
+	if (!color) color = &settings.colors.dropShadow;
+	
 	shadowEffect->SetInput(0, background);
-	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {settings.colors.dropShadow.r, settings.colors.dropShadow.g, settings.colors.dropShadow.b, settings.colors.dropShadow.a});
+	shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F {color->r, color->g, color->b, color->a});
 	deviceContext->DrawImage(shadowEffect, D2D1_POINT_2F {area.left, area.top});
 }
 

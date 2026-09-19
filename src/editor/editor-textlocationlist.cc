@@ -105,7 +105,6 @@ void EditorTextLocationList::Update() {
 		filePreview.x = position.x + width;
 		filePreview.y = position.y + (selectedItem * settings.fontUi.lineHeight);
 		filePreview.OnUpdate();
-		deviceContext->DrawRectangle(filePreview.GetArea(), settings.GetBrushSelection());	
 	}
 }
 
@@ -115,7 +114,7 @@ void EditorTextLocationList::UpdateFilePreview() {
 		
 	FilePreview::LoadArgs args {
 		.path = item.targetPath,
-		.hasSelection = true,
+		.highlightMode = FilePreview::HighlightMode_Selection,
 		.selectionFrom = item.selectionRange.start,
 		.selectionTo = item.selectionRange.end};
 	

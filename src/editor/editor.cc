@@ -167,7 +167,6 @@ Editor::FileResult Editor::CloseFile() {
 	textDocumentIdentifier.uri.clear();
 	textDocumentIdentifier.version = 0u;		
 	path.clear();	
-	
 	return FileResult_Success;
 }
 
@@ -478,7 +477,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			   + PADDING_X2 + (settings.fontUi.lineHeight * runMessage.LineCount());
 			   
 	if (isScrollbarTooltip)
-		height += PADDING_X2 + (settings.fontEditor.lineHeight * 4);		
+		height += PADDING_X2 + (settings.fontEditor.lineHeight * 5);
 	
 	D2D1_POINT_2F position;
 	
@@ -505,7 +504,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		DEFER(background->Release());
 	
 		if (isScrollbarTooltip)
-			DrawGlow(deviceContext, background, area);
+			DrawGlow(deviceContext, background, area, &Diagnostics::SEVERITY_COLORS[record.severity]);
 	
 		PushLayer(deviceContext, area);
 		BlurArea(deviceContext, area, background);
@@ -570,8 +569,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	if (isScrollbarTooltip) {
 	
 		const f32 contextStartY = position.y + PADDING_X4
-			+ settings.fontEditor.lineHeight
-	 		+ (settings.fontUi.lineHeight * runMessage.LineCount());
+		                        + settings.fontEditor.lineHeight
+                                + (settings.fontUi.lineHeight * runMessage.LineCount());
 		
 		// draw 2nd seperator
 		deviceContext->DrawLine(
@@ -583,7 +582,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 				.y = contextStartY},
 			settings.GetBrushUiBackground());
 	
-		const s64 sFrom = static_cast<s64>(record.from.line - 1);
+		const s64 sFrom = static_cast<s64>(record.from.line - 2);
 		const s64 sTo   = static_cast<s64>(record.from.line + 2);
 		for (s64 i = sFrom; i <= sTo; i++) {
 			if (i < 0 || i >= static_cast<s64>(self->glyphRuns.size())) continue;

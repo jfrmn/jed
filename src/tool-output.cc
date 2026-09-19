@@ -64,7 +64,7 @@ static void AppendParameterValue(std::string* builder, const ParameterValue& val
 					: std::string_view("true"));
 			} else {
 				builder->append(definition.hasIfFalse
-					? definition.ifTrue
+					? definition.ifFalse
 					: std::string_view("false"));
 			}
 		} break;
@@ -270,9 +270,8 @@ static void UpdateFilePreview(ToolOutput* self, const ToolOutput::EditorDiagnost
 		.path = record.file,
 		.mode = FilePreview::LoadMode_TargetLine,
 		.targetLine = record.line,
-		.hasSelection = true,
-		.selectionFrom = self->selectionStart,
-		.selectionTo = self->selectionEnd});
+		.highlightMode = FilePreview::HighlightMode_Underline,
+		.underlinedLine = record.line});
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -689,11 +688,10 @@ void ToolOutput::Update() {
 	if (selectedDiagnosticsRecord != U64_MAX) {
 		const ToolOutput::EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
 	
-		filePreview.x = animatedArea.left - filePreview.width;
+		filePreview.x = animatedArea.left - filePreview.width - MARGIN;
 		filePreview.y = animatedArea.top  + toolbarHeight + ((record.originLine-2u) * settings.fontEditor.lineHeight) - scrollarea.vpY;
+		filePreview.color = record.color;
 		filePreview.OnUpdate();
-			
-		deviceContext->DrawRectangle(filePreview.GetArea(), UseColor(record.color));
 	}
 	
 	//
@@ -812,7 +810,7 @@ void ToolOutput::Update() {
 				
 				deviceContext->DrawBitmap(
 					settings.icons.editorDiagnosticsWarning,
-					MakeRect(area.left + offsetX + PADDING, area.top + MARGIN, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
+					MakeRect(areaWarningIcon.left + PADDING, areaWarningIcon.top + PADDING, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
 					
 				if (mouse.Hittest(areaWarningIcon, this, OnClickToolDiagnostics)) {
 					

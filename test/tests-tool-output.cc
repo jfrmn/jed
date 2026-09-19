@@ -62,7 +62,8 @@ void Test_ToolOutput_RunTestTool() {
 	
 	CHECK_NEQ(app.toolOutput.selectionStart, app.toolOutput.selectionEnd);
 	CHECK_FALSE(app.toolOutput.filePreview.hasError);
-	CHECK_TRUE(app.toolOutput.filePreview.hasSelection);
+	CHECK_EQ(app.toolOutput.filePreview.highlightMode, FilePreview::HighlightMode_Underline);
+	CHECK_EQ(app.toolOutput.filePreview.highlightFrom.line, app.toolOutput.filePreview.highlightTo.line);
 	CHECK_FALSE(app.toolOutput.filePreview.lines.empty());
 	
 	/* Not implemented yet

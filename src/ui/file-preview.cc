@@ -25,6 +25,7 @@ static constexpr f32 MAX_WIDTH = 500.0f;
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void FilePreview::Init() {
 	textBuffer.Init();
+	color = settings.colors.dropShadow;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,13 +110,10 @@ bool FilePreview::Load(const LoadArgs& args) {
 			
 			if (!ok) {
 				const u32 lastErr = GetLastError();
-				if (lastErr != ERROR_HANDLE_EOF) {
-					SetReadError(this, lastErr);
-					return false;
+				if (lastErr == ERROR_HANDLE_EOF) break;
 				
-				} else {
-					break; // end of file reached
-				}
+				SetReadError(this, lastErr);
+				return false;
 			}
 			
 			textBuffer.Insert(
@@ -125,29 +123,29 @@ bool FilePreview::Load(const LoadArgs& args) {
 		}
 	}
 	
-	u64 from = 0u, to = 0u;
+	u64 fromLine = 0u, toLine = 0u;
 	
 	//
 	// get displayed lines
 	//
 	if (args.mode == LoadMode_FirstFewLine) {
-		from = 0u;
-		to = std::min<u64>(args.lineCount - 1u, textBuffer.GetMaxLine());
+		fromLine = 0u;
+		toLine   = std::min<u64>(args.lineCount - 1u, textBuffer.GetMaxLine());
 		
 	} else if (args.mode == LoadMode_TargetLine) {
 		
 		const s64 sTargetLine = static_cast<s64>(args.targetLine);
-		from = std::max<s64>(sTargetLine - TARGET_LINE_LINES_BEFORE, 0);
-		to   = std::min<s64>(args.targetLine + TARGET_LINE_LINES_AFTER, textBuffer.GetMaxLine());
+		fromLine = std::max<s64>(sTargetLine - TARGET_LINE_LINES_BEFORE, 0);
+		toLine   = std::min<s64>(args.targetLine + TARGET_LINE_LINES_AFTER, textBuffer.GetMaxLine());
 		
 	} else if (args.mode == LoadMode_LineRange) {
 		ASSERT(args.lineFrom <= args.lineTo);
 		
-		from = args.lineFrom;
-		if (from > textBuffer.GetMaxLine())
-			from = std::max<s64>(0, static_cast<s64>(textBuffer.GetMaxLine()) - 5);
+		fromLine = args.lineFrom;
+		if (fromLine > textBuffer.GetMaxLine())
+			fromLine = std::max<s64>(0, static_cast<s64>(textBuffer.GetMaxLine()) - 5);
 			
-		to = std::max<u64>(0u, textBuffer.GetMaxLine());
+		toLine = std::max<u64>(0u, textBuffer.GetMaxLine());
 	
 	} else {
 		ASSERT_UNREACHABLE;
@@ -160,7 +158,7 @@ bool FilePreview::Load(const LoadArgs& args) {
 		lines.clear();
 		width = 0.0f;
 		
-		for (u64 i = from; i <= to; i++) {
+		for (u64 i = fromLine; i <= toLine; i++) {
 			GlyphRun& run = lines.emplace_back();
 			const TextBuffer::Line& line = textBuffer.GetLineAt(i);
 			
@@ -177,35 +175,66 @@ bool FilePreview::Load(const LoadArgs& args) {
 	//
 	// handle selection
 	//
-	if (args.hasSelection) {
+	if (args.highlightMode == HighlightMode_None) {
+		// do nothing
+		
+	} else if (args.highlightMode == HighlightMode_Selection) {
 		
 		const TextPosition minPos {
-			.line = from,
+			.line = fromLine,
 			.character = 0u};
 			
 		const TextPosition maxPos {
-			.line = to,
-			.character = textBuffer.GetLineAt(to).length};
+			.line = toLine,
+			.character = textBuffer.GetLineAt(toLine).length};
 		
-		TextPosition clampedSelectionFrom = std::clamp(args.selectionFrom, minPos, maxPos);
-		TextPosition clampedSelectionTo = std::clamp(args.selectionTo, minPos, maxPos);
+		const TextPosition clampedSelectionFrom = std::clamp(args.selectionFrom, minPos, maxPos);
+		const TextPosition clampedSelectionTo   = std::clamp(args.selectionTo,   minPos, maxPos);
+	
+		this->highlightMode = HighlightMode_Selection;
 		
-		this->selectionFrom = TextPosition {
-			.line = to - clampedSelectionFrom.line,
+		this->highlightFrom = TextPosition {
+			.line = clampedSelectionFrom.line - fromLine,
 			.character = clampedSelectionFrom.character};
 		
-		this->selectionTo = TextPosition {
-			.line = to - clampedSelectionTo.line,
+		this->highlightTo = TextPosition {
+			.line = clampedSelectionFrom.line - fromLine,
 			.character = clampedSelectionTo.character};
+				
+		ASSERT(highlightFrom.line <= highlightTo.line);
 	
-		this->hasSelection = true;		
+	
+	} else if ((args.highlightMode == HighlightMode_Underline) &&
+		       (args.underlinedLine >= fromLine) &&
+		       (args.underlinedLine <= toLine)) {
 		
-		ASSERT(selectionFrom.line <= selectionTo.line);
-	
-	} else {
-		this->selectionFrom = TextPosition {};
-		this->selectionTo = TextPosition {};
-		this->hasSelection = false;
+		const u64 adjustedLine = args.underlinedLine - fromLine;
+		ASSERT(adjustedLine < lines.size()) // check condition above. might a off by one error
+		
+		const std::string_view& lineText = textBuffer.GetLineAt(args.underlinedLine).GetText();
+		
+		u64 startPos = 0u, endPos = 0u;		
+		if (const auto it = std::find_if_not(lineText.begin(), lineText.end(), isspace); it != lineText.end()) {
+			
+			const auto rit = std::find_if_not(lineText.rbegin(), lineText.rend(), isspace);
+			ASSERT(rit != lineText.rend());  // we know the line is not empty so that should return something
+			
+			startPos = static_cast<u64>(std::distance(lineText.begin(), it));
+			endPos = static_cast<u64>(lineText.size() - 1u - std::distance(lineText.rbegin(), rit));
+					
+		} else {
+			// line is either empty or blank
+			startPos = 0u;
+			endPos = std::min(0ull, lineText.size()-1u);
+		}
+		
+		this->highlightMode = HighlightMode_Underline;
+		this->highlightFrom = TextPosition {
+			.line = adjustedLine,
+			.character = startPos};
+		this->highlightTo = TextPosition {
+			.line = adjustedLine,
+			.character = endPos};
 	}
 	
 	return true;
@@ -214,19 +243,56 @@ bool FilePreview::Load(const LoadArgs& args) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void FilePreview::OnUpdate() {
 	
+	// background
 	const D2D_RECT_F area = GetArea();
-	BlurArea(deviceContext, area);
+	ID2D1Bitmap* background = CopyFromRenderTarget(deviceContext, area);
+	if (!background) return;
+	DEFER(background->Release());
+
+	DrawGlow(deviceContext, background, area, &color);
+
+	PushLayer(deviceContext, area);
+	DEFER(PopLayer(deviceContext));
 	
-	deviceContext->PushAxisAlignedClip(area, D2D1_ANTIALIAS_MODE_ALIASED);
+	BlurArea(deviceContext, area, background);
 	
+	// lines
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
 		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.GetBrushEditorText());
 	}
 	
-	// @TODO draw selection etc.
+	if (highlightMode != HighlightMode_None) {
+		ID2D1SolidColorBrush* brush = UseColor(color);
 		
-	deviceContext->PopAxisAlignedClip();
+		IterateTextRange(highlightFrom, highlightTo, [&] (u64 line, u64 columnFrom, u64 columnTo) {
+			ASSERT(line < lines.size());
+			const GlyphRun& run = lines[line];
+			
+			f32 from = 0.0f, to = 0.0f;
+			lines[line].MeasureOffsetRange(columnFrom, columnTo, &from, &to);
+					
+			if (highlightMode == HighlightMode_Selection) {
+				deviceContext->FillRectangle(
+					D2D_RECT_F {
+						.left   = x + PADDING + from,
+						.top    = y + (settings.fontEditor.lineHeight * line),
+						.right  = x + PADDING + to,
+						.bottom = y + (settings.fontEditor.lineHeight * (line+1u))},
+					brush);
+			
+			} else if (highlightMode == HighlightMode_Underline) {
+				const f32 y = this->y + PADDING + (settings.fontEditor.lineHeight * line) + settings.fontEditor.underlineOffset;
+				deviceContext->DrawLine(
+					D2D_POINT_2F {x + PADDING + from, y},
+					D2D_POINT_2F {x + PADDING + to,   y},
+					brush);
+			
+			} else {
+				ASSERT_UNREACHABLE;
+			}
+		});
+	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
