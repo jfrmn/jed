@@ -40,7 +40,7 @@ void _TriggerHardAssert(const char* expression, const char* file, int line, cons
 }
 
 void _TriggerSoftAssert(const char* expression, const char* file, int line, const char* function) {
-	PrintAssertMessage(expression, file, line, function, false);
+	PrintAssertMessage(expression, file, line, function, true);
 	
 	char buffer[256] {0};
 	sprintf_s(buffer, "expr: %s\nfile: %s\nline: %d\nfunction: %s\n\nPress OK to continue or Cancel to terminate.", expression, file, line, function);
