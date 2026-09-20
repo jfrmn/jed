@@ -14,11 +14,12 @@ add_executable (jed)
 # dependencies
 
 set (BUILD_SHARED_LIBS OFF)
+set (CACHE DEPS_DIR "deps")
 
 #
 # toml++
 #
-target_include_directories (jed PRIVATE "deps/tomlplusplus/include")
+target_include_directories (jed PRIVATE "${DEPS_DIR}/tomlplusplus/include")
 
 #
 # pearl regex lib
@@ -31,25 +32,25 @@ set (PCRE2_NEVER_BACKSLASH_C OFF)
 set (PCRE2_BUILD_PCRE2GREP OFF)
 set (PCRE2_BUILD_TESTS OFF)
 
-add_subdirectory ("deps/pcre2")
+add_subdirectory ("${DEPS_DIR}/pcre2" ${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2)
 target_link_libraries (jed pcre2-8-static)
 target_include_directories (jed PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/deps/pcre2/interface")
 
 #
 # tree-sitter
 #
-add_subdirectory ("deps/tree-sitter")
+add_subdirectory ("${DEPS_DIR}/tree-sitter" ${CMAKE_CURRENT_BINARY_DIR}/deps/tree-sitter)
 target_link_libraries (jed tree-sitter)
-target_include_directories (jed PRIVATE "deps/tree-sitter/lib/include")
+target_include_directories (jed PRIVATE "${DEPS_DIR}/tree-sitter/lib/include")
 
 #
 # cJSON
 #
 set (CJSON_BUILD_SHARED_LIBS OFF)
 
-add_subdirectory ("deps/cJSON")
+add_subdirectory ("${DEPS_DIR}/cJSON" ${CMAKE_CURRENT_BINARY_DIR}/deps/cJSON)
 target_link_libraries(jed cjson)
-target_include_directories (jed PRIVATE "deps/cJSON")
+target_include_directories (jed PRIVATE "${DEPS_DIR}/cJSON")
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # main executable

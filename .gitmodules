@@ -10,6 +10,3 @@
 [submodule "deps/tree-sitter"]
 	path = deps/tree-sitter
 	url = https://github.com/tree-sitter/tree-sitter.git
-[submodule "deps/doctest"]
-	path = deps/doctest
-	url = https://github.com/doctest/doctest.git

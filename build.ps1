@@ -9,6 +9,8 @@ param(
 	[ValidateSet("debug", "stable", "release")]
 	[string] $profile = "debug",
 	
+	[string]$dependencyDir = $null,
+	
 	[Alias("r")]
 	[switch] $run = $false,
 	
@@ -32,6 +34,10 @@ function Write-Step($message) {
 	Write-Output "`e[36m > $message`e[0m";
 }
 
+function Write-Err($message) {
+	Write-Output "`e[31mERR: $message`e[0m";
+}
+
 # set tab color and title
 Write-Output "`e];build`a`e[2;0;1,|" > $null;
 
@@ -51,9 +57,27 @@ if (-not (Test-Path ".\out\$profile")) {
 if ($reconfigure) {
 	Write-Step "reconfiguring";
 	$buildType = if (($profile -eq "debug") -or ($profile -eq "stable")) { "Debug" } else { "Release" };
-	& cmake -S . -B .\out\$profile -G "Ninja" -DCMAKE_BUILD_TYPE="$buildType";
+	
+	$depsDir = if ($dependencyDir) {
+		$dependencyDir
+	
+	# are we perhaps in a worktree? 
+	} elseif (($PSScriptRoot | Split-Path -Parent | Split-Path -Leaf) -eq ".worktrees") {
+		"../../deps"
+	
+	} else {
+		if ((Get-ChildItem -Path deps -Recurse -File).Count -eq 0) {
+			Write-Output "`e[33mWRN: deps directory appears to be empty. Forgot to run 'git submodule --init --recursive'?`e[0m";
+		}
+		"deps"
+	};
+	
+	Write-Output "dependencies directory: `e[90m$depsDir`e[0m";
+	
+	& cmake -S . -B .\out\$profile -G "Ninja" -DCMAKE_BUILD_TYPE="$buildType" -DDEPS_DIR="$depsDir"
 
 	if ($LASTEXITCODE -ne 0) {
+		Write-Err "reconfigure failed.";
 		exit;
 	}
 }
@@ -62,6 +86,7 @@ Write-Step "compiling";
 & cmake --build .\out\$profile;
 
 if ($LASTEXITCODE -ne 0) {
+	Write-Err "compile failed.";
 	exit;
 }
 
@@ -74,12 +99,18 @@ if ($install) {
 	Write-Step "installing (dir=$installDir)";
 
 	& cmake --install ./out/$profile/build --prefix $installDir;
+	
+	if ($LASTEXITCODE -ne 0) { exit; }
 }
 
 if ($test) {
 	Write-Step "running tests";
 	& ./out/$profile/jed-tests.exe
+	
+	if ($LASTEXITCODE -ne 0) { exit; }
 }
+
+Write-Output "`e[32mDone.`e[0m";
 
 if ($run) {
 	Write-Step "running";
