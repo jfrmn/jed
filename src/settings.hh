@@ -6,12 +6,11 @@
 
 #include <unordered_map>
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct ID2D1Bitmap;
 struct ID2D1DeviceContext;
 struct ID2D1SolidColorBrush;
+struct Tool;
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 struct Settings {
 
 	//-----------------------------------------------------
@@ -129,6 +128,8 @@ struct Settings {
 	};
 	
 	std::unordered_map<u64, KeyBind> keyBinds = {};
+	
+	std::vector<Tool> tools = {};
 		
 	Font fontUi = {};
 	Font fontEditor = {};

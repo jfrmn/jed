@@ -1112,13 +1112,12 @@ void App::HandleEvent(const Event& event) {
 		if (event.cmd.id == Command::Id_OpenFileSearch) {
 			searchBarFiles.Open();
 			searchBar = &searchBarFiles;
-			searchBar->shouldClose = false;
 		} else if (event.cmd.id == Command::Id_OpenToolSearch) {
+			searchBarTools.Open();
 			searchBar = &searchBarTools;
-			searchBar->shouldClose = false;
 		} else if (event.cmd.id == Command::Id_OpenCommandSearch) {
+			searchBarCommands.Open();
 			searchBar = &searchBarCommands;
-			searchBar->shouldClose = false;
 		} else if (event.cmd.id == Command::Id_ToggleToolOutput) {
 			toolOutput.open = !toolOutput.open;
 			toolOutput.spawnAnimationValue = 1.0f - toolOutput.spawnAnimationValue;

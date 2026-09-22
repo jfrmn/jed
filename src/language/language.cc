@@ -9,6 +9,7 @@
 #include "app.hh"
 #include "util.hh"
 #include "logging.hh"
+#include "tools.hh"
 #include "ui/window.hh"
 
 #include <mutex>
@@ -112,13 +113,30 @@ bool Language::LoadLanguages(std::string_view directory) {
 				const bool ok = language->syntaxHighlighterTreeSitter.FromToml(nodeTreeSitter);
 				if (ok)  language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
 			}
-		}
 			
-		if (auto nodeDefaultSyntaxHighlighter = tblLanguage.get_as<std::string>("default-syntax-highlight")) {
-			if      (nodeDefaultSyntaxHighlighter->get() == "none")  language->syntaxHighlighter = nullptr;
-			else if (nodeDefaultSyntaxHighlighter->get() == "regex") language->syntaxHighlighter = &language->syntaxHighlighterRegex;
-			else LogWarning("%s: unknwon default-syntax-highlight value '%.*s'", Str(nodeDefaultSyntaxHighlighter->source()), SIZE_AND_DATA(nodeDefaultSyntaxHighlighter->get()));
+			if (auto nodeDefault = tblSyntaxHighlight->get_as<std::string>("default")) {
+				if      (nodeDefault->get() == "none")        language->syntaxHighlighter = nullptr;
+				else if (nodeDefault->get() == "regex")       language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+				else if (nodeDefault->get() == "tree-sitter") language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
+				else LogWarning("%s: unknwon default-syntax-highlight value '%.*s'", Str(nodeDefault->source()), SIZE_AND_DATA(nodeDefault->get()));
+			}
+			
+			if (auto tblColors = tblSyntaxHighlight->get_as<toml::table>("colors")) {
+				language->syntaxColors.reserve(tblColors->size());
+				for (auto nodeColor : *tblColors) {
+					Color color {};
+					if (!Color::FromToml(nodeColor.second, &color))
+						continue;
+					
+					language->syntaxColors.push_back(SyntaxColor {
+						.label = std::string {nodeColor.first},
+						.color = color});
+				}
+			}
 		}
+		
+		if (auto nodeTools = tblLanguage.get("tools"))
+			Tool::FromToml(nodeTools, &language->tools);
 		
 		languages.push_back(std::move(language));
 	}

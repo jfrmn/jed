@@ -814,9 +814,8 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	//
 	// load tools
 	//
-	if (toml::node* nodeTools = table.get("Tools")) {
-		Tool::LoadTools(nodeTools);
-	}
+	if (toml::node* nodeTools = table.get("Tools"))
+		Tool::FromToml(nodeTools, &tools);
 	
 	return true;
 }

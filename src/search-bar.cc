@@ -7,12 +7,15 @@
 #include "app.hh"
 #include "util.hh"
 #include "logging.hh"
+#include "editor/editor.hh"
 
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/parameter-configurator.hh"
 #include "ui/animation.hh"
+
 #include "graphics.hh"
+#include "language/language.hh"
 
 #include <algorithm>
 
@@ -52,6 +55,7 @@ static void OnClickItem(void* ud, u64 i) {
 void SearchBar::Open() {
 	spawnAnimationValue = 0.0f;
 	itemHighlightAnimationValue = 0.0f;
+	shouldClose = false;
 	textBox.textController.SetSelection(
 		TextPosition {0, 0},
 		TextPosition {0, textBox.textController.buffer.lines.front().length});
@@ -146,6 +150,12 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 		deviceContext->FillRectangle(itemArea, brushGlow);
 	}
 	
+	f32 prefixOffset = 0.0f;
+	if (!params.prefix.empty()) {
+		staticGlyphRun.ShapeAndDraw(deviceContext, params.prefix, MARGIN + itemArea.left, MARGIN + itemArea.top, settings.fontUi,  UseColor(settings.colors.editorMultiCaretEdit));
+		prefixOffset = staticGlyphRun.width + PADDING;
+	}
+	
 	staticGlyphRun.Shape(params.text, settings.fontUi);
 	
 	f32 offsetFrom, offsetTo;
@@ -156,14 +166,14 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 	
 	deviceContext->FillRectangle(
 		D2D1_RECT_F {
-			.left   = MARGIN + itemArea.left + offsetFrom,
+			.left   = MARGIN + itemArea.left + prefixOffset + offsetFrom,
 		    .top    = MARGIN + itemArea.top,
-		    .right  = MARGIN + itemArea.left + offsetTo,
+		    .right  = MARGIN + itemArea.left + prefixOffset + offsetTo,
 		    .bottom = MARGIN + itemArea.top + settings.fontUi.lineHeight},
 		settings.GetBrushUiSearchResult());
 
 	staticGlyphRun.Draw(deviceContext,
-		MARGIN + itemArea.left,
+		MARGIN + itemArea.left + prefixOffset,
 	    MARGIN + itemArea.top,
 		settings.fontUi,
 		settings.GetBrushUiText());
@@ -516,25 +526,31 @@ void SearchBarFiles::OnPickItem(u64 i, const Event* event) {
 
 void SearchBarTools::Init() {
 	__super::Init("run tool...");
-	filteredTools.reserve(Tool::tools.size());
-	FilterItems({});
+	FilterItems(std::string_view {});
 }
 	
+void SearchBarTools::Open() {
+	__super::Open();
+	FilterItems(textBox.GetText());
+}
+
 void SearchBarTools::FilterItems(std::string_view text) {
 	
 	filteredTools.clear();
+	for (const Tool& tool : settings.tools) {
+		FuzzyMatchResult result {};
+		if (text.empty() || FuzzyMatch(text, tool.name, &result))
+			filteredTools.emplace_back(&tool, nullptr, result);
+	}
 	
-	if (text.empty()) {
-		for (const auto& t : Tool::tools)
-			filteredTools.emplace_back(&t, FuzzyMatchResult {});
-	
-	} else {
-	
-		for (const Tool& tool : Tool::tools) {
+	for (const Language* lang : Language::languages) {
+		const bool isInUse = std::any_of(app.tabs.begin(), app.tabs.end(), [lang] (const App::Tab& t) { return t.editor && t.editor->language == lang; });
+		if (!isInUse) continue;
+		
+		for (const Tool& t : lang->tools) {
 			FuzzyMatchResult result {};
-			if (FuzzyMatch(text, tool.name, &result)) {
-				filteredTools.emplace_back(&tool, result);
-			}
+			if (text.empty() || FuzzyMatch(text, t.name, &result))
+				filteredTools.emplace_back(&t, lang, result);
 		}
 	}
 	
@@ -557,7 +573,7 @@ static bool CheckIfAToolIsAlreadyRunnung(SearchBarTools* self) {
 void SearchBarTools::OnPickItem(u64 item, const Event* event) {
 	ASSERT(item < filteredTools.size());
 	
-	const Tool& tool = Tool::tools[item];
+	const Tool& tool = settings.tools[item];
 	if (tool.forceConfiguration || (event && (event->keypress.mods & KM_Ctrl) != 0)) {
 		ASSERT(!parameterConfigurator);
 		parameterConfigurator = ParameterConfigurator::Make(tool.parameters);
@@ -579,6 +595,7 @@ void SearchBarTools::OnUpdateItems(u64 firstVisible, u64 lastVisible) {
 	for (u64 i = firstVisible; i < lastVisible; i++) {
 		const Item& item = filteredTools[i];
 		UpdateItem(i, UpdateItemParams {
+			.prefix = item.langauge ? item.langauge->name : std::string_view {},
 			.text = item.tool->name,
 			.subText = item.tool->command,
 			.matchedPosition = item.fuzzyMatchResult.position,
@@ -593,7 +610,7 @@ void SearchBarTools::OnFinishedParameterConfiguration() {
 		if (!CheckIfAToolIsAlreadyRunnung(this)) return;
 		
 		ASSERT(selectedItem < filteredTools.size());	
-		const Tool& tool = Tool::tools[selectedItem];
+		const Tool& tool = settings.tools[selectedItem];
 		
 		parameterConfigurator->GetParameterValues(&app.toolOutput.toolParameterValues);
 		app.toolOutput.tool = &tool;

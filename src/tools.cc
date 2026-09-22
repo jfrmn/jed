@@ -11,10 +11,6 @@
 #define TOML_IMPLEMENTATION 0
 #include <toml++/toml.hpp>
 
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-std::vector<Tool> Tool::tools {};
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, std::string_view key, /*out*/ u32* captureGroup) {
 	auto valGroup = table->get_as<s64>(key);
@@ -27,13 +23,15 @@ static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, 
 	*captureGroup = static_cast<u32>(valGroup->get());
 }
 
-bool Tool::LoadTools(toml::node* toml) {
+bool Tool::FromToml(toml::node* toml, /*out*/ std::vector<Tool>* tools) {
 	
 	toml::array* array = toml->as_array();
 	if (!array) {
 		LogError("%s: expected an array", Str(toml->source()));
 		return false;
 	}
+	
+	tools->reserve(array->size());
 	
 	Tool tool {};
 	for (toml::node& node : *array) {
@@ -198,7 +196,7 @@ bool Tool::LoadTools(toml::node* toml) {
 			}
 		}
 		
-		tools.push_back(std::move(tool));
+		tools->push_back(std::move(tool));
 	}
 	
 	return true;

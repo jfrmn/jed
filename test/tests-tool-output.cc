@@ -1,5 +1,6 @@
 #include "checks.hh"
 #include "tools.hh"
+#include "settings.hh"
 #include "app.hh"
 
 static bool WaitForProcessExit() {
@@ -20,7 +21,7 @@ void Test_ToolOutput_RunTestTool() {
 	// instead of relying on it being in the settings
 	
 	const Tool* tool = nullptr;
-	for (const Tool& t : Tool::tools) {
+	for (const Tool& t : settings.tools) {
 		if (t.name == "test tool") {
 			tool = &t;
 			break;

@@ -10,6 +10,7 @@
 struct Event;
 struct ParameterConfigurator;
 struct Tool;
+struct Language;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -24,6 +25,7 @@ struct SearchBar {
 	//-----------------------------------------------------
 	
 	struct UpdateItemParams {
+		std::string_view prefix = {};
 		std::string_view text = {};
 		std::string_view subText = {};
 		ID2D1Bitmap* icon = nullptr;
@@ -148,6 +150,7 @@ struct SearchBarTools : public SearchBar {
 	
 	struct Item {
 		const Tool* tool = nullptr;
+		const Language* langauge = nullptr;
 		FuzzyMatchResult fuzzyMatchResult = {};	
 	};
 	
@@ -162,7 +165,8 @@ struct SearchBarTools : public SearchBar {
 	//-----------------------------------------------------
 
 	void Init();
-		
+	virtual void Open() override;
+			
 	virtual void FilterItems(std::string_view text) override;
 	virtual void OnUpdateItems(u64 firstVisible, u64 lastVisible) override;	
 	virtual void OnPickItem(u64 item, const Event* event) override;

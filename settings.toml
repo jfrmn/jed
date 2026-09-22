@@ -50,12 +50,18 @@ parameters = [
 		if-false = ""
 	}
 ]
-	
-[[Tools]]
-name = "dnGREP"
-command = 'D:\Apps\dnGrep\dnGrep.exe .'
-open-console = "never"
-	
+
+# @TODO make parameter for PWD so we don't need to do the pwsh hack
+#[[Tools]]
+#name = "dnGREP"
+#command = 'pwsh -c Start-Process -Path D:\Apps\dnGrep\dnGrep.exe -ArgumentList $PWD'
+#open-console = "never"
+
+#[[Tools]]
+#name = "edit TODO.md"
+#command = "marktext .\TODO.md"
+#open-console = "never"
+
 [[Tools]]
 name = "test tool"
 command = 'pwsh.exe -f .\test\testtool.ps1 %0'

@@ -3,12 +3,14 @@
 #include "language/syntaxhighlighter-regex.hh"
 #include "language/syntaxhighlighter-treesitter.hh"
 #include "text/text-change.hh"
+#include "util/color.hh"
 
 #include <string_view>
 #include <vector>
 
-struct Editor;
 struct ID2D1RenderTarget;
+struct Tool;
+struct Editor;
 struct EditorAutocomplete;
 struct EditorSignatureHelp;
 struct EditorTextLocationList;
@@ -39,6 +41,11 @@ struct Language : public LanguageServer::NotificationHandler {
 	struct LanguageServerStartInfo {
 		std::string commandLine = {};
 	};
+	
+	struct SyntaxColor {
+		std::string label = {};
+		Color color = {};
+	};
 
 	//-----------------------------------------------------
 	// data
@@ -53,6 +60,9 @@ struct Language : public LanguageServer::NotificationHandler {
 	SyntaxHighlighter*          syntaxHighlighter = nullptr;
 	SyntaxHighlighterRegex      syntaxHighlighterRegex = {};
 	SyntaxHighlighterTreeSitter syntaxHighlighterTreeSitter = {};
+	std::vector<SyntaxColor>    syntaxColors = {};
+	
+	std::vector<Tool> tools = {};
 		
 	std::string lineComment = {};
 	std::string blockComment[2] = {};

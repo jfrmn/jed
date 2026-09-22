@@ -15,9 +15,8 @@ struct Tool {
 	// statics
 	//-----------------------------------------------------
 	
-	static std::vector<Tool> tools;
-	
-	static bool LoadTools(toml::node* toml);
+	// load multiple tools from an toml array
+	static bool FromToml(toml::node* toml, /*out*/ std::vector<Tool>* tools);
 	
 	//-----------------------------------------------------
 	// types
