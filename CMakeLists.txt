@@ -14,7 +14,7 @@ add_executable (jed)
 # dependencies
 
 set (BUILD_SHARED_LIBS OFF)
-set (CACHE DEPS_DIR "deps")
+set(CACHE{DEPS_DIR} TYPE PATH VALUE "deps")
 
 #
 # toml++
