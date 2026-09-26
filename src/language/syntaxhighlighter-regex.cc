@@ -75,30 +75,6 @@ bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
 	return true;
 }
 
-// @DUMMY
-static D2D1_COLOR_F GetColorForLabel(std::string_view label) {
-	if (label == "keyword")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "function")
-		return D2D1::ColorF(D2D1::ColorF::LemonChiffon);
-	else if (label == "control-flow")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "string")
-		return D2D1::ColorF(D2D1::ColorF::LightSalmon);
-	else if (label == "comment")
-		return D2D1::ColorF(D2D1::ColorF::LightGray);
-	else if (label == "type")
-		return D2D1::ColorF(D2D1::ColorF::DarkTurquoise);
-	else if (label == "preprocessor")
-		return D2D1::ColorF(D2D1::ColorF::HotPink);
-	else if (label == "number")
-		return D2D1::ColorF(D2D1::ColorF::LimeGreen);
-	else if (label == "tag")
-		return D2D1::ColorF(D2D1::ColorF::Gold);
-	else
-		return D2D1::ColorF(D2D1::ColorF::White);
-}
-
 void SyntaxHighlighterRegex::Highlight(Editor* editor, ID2D1RenderTarget* renderTarget, u64 fromLine, u64 toLine) {
 	for (u64 ln = fromLine; ln <= toLine; ln++) {
 		const TextBuffer::Line& line = editor->textController.buffer.GetLineAt(ln);
@@ -112,8 +88,8 @@ void SyntaxHighlighterRegex::Highlight(Editor* editor, ID2D1RenderTarget* render
 					if (rule.labels[i].empty()) continue;
 					const RegexMatch::Group& group = match.GetGroup(static_cast<u32>(i));
 					
-					const D2D_COLOR_F color = GetColorForLabel(rule.labels[i]);
-					brush->SetColor(color);
+					const Color color = LookupColor(editor, rule.labels[i]);
+					brush->SetColor(color.ToD2D());
 					
 					const u64 start = group.begin - line.data;
 					const u64 end   = group.end   - line.data;

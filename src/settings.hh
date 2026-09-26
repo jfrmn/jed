@@ -2,6 +2,7 @@
 #include "events.hh"
 #include "commands.hh"
 #include "util/color.hh"
+#include "util/hashtable.hh"
 #include "glyph-run.hh"
 
 #include <unordered_map>
@@ -128,7 +129,7 @@ struct Settings {
 	};
 	
 	std::unordered_map<u64, KeyBind> keyBinds = {};
-	
+	Hashtable<Color> syntaxColors = {};	
 	std::vector<Tool> tools = {};
 		
 	Font fontUi = {};

@@ -4,6 +4,7 @@
 #include "language/syntaxhighlighter-treesitter.hh"
 #include "text/text-change.hh"
 #include "util/color.hh"
+#include "util/hashtable.hh"
 
 #include <string_view>
 #include <vector>
@@ -19,6 +20,7 @@ struct Language : public LanguageServer::NotificationHandler {
 
 	//-----------------------------------------------------
 	// statics
+	//-----------------------------------------------------
 
 	static std::vector<Language*> languages;
 
@@ -29,6 +31,7 @@ struct Language : public LanguageServer::NotificationHandler {
 
 	//-----------------------------------------------------
 	// types
+	//-----------------------------------------------------
 
 	enum Startup {
 		 Startup_Never = 0,
@@ -42,13 +45,9 @@ struct Language : public LanguageServer::NotificationHandler {
 		std::string commandLine = {};
 	};
 	
-	struct SyntaxColor {
-		std::string label = {};
-		Color color = {};
-	};
-
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 
 	std::string name = {};
 	std::vector<std::string> fileEndings = {};
@@ -60,7 +59,7 @@ struct Language : public LanguageServer::NotificationHandler {
 	SyntaxHighlighter*          syntaxHighlighter = nullptr;
 	SyntaxHighlighterRegex      syntaxHighlighterRegex = {};
 	SyntaxHighlighterTreeSitter syntaxHighlighterTreeSitter = {};
-	std::vector<SyntaxColor>    syntaxColors = {};
+	Hashtable<Color>            syntaxColors = {};
 	
 	std::vector<Tool> tools = {};
 		
@@ -69,10 +68,10 @@ struct Language : public LanguageServer::NotificationHandler {
 
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 	
 	bool HasLanguageServer() const;
 
-	void HighlightSyntax(Editor* editor, ID2D1RenderTarget* renderTarget, u64 fromLine, u64 toLine);
 	EditorAutocomplete* GetAutoComplete(Editor* editor);
 	EditorSignatureHelp* GetSignatureHelp(Editor* editor);
 	

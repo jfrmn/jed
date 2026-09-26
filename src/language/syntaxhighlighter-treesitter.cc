@@ -252,32 +252,6 @@ void SyntaxHighlighterTreeSitter::OnTextBufferChanged(Editor* editor, const Text
 	editor->tsTree = ts_parser_parse(editor->tsParser, editor->tsTree, tsInput);
 }
 
-// @DUMMY
-static D2D1_COLOR_F GetColorForLabel(std::string_view label) {
-	if (label == "keyword")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "function")
-		return D2D1::ColorF(D2D1::ColorF::LemonChiffon);
-	else if (label == "control-flow")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "string")
-		return D2D1::ColorF(D2D1::ColorF::LightSalmon);
-	else if (label == "comment")
-		return D2D1::ColorF(D2D1::ColorF::LightGray);
-	else if (label == "type")
-		return D2D1::ColorF(D2D1::ColorF::DarkTurquoise);
-	else if (label == "preprocessor")
-		return D2D1::ColorF(D2D1::ColorF::HotPink);
-	else if (label == "number")
-		return D2D1::ColorF(D2D1::ColorF::LimeGreen);
-	else if (label == "tag")
-		return D2D1::ColorF(D2D1::ColorF::Gold);
-	else if (label == "normal")
-		return settings.colors.editorText.ToD2D();
-	else
-		return D2D1::ColorF(D2D1::ColorF::White);
-}
-
 void SyntaxHighlighterTreeSitter::Highlight(Editor* editor, ID2D1RenderTarget* renderTarget, u64 fromLine, u64 toLine) {
 	if (!query || !queryCursor) return;
 	if (!editor->tsTree) return;
@@ -298,8 +272,8 @@ void SyntaxHighlighterTreeSitter::Highlight(Editor* editor, ID2D1RenderTarget* r
 		const char* captureNameData = ts_query_capture_name_for_id(query, capture.index, &captureNameLength);
 		
 		const std::string_view captureName {captureNameData, captureNameLength};
-		const D2D1_COLOR_F color = GetColorForLabel(captureName);
-		brush->SetColor(color);
+		const Color color = LookupColor(editor, captureName);
+		brush->SetColor(color.ToD2D());
 		
 		const TSPoint start = ts_node_start_point(capture.node);
 		TSPoint end = ts_node_end_point(capture.node);

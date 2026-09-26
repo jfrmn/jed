@@ -816,6 +816,22 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	//
 	if (toml::node* nodeTools = table.get("Tools"))
 		Tool::FromToml(nodeTools, &tools);
+		
+	//
+	// syntax colors
+	//
+	if (auto tblSynColors = table.get_as<toml::table>("Syntax-Colors")) {
+		syntaxColors.Reserve(tblSynColors->size());
+		for (auto nodeColor : *tblSynColors) {
+			Color color {};
+			if (!Color::FromToml(nodeColor.second, &color)) {
+				LogWarning("color '%.*s' is invalid (%.*s)", SIZE_AND_DATA(nodeColor.first.str()), Str(nodeColor.second.source()));
+				continue;
+			}
+			
+			syntaxColors.Upsert(std::string {nodeColor.first}, color);
+		}
+	}
 	
 	return true;
 }

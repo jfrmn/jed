@@ -51,7 +51,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 		toml::parse_result parseResult = toml::parse(fileBuffer, path);
 		if (parseResult.failed()) {
 			const toml::parse_error& error = parseResult.error();
-			LogError("failed to parse toml %s: %s. Ignoring language...", Str(error.source()), error.description());
+			LogError("failed to parse toml %s: %.*s. Ignoring language...", Str(error.source()), SIZE_AND_DATA(error.description()));
 			continue;
 		}
 		
@@ -70,7 +70,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 			}
 		}
 		
-		if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("language-server")) {
+		if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("Language-Server")) {
 			if (auto valCommand = nodeLanguageServer->get_as<std::string>("command")) {
 				language->serverStartInfo.commandLine = valCommand->get();
 			} else {
@@ -102,7 +102,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 			}
 		}
 		
-		if (auto tblSyntaxHighlight = tblLanguage.get_as<toml::table>("syntax-highlight")) {
+		if (auto tblSyntaxHighlight = tblLanguage.get_as<toml::table>("Syntax-Highlight")) {
 			
 			if (auto nodeRegex = tblSyntaxHighlight->get("regex")) {
 				const bool ok = language->syntaxHighlighterRegex.FromToml(nodeRegex);
@@ -122,20 +122,18 @@ bool Language::LoadLanguages(std::string_view directory) {
 			}
 			
 			if (auto tblColors = tblSyntaxHighlight->get_as<toml::table>("colors")) {
-				language->syntaxColors.reserve(tblColors->size());
+				language->syntaxColors.Reserve(tblColors->size());
 				for (auto nodeColor : *tblColors) {
 					Color color {};
 					if (!Color::FromToml(nodeColor.second, &color))
 						continue;
 					
-					language->syntaxColors.push_back(SyntaxColor {
-						.label = std::string {nodeColor.first},
-						.color = color});
+					language->syntaxColors.Upsert(std::string {nodeColor.first}, color);
 				}
 			}
 		}
 		
-		if (auto nodeTools = tblLanguage.get("tools"))
+		if (auto nodeTools = tblLanguage.get("Tools"))
 			Tool::FromToml(nodeTools, &language->tools);
 		
 		languages.push_back(std::move(language));
@@ -165,28 +163,6 @@ void Language::UnloadLanguages() {
 
 bool Language::HasLanguageServer() const {
 	return serverStartup != Startup_Never;
-}
-
-// @DUMMY
-static D2D1_COLOR_F GetColorForLabel(std::string_view label) {
-	if (label == "keyword")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "function")
-		return D2D1::ColorF(D2D1::ColorF::LemonChiffon);
-	else if (label == "controlFlow")
-		return D2D1::ColorF(D2D1::ColorF::RoyalBlue);
-	else if (label == "string")
-		return D2D1::ColorF(D2D1::ColorF::LightSalmon);
-	else if (label == "comment")
-		return D2D1::ColorF(D2D1::ColorF::LightGray);
-	else if (label == "type")
-		return D2D1::ColorF(D2D1::ColorF::DarkTurquoise);
-	else if (label == "preprocessor")
-		return D2D1::ColorF(D2D1::ColorF::HotPink);
-	else if (label == "number")
-		return D2D1::ColorF(D2D1::ColorF::LimeGreen);
-	else
-		return D2D1::ColorF(D2D1::ColorF::White);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

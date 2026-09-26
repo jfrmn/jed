@@ -1,6 +1,6 @@
 #pragma once
 #include "basic.hh"
-#include "language/syntaxhighlighter.h"
+#include "language/syntaxhighlighter.hh"
 #include "util/regex.hh"
 
 #include <string>

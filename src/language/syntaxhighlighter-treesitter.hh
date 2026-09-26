@@ -1,5 +1,5 @@
 #pragma once
-#include "language/syntaxhighlighter.h"
+#include "language/syntaxhighlighter.hh"
 #include <string>
 
 namespace toml { class node; }
