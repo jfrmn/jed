@@ -639,5 +639,6 @@ found_editor:
 			.message = std::string(diagnostics.message),
 			.severity = static_cast<Diagnostics::Severity>(diagnostics.severity) });
 	}
+	editor->editorDiagnostics.Sort();
 	editor->editorDiagnostics.diagnosticsVersion++;	
 }

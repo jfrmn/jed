@@ -1172,7 +1172,38 @@ bool Editor::HandleEvent(const Event& event) {
 		return true;
 
 	if (event.type == Event::Type_Command) {
-		if (event.cmd.id == Command::Id_Editor_OpenSearch) {		
+		if (event.cmd.id == Command::Id_GotoNextDiagnosticRecord || event.cmd.id == Command::Id_GotoPrevDiagnosticRecord) {
+			if (textController.isEditCaretsMode) return false;
+			
+			const std::scoped_lock lock {editorDiagnostics.mutex};
+			
+			TextPosition caretPosition;
+			if (TextPosition from, to; textController.carets.front().GetSelection(&from, &to)) caretPosition = from;
+			else caretPosition = textController.carets.front().position;
+			
+			const EditorDiagnostics::Record* targetRecord = nullptr;
+			
+			if (event.cmd.id == Command::Id_GotoNextDiagnosticRecord) {
+				for (const EditorDiagnostics::Record& record : editorDiagnostics.records) {
+					if (record.from > caretPosition) {
+						targetRecord = &record;
+						break;
+					}
+				}
+				
+			} else {
+				for (const EditorDiagnostics::Record& record : editorDiagnostics.records) {
+					if (record.from >= caretPosition) break;
+					targetRecord = &record;
+				}
+			}
+			
+			if (targetRecord) {
+				textController.SetSelection(targetRecord->from, targetRecord->to);
+				ScrollToLine(targetRecord->from.line);
+			}
+			
+		} else if (event.cmd.id == Command::Id_Editor_OpenSearch) {		
 			const bool showReplace = event.cmd.parameters.front().boolValue;
 			
 			if (auto search = dynamic_cast<EditorSearch*>(toolWindow)) {

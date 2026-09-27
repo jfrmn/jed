@@ -40,6 +40,7 @@ struct EditorDiagnostics {
 	void Reset();
 	u64 RecordCount() const;
 	bool IsEmpty() const;
+	void Sort();
 	
 	      Record& operator[](u64 i);
 	const Record& operator[](u64 i) const;

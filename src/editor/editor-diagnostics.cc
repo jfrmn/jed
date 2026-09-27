@@ -1,4 +1,5 @@
 #include "editor-diagnostics.hh"
+#include <algorithm>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void EditorDiagnostics::Reset() {
@@ -14,6 +15,12 @@ u64 EditorDiagnostics::RecordCount() const {
 
 bool EditorDiagnostics::IsEmpty() const {
 	return records.empty();
+}
+
+void EditorDiagnostics::Sort() {
+	std::sort(records.begin(), records.end(), [] (const Record& lhs, const Record& rhs) {
+		return (lhs.from < rhs.from);
+	});
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
