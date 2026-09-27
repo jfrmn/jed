@@ -3,12 +3,14 @@
 #include "util.hh"
 #include "logging.hh"
 #include "tools.hh"
+#include "app.hh"
 
 #include "util/diagnostics.hh"
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/animation.hh"
 #include "graphics.hh"
+#include "editor/editor.hh"
 
 #include <charconv>
 #include <algorithm>
@@ -878,57 +880,72 @@ void ToolOutput::OnMouseWheel(f32 distance) {
 }
 
 bool ToolOutput::HandleEvent(const Event& event) {
-	if (event.type != Event::Type_Command) return false;
-	
-	if (event.cmd.id == Command::Id_GotoNextDiagnosticRecord) {
-		selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
-		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
-		return true;
+	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_RETURN) {
+		if (selectedDiagnosticsRecord == U64_MAX) return true;
 		
-	} else if (event.cmd.id == Command::Id_GotoPrevDiagnosticRecord) {
-		selectedDiagnosticsRecord = DecrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
-		UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
-		return true;
-	
-	} else if (event.cmd.id == Command::Id_ToolOutput_TerminateProcess) {
-		if (process) process->Terminate();
+		const EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
+		if (record.file.empty()) return true;
+		
+		const App::OpenBehavior openBehav = OpenBehaviorFromModifiers(event.keypress.mods);
+		Editor* editor = app.OpenEditor(record.file, openBehav);
+		
+		if (record.line != 0u)
+			editor->ScrollToLine(record.line);
+		
 		return true;
 	
-	} else if (event.cmd.id == Command::Id_Clipboard_Copy) {
-		if (selectionStart == selectionEnd) return false; // we could consume the command or not. Up for debate...
-		
-		const std::string& startLine = lines[selectionStart.line];
-		const std::string& endLine   = lines[selectionEnd.line];
-		
-		OpenClipboard(mainWindow.hWnd);
-		DEFER(CloseClipboard());
-		
-		EmptyClipboard();
-		
-		u64 totalSize = 0u;
-		IterateTextRange(selectionStart, selectionEnd, [&] (u64 ln, u64 from, u64 to) {
-			if (to == U64_MAX)
-				to = lines[ln].size();
-			totalSize += (to - from);
-		});
-		
-		HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, totalSize + 1u);
-		char* mem = static_cast<char*>(GlobalLock(hGlobal));
-		
-		u64 alreadyCopied = 0u;
-		IterateTextRange(selectionStart, selectionEnd, [&] (u64 ln, u64 from, u64 to) {
-			const std::string_view line = lines[ln];
-			if (to == U64_MAX)
-				to = line.size();
+	} else if (event.type == Event::Type_Command) {
+	
+		if (event.cmd.id == Command::Id_GotoNextDiagnosticRecord) {
+			selectedDiagnosticsRecord = IncrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
+			UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
+			return true;
 			
-			const u64 cnt = to - from;
-			memcpy_s(mem + alreadyCopied, totalSize - alreadyCopied, line.data() + from, cnt);
-			alreadyCopied += cnt;
-		});
+		} else if (event.cmd.id == Command::Id_GotoPrevDiagnosticRecord) {
+			selectedDiagnosticsRecord = DecrementWrapAround(selectedDiagnosticsRecord, diagnosticsRecords.size());
+			UpdateFilePreview(this, diagnosticsRecords[selectedDiagnosticsRecord]);
+			return true;
 		
-		GlobalUnlock(hGlobal);
-		SetClipboardData(CF_TEXT, hGlobal);
-		return true;
+		} else if (event.cmd.id == Command::Id_ToolOutput_TerminateProcess) {
+			if (process) process->Terminate();
+			return true;
+		
+		} else if (event.cmd.id == Command::Id_Clipboard_Copy) {
+			if (selectionStart == selectionEnd) return false; // we could consume the command or not. Up for debate...
+			
+			const std::string& startLine = lines[selectionStart.line];
+			const std::string& endLine   = lines[selectionEnd.line];
+			
+			OpenClipboard(mainWindow.hWnd);
+			DEFER(CloseClipboard());
+			
+			EmptyClipboard();
+			
+			u64 totalSize = 0u;
+			IterateTextRange(selectionStart, selectionEnd, [&] (u64 ln, u64 from, u64 to) {
+				if (to == U64_MAX)
+					to = lines[ln].size();
+				totalSize += (to - from);
+			});
+			
+			HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, totalSize + 1u);
+			char* mem = static_cast<char*>(GlobalLock(hGlobal));
+			
+			u64 alreadyCopied = 0u;
+			IterateTextRange(selectionStart, selectionEnd, [&] (u64 ln, u64 from, u64 to) {
+				const std::string_view line = lines[ln];
+				if (to == U64_MAX)
+					to = line.size();
+				
+				const u64 cnt = to - from;
+				memcpy_s(mem + alreadyCopied, totalSize - alreadyCopied, line.data() + from, cnt);
+				alreadyCopied += cnt;
+			});
+			
+			GlobalUnlock(hGlobal);
+			SetClipboardData(CF_TEXT, hGlobal);
+			return true;
+		}
 	}
 	
 	return false;
@@ -1079,7 +1096,7 @@ static void MatchDiagnostics(ToolOutput* self, const std::string* line) {
 		
 		if (fcr.ec != std::errc()) {
 			PushFailedToParseDiagnostics(self, "group-line", fcr, group.begin-line->data(), group.end-line->data());
-			record.line = 0u;
+			record.line = 0;
 		}
 		
 		if (self->tool->diagnostics.linesStartAtOne && record.line > 0u)
