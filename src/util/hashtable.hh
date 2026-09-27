@@ -30,17 +30,22 @@ struct Hashtable {
 	void Reserve(u64 expectedItems);
 	void Grow(u64 newSize);
 	
+	// returns true if the key didn't exist and the value was inserted
+	// otherwise returns false
 	bool InsertWithHash(std::string_view key, u64 hash, T value);
+	// returns true if the key didn't exists and the value was inserted
+	// otherwise the existing value gets updated and the function returns false
 	bool UpsertWithHash(std::string_view key, u64 hash, T value);
 	T* LookupWithHash(std::string_view key, u64 hash);
 	
 	bool Insert(std::string_view key, T value) { return this->InsertWithHash(key, HashString(key), value); }
 	bool Upsert(std::string_view key, T value) { return this->UpsertWithHash(key, HashString(key), value); }
   
-	const T* Lookup(std::string_view key) const                   { return const_cast<Hashtable<T>*>(this)->Lookup(key); }
+	      T* Lookup(std::string_view key)                         { return this->LookupWithHash(key, HashString(key)); }
+	const T* Lookup(std::string_view key) const                   { return const_cast<Hashtable<T>*>(this)->LookupWithHash(key, HashString(key)); }
 	const T* LookupWithHash(std::string_view key, u64 hash) const { return const_cast<Hashtable<T>*>(this)->LookupWithHash(key, hash); }
-	      T* operator[](std::string_view key)                     { return this->Lookup(key); }
-	const T* operator[](std::string_view key) const               { return const_cast<Hashtable<T>*>(this)->Lookup(key); }
+	      T* operator[](std::string_view key)                     { return this->LookupWithHash(key, HashString(key)); }
+	const T* operator[](std::string_view key) const               { return const_cast<Hashtable<T>*>(this)->LookupWithHash(key, HashString(key)); }
 };
 
 template<class T>
@@ -53,12 +58,12 @@ template<class T>
 void Hashtable<T>::Grow(u64 newSize) {
 	auto newSlots = std::make_unique<Slot[]>(newSize);
 	
-	for (u64 i = 0u; i < size; i++) {
+	for (u64 i = 0u; i < occupied; i++) {
 		Slot& oldSlot = slots[i];
 		
 		const u64 startIndex = oldSlot.hash % newSize;
-		for (u64 i = 0; i < newSize; i++) {
-			const u64 index = (startIndex + i) % newSize;
+		for (u64 j = 0; j < newSize; j++) {
+			const u64 index = (startIndex + j) % newSize;
 			Slot& targetSlot = newSlots[index];
 			if (!targetSlot.IsOccupied()) {
 				targetSlot = std::move(oldSlot);
@@ -84,8 +89,8 @@ static void Hashtable_MaybeGrow(Hashtable<T>* self) {
 		return;
 	}
 	
-	const f32 loadFactory = static_cast<f32>(self->occupied) / self->size;
-	if (loadFactory < Hashtable<T>::MAX_LOAD_FACTOR)
+	const f32 loadFactor = static_cast<f32>(self->occupied) / self->size;
+	if (loadFactor >= Hashtable<T>::MAX_LOAD_FACTOR)
 		self->Grow(self->size * Hashtable<T>::GROW_FACTOR);
 }
 
