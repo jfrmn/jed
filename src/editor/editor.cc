@@ -793,7 +793,7 @@ void Editor::Update() {
 		const float lineNumbersWidth = GetLineNumberWidth();
 		const D2D_SIZE_F textAreaSize {
 			.width  = RectWidth(area) - lineNumbersWidth,
-			.height = RectHeight(area) };
+			.height = RectHeight(area)};
 		const D2D1_MATRIX_3X2_F scrollTransform = D2D1::Matrix3x2F::Translation(scrollarea.vpX, -scrollarea.vpY);
 		
 		// render glyphs to bitmap
@@ -824,7 +824,6 @@ void Editor::Update() {
 		
 		DEFER(bitmapGlyphs->Release());
 
-		// @TODO we could just reuse the other rendertarget??
 		// apply syntax highlighting
 		{
 			ID2D1BitmapRenderTarget* renderTargetColor = nullptr;

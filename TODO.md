@@ -30,10 +30,10 @@
 * synatx highlighting in scrollbar preview and file preview
 * open explorer at current file (maybe a command?)
 * **STARTED** detect file changes -> watch settings and external files
+* Command line Parameters
 
 # MINOR TASKS
 
-* refactor animation so that all animations use the same logic
 * refactor statu-bar to utilize the new glyph run better (e.g. use draw partial at text pos)
 * get rid of OnMouseWheel and OnResize etc.
 * .clangd only really accepts absolute include paths. Relative paths are relative to eicher the current file or the compilation database. The compilation database has the msvc commands in it so that is not an option. Therefore generate .clangd from build.ps1
