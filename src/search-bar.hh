@@ -62,7 +62,7 @@ protected:
 	virtual ~SearchBar() noexcept;
 
 public:
-	void OnUpdate();
+	void Update();
 	virtual void Open();
 	
 	void UpdateItem(u64 i, const UpdateItemParams& params);

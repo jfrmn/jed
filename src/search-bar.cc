@@ -42,7 +42,7 @@ SearchBar::~SearchBar() noexcept {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static float ItemHeight() {
+static f32 ItemHeight() {
 	return MARGIN_X2 + (settings.fontUi.lineHeight * 2);
 }
 
@@ -62,7 +62,7 @@ void SearchBar::Open() {
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void SearchBar::OnUpdate() {
+void SearchBar::Update() {
 
 	if (parameterConfigurator) {
 		parameterConfigurator->Update();
@@ -200,8 +200,8 @@ void SearchBar::SetItemCount(u64 newItemCount) {
 		itemCount = newItemCount;
 		scrollarea.totalSize.height = itemCount * ItemHeight();
 		area.bottom = std::min(
-			area.top + MARGIN_X2 + textBox.Height() + (itemCount * ItemHeight()),
-			mainWindow.height - MARGIN);
+			area.top + (itemCount * ItemHeight()),
+			mainWindow.height - PADDING_X2 - settings.fontUi.lineHeight - MARGIN);
 	}
 }
 
@@ -216,7 +216,7 @@ void SearchBar::OnResize() {
 		.right  = mainWindow.width * 0.7f,
 		.bottom = std::min(
 			itemAreaTop + (itemCount * ItemHeight()),
-			mainWindow.height - MARGIN)};
+			mainWindow.height - PADDING_X2 - settings.fontUi.lineHeight - MARGIN)};
 	
 	textBox.position = D2D_POINT_2F {
 		.x = area.left + MARGIN,

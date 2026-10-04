@@ -732,7 +732,7 @@ void App::Update() {
 	// draw search bar
 	//
 	if (searchBar) {
-		searchBar->OnUpdate();
+		searchBar->Update();
 		
 		if (searchBar->shouldClose)
 			searchBar = nullptr;
