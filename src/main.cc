@@ -9,6 +9,8 @@
 
 #include "ui/window.hh"
 #include "ui/animation.hh"
+#include "ui/icons.hh"
+
 #include "logging.hh"
 #include "file-watcher.hh"
 
@@ -65,6 +67,11 @@ bool Init() {
 		return false;
 	}
 	
+	if (!icons.Init(mainWindow.deviceContext)) {
+		LogFatal("init icons failed");
+		return false;
+	}
+	
 	if (!Language::LoadLanguages(".\\config\\languages"))
 		LogError("failed to load languages");
 	
@@ -83,9 +90,10 @@ bool Init() {
 
 void Shutdown() {
 	app.Shutdown();
-	mainWindow.CleanUp();
 	fileWatcher.Shutdown();
+	mainWindow.CleanUp();
 	ShutdownGraphics();
+	icons.Shutdown(); 
 	ShutdownFactories();
 	CloseLogger();
 }

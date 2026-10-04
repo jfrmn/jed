@@ -91,11 +91,11 @@ void EditorTextLocationList::Update() {
 					.top    = posY,
 					.right  = position.x + width, //runLabel.GetTotalAdvance() + runFullPath.GetTotalAdvance() + PADDING_X3,
 					.bottom = position.y + settings.fontUi.lineHeight},
-				settings.GetBrushSelection());
+				settings.colors.UseSelection());
 		}
 		
-		runLabel.Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.GetBrushUiText());
-		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (settings.fontUi.lineHeight * i), settings.fontUi, settings.GetBrushUiText(false));
+		runLabel.Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.colors.UseUiText());
+		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (settings.fontUi.lineHeight * i), settings.fontUi, settings.colors.UseUiText(false));
 	}
 	
 	//

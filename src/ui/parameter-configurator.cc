@@ -122,7 +122,7 @@ void ParameterConfigurator::Update() {
 					areaButton[i],
 					UseColor(isEnabled[i] ? backgroundColors[i] : settings.colors.uiBackground));
 			} else {
-				deviceContext->FillRectangle(areaButton[i], settings.GetBrushUiBackground(false));
+				deviceContext->FillRectangle(areaButton[i], settings.colors.UseUiBackground((false)));
 			}
 			
 			staticGlyphRun.Shape(text[i], settings.fontUi);
@@ -130,7 +130,7 @@ void ParameterConfigurator::Update() {
 				areaButton[i].left + (RectWidth(areaButton[i]) / 2.0f) - (staticGlyphRun.width / 2.0f),
 				areaButton[i].top + PADDING,
 				settings.fontUi,
-				settings.GetBrushUiText(isEnabled[i]));
+				settings.colors.UseUiText(isEnabled[i]));
 		}
 	}
 		
@@ -150,7 +150,7 @@ void ParameterConfigurator::Update() {
 			.bottom = area.top + ((i+1) * itemHeight)};
 		
 		run.Shape(item.parameter->name, settings.fontUi);
-		run.Draw(deviceContext, itemArea.left + MARGIN, itemArea.top + PADDING_X2, settings.fontUi, settings.GetBrushUiText());
+		run.Draw(deviceContext, itemArea.left + MARGIN, itemArea.top + PADDING_X2, settings.fontUi, settings.colors.UseUiText());
 		
 		const bool isSelected = (i == selectedItem);
 		
@@ -171,9 +171,9 @@ void ParameterConfigurator::Update() {
 						.right = textBoxArea.left,
 						.bottom = textBoxArea.bottom});
 						
-					deviceContext->DrawRoundedRectangle(areaMinusButton, settings.GetBrushUiText(isSelected));
+					deviceContext->DrawRoundedRectangle(areaMinusButton, settings.colors.UseUiText(isSelected));
 					if (mouse.Hittest(areaMinusButton.rect, this, OnClickMinus, i))
-						deviceContext->FillRoundedRectangle(areaMinusButton, settings.GetBrushHover(mouse.isDown));
+						deviceContext->FillRoundedRectangle(areaMinusButton, settings.colors.UseHover(mouse.isDown));
 				}
 				
 				{
@@ -183,9 +183,9 @@ void ParameterConfigurator::Update() {
 						.right = textBoxArea.right + btnWidth,
 						.bottom = textBoxArea.bottom});
 				
-					deviceContext->DrawRoundedRectangle(areaPlusButton, settings.GetBrushUiText(isSelected));
+					deviceContext->DrawRoundedRectangle(areaPlusButton, settings.colors.UseUiText(isSelected));
 					if (mouse.Hittest(areaPlusButton.rect, this, OnClickPlus, i))
-						deviceContext->FillRoundedRectangle(areaPlusButton, settings.GetBrushHover(mouse.isDown));
+						deviceContext->FillRoundedRectangle(areaPlusButton, settings.colors.UseHover(mouse.isDown));
 				}
 			}
 			
@@ -198,7 +198,7 @@ void ParameterConfigurator::Update() {
 				.right = itemArea.left + (RectWidth(area) / 2.0f) + PADDING + settings.fontUi.lineHeight,
 				.bottom = itemArea.bottom - PADDING_X2};
 			
-			deviceContext->DrawRectangle(checkboxArea, settings.GetBrushUiText(isSelected));
+			deviceContext->DrawRectangle(checkboxArea, settings.colors.UseUiText(isSelected));
 			
 			if (item.isChecked) {
 				deviceContext->FillRectangle(
@@ -207,7 +207,7 @@ void ParameterConfigurator::Update() {
 						checkboxArea.top + 2u,
 						checkboxArea.right - 2u,		
 						checkboxArea.bottom - 3u},
-					settings.GetBrushUiText(isSelected));
+					settings.colors.UseUiText(isSelected));
 			}
 		
 		// draw dropdown
@@ -228,9 +228,9 @@ void ParameterConfigurator::Update() {
 					.top  = y + PADDING,
 					.right = itemArea.right - PADDING,
 					.bottom = itemArea.bottom - PADDING},
-				settings.GetBrushUiBackground(isSelected));
+				settings.colors.UseUiBackground((isSelected)));
 				
-			staticGlyphRun.Draw(deviceContext, x + PADDING_X2, y + PADDING_X2, settings.fontUi, settings.GetBrushUiText());
+			staticGlyphRun.Draw(deviceContext, x + PADDING_X2, y + PADDING_X2, settings.fontUi, settings.colors.UseUiText());
 			
 			if (isSelected && isDropDownOpen) {
 				const D2D_RECT_F dropdownArea {
@@ -249,10 +249,10 @@ void ParameterConfigurator::Update() {
 						.bottom = dropdownArea.top + (settings.fontUi.lineHeight * (j+1)) + PADDING};
 								
 					if (j == item.selectedEnumIndex)
-						deviceContext->FillRectangle(dropDownItemArea, settings.GetBrushSelection());
+						deviceContext->FillRectangle(dropDownItemArea, settings.colors.UseSelection());
 					
 					staticGlyphRun.Shape(item.parameter->enumValues[j].name, settings.fontUi);
-					staticGlyphRun.Draw(deviceContext, dropDownItemArea.left + PADDING, dropDownItemArea.top, settings.fontUi, settings.GetBrushUiText());
+					staticGlyphRun.Draw(deviceContext, dropDownItemArea.left + PADDING, dropDownItemArea.top, settings.fontUi, settings.colors.UseUiText());
 				}
 			}
 		}

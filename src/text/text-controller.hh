@@ -20,7 +20,7 @@ struct TextController {
 		 LineEnding_CrLf,
 		 LineEnding_Lf,
 		 LineEnding_Cr,
-		 LineEnding_MAX
+		 LineEnding_COUNT
 	};
 	
 	struct Caret {

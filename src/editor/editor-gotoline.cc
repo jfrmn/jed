@@ -78,7 +78,7 @@ void EditorGotoLine::Update() {
 	    area.left + MARGIN, 
 	    area.top  + MARGIN,
 	    settings.fontUi,
-	    settings.GetBrushUiText());
+	    settings.colors.UseUiText());
 	
 	deviceContext->DrawLine(
 		D2D1_POINT_2F {
@@ -87,7 +87,7 @@ void EditorGotoLine::Update() {
 		D2D1_POINT_2F {
 			.x = area.left + MARGIN + glyphRunHeadline.width,
 			.y = area.top  + MARGIN + settings.fontUi.lineHeight },
-		settings.GetBrushUiText());
+		settings.colors.UseUiText());
 
 	//
 	// draw textbox

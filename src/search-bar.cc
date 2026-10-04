@@ -140,7 +140,7 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 		.bottom = itemAreaTop - scrollarea.vpY + (itemHeight * (i+1))};
 		
 	if (selectedItem == i) {
-		ID2D1SolidColorBrush* brushGlow = settings.GetBrushDropShadow();
+		ID2D1SolidColorBrush* brushGlow = settings.colors.UseDropShadow();
 		const f32 opacityBefore = brushGlow->GetOpacity();
 		DEFER(brushGlow->SetOpacity(opacityBefore));
 		
@@ -152,7 +152,13 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 	
 	f32 prefixOffset = 0.0f;
 	if (!params.prefix.empty()) {
-		staticGlyphRun.ShapeAndDraw(deviceContext, params.prefix, MARGIN + itemArea.left, MARGIN + itemArea.top, settings.fontUi,  UseColor(settings.colors.editorMultiCaretEdit));
+		staticGlyphRun.ShapeAndDraw(
+			deviceContext,
+			params.prefix,
+			MARGIN + itemArea.left,
+			MARGIN + itemArea.top,
+			settings.fontUi,
+			settings.colors.UseEditorMultiCaret());
 		prefixOffset = staticGlyphRun.width + PADDING;
 	}
 	
@@ -170,23 +176,23 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 		    .top    = MARGIN + itemArea.top,
 		    .right  = MARGIN + itemArea.left + prefixOffset + offsetTo,
 		    .bottom = MARGIN + itemArea.top + settings.fontUi.lineHeight},
-		settings.GetBrushUiSearchResult());
+		settings.colors.UseSearchResult());
 
 	staticGlyphRun.Draw(deviceContext,
 		MARGIN + itemArea.left + prefixOffset,
 	    MARGIN + itemArea.top,
 		settings.fontUi,
-		settings.GetBrushUiText());
+		settings.colors.UseUiText());
 		
 	staticGlyphRun.ShapeAndDraw(deviceContext, 
 		params.subText,
 		MARGIN + itemArea.left,
 	    MARGIN + itemArea.top + settings.fontUi.lineHeight,
 		settings.fontUi,
-		settings.GetBrushUiText(false));
+		settings.colors.UseUiText(false));
 	
 	if (mouse.Hittest(itemArea, this, OnClickItem))
-		deviceContext->FillRectangle(itemArea, settings.GetBrushHover(mouse.isDown));
+		deviceContext->FillRectangle(itemArea, settings.colors.UseHover(mouse.isDown));
 }
 
 void SearchBar::SetItemCount(u64 newItemCount) {

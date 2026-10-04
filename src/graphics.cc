@@ -278,3 +278,90 @@ ID2D1SolidColorBrush* UseColor(const Color& clr) {
 	brush->SetColor(clr.ToD2D());
 	return brush;
 }
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+static ID2D1Bitmap* LoadImageInternal(ID2D1RenderTarget* rt, IStream* stream) {
+	
+	IWICBitmapDecoder* decoder = nullptr;	
+	if (HRESULT hr = wicFactory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnDemand,  &decoder); hr != S_OK) {
+		LogError("Failed to create IWICBitmapDecoder. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	DEFER(decoder->Release());
+	
+	IWICBitmapFrameDecode* frame = nullptr;
+	if (HRESULT hr = decoder->GetFrame(0, &frame); hr != S_OK) {
+		LogError("Failed to get frame from decoder. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	DEFER(frame->Release());
+	
+	IWICFormatConverter* converter = nullptr;
+	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
+		LogError("Failed to create IWICFormatConverter. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	DEFER(converter->Release());
+	
+	// GUID_WICPixelFormat32bppPBGRA
+	if (HRESULT hr = converter->Initialize(frame, GUID_WICPixelFormat8bppAlpha, WICBitmapDitherTypeNone, nullptr, 0.0f, WICBitmapPaletteTypeCustom); hr != S_OK) {
+		LogError("Failed to initialize decoder. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	
+	ID2D1Bitmap* bitmap = nullptr;
+	if (HRESULT hr = rt->CreateBitmapFromWicBitmap(converter, &bitmap); hr != S_OK) {
+		LogError("Failed to create ID2D1Bitmap from IWICBitmapFrameDecode. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	
+	return bitmap;
+}
+
+ID2D1Bitmap* LoadBitmapFromFile(ID2D1RenderTarget* rt, const wchar_t* filename) {
+	
+	IWICStream* stream = nullptr;
+	if (HRESULT hr = wicFactory->CreateStream(&stream); hr != S_OK) {
+		LogError("Failed to create stream. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	DEFER(stream->Release());
+	
+	if (HRESULT hr = stream->InitializeFromFilename(filename, GENERIC_READ); hr != S_OK) {
+		LogError("Failed to initialize stream from filenmae. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	
+	return LoadImageInternal(rt, stream);
+}
+
+ID2D1Bitmap* LoadBitmapFromResource(ID2D1RenderTarget* rt, HRSRC hResource) {
+	HGLOBAL hData = LoadResource(NULL, hResource);
+	if (!hData) {
+		LogError("Failed to load resource. Last Error: %s", StrLastErr(GetLastError()));
+		return nullptr;
+	}
+
+	void* memory = LockResource(hData);
+	if (!memory) {
+		LogError("Failed to lock resource. Last Error: %s", StrLastErr(GetLastError()));
+		return nullptr;
+	}
+	DEFER(FreeResource(hData));
+	
+	const u32 memorySize = SizeofResource(NULL, hResource);
+
+	IWICStream* stream = nullptr;
+	if (HRESULT hr = wicFactory->CreateStream(&stream); hr != S_OK) {
+		LogError("Failed to create stream. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+	DEFER(stream->Release());
+	
+	if (HRESULT hr = stream->InitializeFromMemory(static_cast<BYTE*>(memory), memorySize); hr != S_OK) {
+		LogError("Failed to initialize stream from memory. HRESULT: %s", StrHr(hr));
+		return nullptr;
+	}
+
+	return LoadImageInternal(rt, stream);
+}

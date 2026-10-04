@@ -2,30 +2,31 @@
 #include "basic.hh"
 #include "settings.hh"
 #include "graphics.hh"
+#include "ui/icons.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1_1.h>
 
-const Color Diagnostics::SEVERITY_COLORS[] {
+const Color Diagnostics::COLORS[] {
 	Color::FromKnown(D2D1::ColorF::White),
 	Color::FromKnown(D2D1::ColorF::Red),
 	Color::FromKnown(D2D1::ColorF::Yellow),
 	Color::FromKnown(D2D1::ColorF::Green),
 	Color::FromKnown(D2D1::ColorF::LightBlue)};
 	
-static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_COLORS) == Diagnostics::Severity_MAX);
+static_assert(STATIC_ARRAY_SIZE(Diagnostics::COLORS) == Diagnostics::Severity_COUNT);
 
-ID2D1Bitmap** Diagnostics::SEVERITY_ICONS[]{
-	&settings.icons.unknown,
-	&settings.icons.editorDiagnosticsError,
-	&settings.icons.editorDiagnosticsWarning,
-	&settings.icons.editorDiagnosticsInfo,
-	&settings.icons.editorDiagnosticsHint};
+const int Diagnostics::ICONS[] {
+	ICON_UNKNOWN,
+	ICON_EDITORDIAGNOSTICS_ERROR,
+	ICON_EDITORDIAGNOSTICS_WARNING,
+	ICON_EDITORDIAGNOSTICS_INFO,
+	ICON_EDITORDIAGNOSTICS_HINT};
 
-static_assert(STATIC_ARRAY_SIZE(Diagnostics::SEVERITY_ICONS) == Diagnostics::Severity_MAX);
+static_assert(STATIC_ARRAY_SIZE(Diagnostics::ICONS) == Diagnostics::Severity_COUNT);
 
 ID2D1SolidColorBrush* Diagnostics::GetServerityBrush(Diagnostics::Severity sev) {
-	brush->SetColor(SEVERITY_COLORS[sev].ToD2D());
+	brush->SetColor(COLORS[sev].ToD2D());
 	return brush;
 }

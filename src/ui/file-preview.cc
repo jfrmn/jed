@@ -259,7 +259,7 @@ void FilePreview::OnUpdate() {
 	// lines
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
-		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.GetBrushEditorText());
+		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.colors.UseEditorText());
 	}
 	
 	if (highlightMode != HighlightMode_None) {

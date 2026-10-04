@@ -4,6 +4,7 @@ struct ID2D1Factory;
 struct IDWriteFactory;
 struct IWICImagingFactory;
 struct ID2D1DeviceContext;
+struct ID2D1RenderTarget;
 struct ID2D1SolidColorBrush;
 struct ID2D1StrokeStyle;
 struct ID2D1Bitmap;
@@ -11,6 +12,7 @@ struct ID2D1BitmapRenderTarget;
 struct D2D_RECT_F;
 struct D2D_POINT_2F;
 struct D2D_SIZE_F;
+struct HRSRC__;
 union Color;
 
 
@@ -82,3 +84,13 @@ extern ID2D1SolidColorBrush* brush;
 
 // set the color of the global brush and return that brush
 ID2D1SolidColorBrush* UseColor(const Color& clr);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Image loading
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+ID2D1Bitmap* LoadBitmapFromFile(ID2D1RenderTarget* rt, const wchar_t* filename);
+ID2D1Bitmap* LoadBitmapFromResource(ID2D1RenderTarget* rt, HRSRC__* hResource);
+

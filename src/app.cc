@@ -11,6 +11,7 @@
 #include "editor/editor.hh"
 #include "ui/constants.h"
 #include "ui/animation.hh"
+#include "ui/icons.hh"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -476,7 +477,7 @@ void App::Update() {
 			.top = tabHeight,
 			.right = mainWindow.width,
 			.bottom = mainWindow.height - tabHeight},
-		settings.GetBrushEditorBackground());
+		settings.colors.UseEditorBackground());
 	
 	//
 	// draw panels
@@ -501,7 +502,7 @@ void App::Update() {
 				.bottom = panel.editor->area.bottom};
 			
 			if (i == focusedPanelIndex) {
-				deviceContext->DrawRectangle(borderRect, settings.GetBrushDropShadow(), 2.0f);
+				deviceContext->DrawRectangle(borderRect, settings.colors.UseDropShadow(), 2.0f);
 			} else if (RectContains(panel.editor->area, mouse.x, mouse.y)) {
 				if (mainWindow.event.type == Event::Type_MouseDown) focusedPanelIndex = i;
 			}
@@ -525,18 +526,18 @@ void App::Update() {
 				.bottom = tabHeight};
 						
 			if (tab.panelIndex == focusedPanelIndex)
-				deviceContext->FillRectangle(tabRect, settings.GetBrushDropShadow());
+				deviceContext->FillRectangle(tabRect, settings.colors.UseDropShadow());
 			
 			else if (tab.panelIndex != U64_MAX)
-				deviceContext->FillRectangle(tabRect, settings.GetBrushUiBackground(false));
+				deviceContext->FillRectangle(tabRect, settings.colors.UseUiBackground(false));
 			
-			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, settings.fontUi, settings.GetBrushUiText());
+			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, settings.fontUi, settings.colors.UseUiText());
 			
 			if (tab.editor->fileRemoved) {
 				deviceContext->DrawLine(
 					D2D_POINT_2F {PADDING + offsetX,                   PADDING + settings.fontUi.strikethroughOffset},
 					D2D_POINT_2F {PADDING + offsetX + tab.title.width, PADDING + settings.fontUi.strikethroughOffset},
-					settings.GetBrushUiText());
+					settings.colors.UseUiText());
 			}
 			
 			bool isTitleHovered = false;
@@ -550,7 +551,7 @@ void App::Update() {
 					.bottom = tabHeight};
 				
 				if (mouse.Hittest(areaTitle, this, OnActivateTab, i)) {
-					deviceContext->FillRectangle(areaTitle, settings.GetBrushHover(mouse.isDown));
+					deviceContext->FillRectangle(areaTitle, settings.colors.UseHover(mouse.isDown));
 					isTitleHovered = true;
 						
 					// draw preview panel
@@ -579,13 +580,13 @@ void App::Update() {
 						// draw header						
 						deviceContext->FillRoundedRectangle(ToRounded(
 							MakeRect(previewPanelArea.left, previewPanelArea.top, width, settings.fontUi.lineHeight + PADDING_X2)),
-							settings.GetBrushUiBackground());
+							settings.colors.UseUiBackground());
 						
 						staticGlyphRun.Draw(deviceContext,
 							previewPanelArea.left + PADDING,
 							previewPanelArea.top + PADDING,
 							settings.fontUi,
-							settings.GetBrushUiText(false));
+							settings.colors.UseUiText(false));
 						
 						auto GetYOffsetForLine = [fromLine] (u64 ln) {
 							return PADDING_X3 + settings.fontUi.lineHeight + (settings.fontEditor.lineHeight * (ln-fromLine));
@@ -597,7 +598,7 @@ void App::Update() {
 								previewPanelArea.left + PADDING,
 								previewPanelArea.top + GetYOffsetForLine(i),
 								settings.fontEditor,
-								settings.GetBrushEditorText());
+								settings.colors.UseEditorText());
 						}
 						
 						// draw caret
@@ -611,7 +612,7 @@ void App::Update() {
 									.top = previewPanelArea.top + offsetY,
 									.right = previewPanelArea.left + offsetX + settings.fontEditor.spaceAdvance,
 									.bottom = previewPanelArea.top + offsetY + settings.fontUi.lineHeight},
-								settings.GetBrushEditorText());
+								settings.colors.UseEditorText());
 						}
 						
 						deviceContext->PopAxisAlignedClip();
@@ -625,7 +626,7 @@ void App::Update() {
 								.top = tab.editor->area.top,
 								.right = tab.editor->area.right - 1.0f,
 								.bottom = tab.editor->area.bottom},
-							settings.GetBrushHover(),
+							settings.colors.UseHover(),
 							2.0f);
 					}
 				}
@@ -641,10 +642,10 @@ void App::Update() {
 			
 				const bool isHovered = mouse.Hittest(areaIcon, this, OnCloseTab, i);
 				
-				ID2D1Bitmap* icon = nullptr;
-				if      (tab.editor->isDirty && isHovered) icon = settings.icons.tabsModifiedHovered;
-				else if (tab.editor->isDirty)              icon = settings.icons.tabsModified;
-				else if (isHovered || isTitleHovered)      icon = settings.icons.tabsHovered;
+				int icon = ICON_UNKNOWN;
+				if      (tab.editor->isDirty && isHovered) icon = ICON_TABS_MODIFIEDHOVERED;
+				else if (tab.editor->isDirty)              icon = ICON_TABS_MODIFIED;
+				else if (isHovered || isTitleHovered)      icon = ICON_TABS_HOVERED;
 				
 				if (icon) {
 					const D2D1_RECT_F iconTargetRect {
@@ -652,10 +653,16 @@ void App::Update() {
 						.top    = areaIcon.top    + PADDING,
 						.right  = areaIcon.right  - PADDING,
 						.bottom = areaIcon.bottom - PADDING};
-					deviceContext->FillOpacityMask(icon, settings.GetBrushUiText(), &iconTargetRect, nullptr);
+					icons.DrawIcon(
+						deviceContext,
+						icon,
+						D2D_POINT_2F {
+							.x = areaIcon.left + PADDING,
+							.y = areaIcon.top  + PADDING},
+						RectWidth(areaIcon) - PADDING_X2);
 					
 					if (isHovered)
-						deviceContext->FillRectangle(areaIcon, settings.GetBrushHover(mouse.isDown));
+						deviceContext->FillRectangle(areaIcon, settings.colors.UseHover(mouse.isDown));
 				}
 			}
 	
@@ -690,15 +697,15 @@ void App::Update() {
 				.right  = (mainWindow.width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
 				.bottom = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
 			
-			deviceContext->DrawRoundedRectangle(ToRounded(buttonRect), settings.GetBrushUiBackground());
+			deviceContext->DrawRoundedRectangle(ToRounded(buttonRect), settings.colors.UseUiBackground());
 			
 			if ((i == 0 && searchBar) || i == 1 && explorer)
-				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.GetBrushUiBackground());
+				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.colors.UseUiBackground());
 			
-			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.GetBrushUiText());
+			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.colors.UseUiText());
 			
 			if (mouse.Hittest(buttonRect, this, OnClickStartPage, i))
-				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.GetBrushHover(mouse.isDown));
+				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.colors.UseHover(mouse.isDown));
 			
 			offsetY += settings.fontUi.lineHeight + PADDING_X2 + MARGIN_X2;
 		}
@@ -1070,7 +1077,7 @@ void App::HandleEvent(const Event& event) {
 			ASSERT_SOFT(tab.editor);
 			
 			if (tab.editor->isDirty) {
-				auto const saveResult = tab.editor->SaveFile();
+				auto const saveResult = tab.editor->CloseFile();
 				if (saveResult == Editor::FileResult_Failure)
 					return; // don't close
 			}

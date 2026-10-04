@@ -78,7 +78,7 @@ void EditorSignatureHelp::Update() {
 	// draw signature
 	//
 	{
-		runLabel.Draw(deviceContext, position.x + PADDING, position.y + PADDING, settings.fontEditor, settings.GetBrushUiText());
+		runLabel.Draw(deviceContext, position.x + PADDING, position.y + PADDING, settings.fontEditor, settings.colors.UseUiText());
 		
 		if (parameter && parameter->labelIsSubstring) {
 			
@@ -92,17 +92,22 @@ void EditorSignatureHelp::Update() {
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetTo,
 					.y = position.y + settings.fontEditor.underlineOffset},
-				settings.GetBrushUiText());
+				settings.colors.UseUiText());
 		}
 				
-		runDocumentation.Draw(deviceContext, position.x + PADDING, position.y + PADDING + settings.fontEditor.lineHeight, settings.fontUi, settings.GetBrushUiText(false));
+		runDocumentation.Draw(
+			deviceContext,
+			position.x + PADDING,
+			position.y + PADDING + settings.fontEditor.lineHeight,
+			settings.fontUi,
+			settings.colors.UseUiText(false));
 		
 		if (signatureCount > 1u) {
 			const std::string text = FormatString("%u/%u", activeSignature + 1u, signatureCount);
 			
 			GlyphRun runSignatureIndex {};
 			runSignatureIndex.Shape(text, settings.fontUi);
-			runSignatureIndex.Draw(deviceContext, position.x + width - PADDING - runSignatureIndex.width, position.y + PADDING + settings.fontEditor.lineHeight, settings.fontUi, settings.GetBrushUiText());
+			runSignatureIndex.Draw(deviceContext, position.x + width - PADDING - runSignatureIndex.width, position.y + PADDING + settings.fontEditor.lineHeight, settings.fontUi, settings.colors.UseUiText());
 		}
 	}
 }

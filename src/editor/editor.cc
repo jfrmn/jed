@@ -3,9 +3,11 @@
 
 #include "graphics.hh"
 #include "language/language.hh"
+
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/animation.hh"
+#include "ui/icons.hh"
 
 #include "logging.hh"
 #include "util.hh"
@@ -504,7 +506,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		DEFER(background->Release());
 	
 		if (isScrollbarTooltip)
-			DrawGlow(deviceContext, background, area, &Diagnostics::SEVERITY_COLORS[record.severity]);
+			DrawGlow(deviceContext, background, area, &Diagnostics::COLORS[record.severity]);
 	
 		PushLayer(deviceContext, area);
 		BlurArea(deviceContext, area, background);
@@ -521,21 +523,22 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 				position.y,
 		    	width,
 		    	settings.fontEditor.lineHeight + PADDING_X2),
-			settings.GetBrushUiBackground());
-	
-		deviceContext->DrawBitmap(
-			*Diagnostics::SEVERITY_ICONS[record.severity],
-			MakeRect(
-				position.x + PADDING,
-				position.y + PADDING,
-			    settings.fontEditor.lineHeight,
-			    settings.fontEditor.lineHeight));
+			settings.colors.UseUiBackground());
+		
+		icons.DrawIcon(
+			deviceContext,
+			Diagnostics::ICONS[record.severity],
+			D2D_POINT_2F {
+				.x = position.x + PADDING,
+				.y = position.y + PADDING},
+		    settings.fontEditor.lineHeight,
+		    Diagnostics::COLORS[record.severity]);
 				
 		runCode.Draw(deviceContext,
 			position.x + PADDING_X2 + settings.fontEditor.lineHeight,
 			position.y + PADDING,
 			settings.fontEditor,
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 	}
 	
 	//
@@ -560,7 +563,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			position.x + PADDING,
 			position.y + PADDING_X3 + settings.fontEditor.lineHeight,
 			settings.fontUi,
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 	}
 		
 	//
@@ -580,7 +583,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			D2D1_POINT_2F {
 				.x = position.x + width,
 				.y = contextStartY},
-			settings.GetBrushUiBackground());
+			settings.colors.UseUiBackground());
 	
 		const s64 sFrom = static_cast<s64>(record.from.line - 2);
 		const s64 sTo   = static_cast<s64>(record.from.line + 2);
@@ -592,7 +595,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 				position.x + PADDING,
 				contextStartY + (settings.fontEditor.lineHeight * (i - sFrom)),
 				settings.fontEditor,
-				settings.GetBrushEditorText());
+				settings.colors.UseEditorText());
 		}
 				
 		// draw underline in context
@@ -764,14 +767,13 @@ void Editor::Update() {
 				glyphRun.glyphCount = LINENUMBERS_MAX_DIGITS;
 				glyphRun.glyphIndices = glyphsToRender;
 				
-				ID2D1SolidColorBrush* brush;
+				Color color = settings.colors.uiTextInactive;
 				for (const TextController::Caret& caret : textController.carets) {
 					if (caret.position.line == i) {
-						brush = settings.GetBrushEditorText();
+						color = settings.colors.editorText;
 						goto draw;
 					}
 				}
-				brush = settings.GetBrushUiText(false);
 			
 			draw:
 				deviceContext->DrawGlyphRun(
@@ -779,7 +781,7 @@ void Editor::Update() {
 						.x = area.left,
 						.y = area.top + (settings.fontEditor.lineHeight * i) - scrollarea.vpY + settings.fontEditor.baselineOffset },
 					&glyphRun,
-					brush);
+					UseColor(color));
 			}
 		}
 	}
@@ -883,7 +885,7 @@ void Editor::Update() {
 				TranslateTextPosition(this, caret.position),
 				caretSize);
 				
-			ID2D1SolidColorBrush* brushCaret = settings.GetBrushEditorText();
+			ID2D1SolidColorBrush* brushCaret = settings.colors.UseEditorText();
 			deviceContext->DrawRectangle(caretRect, brushCaret);
 			
 			// draw blink animation
@@ -897,20 +899,20 @@ void Editor::Update() {
 		
 		if (textController.isEditCaretsMode) {
 			
-			ID2D1SolidColorBrush* brushEditCaret = settings.GetBrushEditorMultiCaretEdit();
+			ID2D1SolidColorBrush* brushEditCaret = settings.colors.UseEditorMultiCaret();
 			const D2D_RECT_F caretRect = MakeRect(
 				TranslateTextPosition(this, textController.editCaretsPosition),
 				caretSize);
 			
 			if (!std::isnan(fillingOpacity)) {
 				brushEditCaret->SetOpacity(fillingOpacity);
-				deviceContext->FillRectangle(caretRect, settings.GetBrushEditorMultiCaretEdit());
+				deviceContext->FillRectangle(caretRect, settings.colors.UseEditorMultiCaret());
 				brushEditCaret->SetOpacity(1.0f);
 			}
 			
 			for (const TextController::Caret& caret : textController.carets) {
 				if (caret.position == textController.editCaretsPosition) {
-					brushEditCaret = settings.GetBrushEditorText();
+					brushEditCaret = settings.colors.UseEditorText();
 					break;
 				}
 			}
@@ -940,7 +942,7 @@ void Editor::Update() {
 						.top    = offsetY + result.from.line * settings.fontEditor.lineHeight,
 						.right  = offsetX + run.MeasureOffset(result.to.character),
 						.bottom = offsetY + (result.from.line + 1) * settings.fontEditor.lineHeight },
-					settings.GetBrushEditorText());
+					settings.colors.UseEditorText());
 			}
 		}
 	}
@@ -974,7 +976,7 @@ void Editor::Update() {
 			const EditorDiagnostics::Record& record = editorDiagnostics.records[i];
 			
 			// change the brush color
-			UseColor(Diagnostics::SEVERITY_COLORS[record.severity]);
+			UseColor(Diagnostics::COLORS[record.severity]);
 			
 			// draw underlines
 			IterateGlyphRange(this, record.from, record.to, [] (f32 offsetY, f32 offsetFrom, f32 offsetTo) {

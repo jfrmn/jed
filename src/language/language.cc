@@ -96,7 +96,7 @@ bool Language::LoadLanguages(std::string_view directory) {
 		if (auto arrBlockComment = tblLanguage.get_as<toml::array>("block-comment")) {
 			for (u64 i = 0u; i < std::min(2ull, arrBlockComment->size()); i++) {
 				if (toml::value<std::string>* valEnding = arrBlockComment->get_as<std::string>(i))
-					language->fileEndings.push_back(std::move(valEnding->get()));
+					language->blockComment[i] = std::move(valEnding->get());
 				else
 					LogWarning("%s: expected a string", Str(valEnding->source()));
 			}

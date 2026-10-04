@@ -44,7 +44,7 @@ struct EditorAutocomplete : public EditorCaretAttached  {
 		 	 Type_Event,
 		 	 Type_Operator,
 		 	 Type_TypeParameter,
-		 	 Type_MAX
+		 	 Type_COUNT
 		};
 		
 		Type type = Type_Unknown;

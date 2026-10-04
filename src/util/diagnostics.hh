@@ -12,14 +12,14 @@ namespace Diagnostics {
 		 Severity_Warning,
 		 Severity_Info,
 		 Severity_Hint,
-		 Severity_MAX
+		 Severity_COUNT
 	};
 	
 	// color for each severity
-	extern const Color SEVERITY_COLORS[Severity_MAX];
+	extern const Color COLORS[Severity_COUNT];
 	
-	// index to the icon in the style.icons-array
-	extern ID2D1Bitmap** SEVERITY_ICONS[];
+	// index to the icon of each severity
+	extern const int ICONS[Severity_COUNT];
 	
 	ID2D1SolidColorBrush* GetServerityBrush(Severity sev);
 };

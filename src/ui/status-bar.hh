@@ -22,7 +22,7 @@ struct StatusBar {
 		 ElementType_CaretInfo,
 		 ElementType_EncodingSelector,
 		 ElementType_LineEndingSelector,
-		 ElementType_MAX
+		 ElementType_COUNT
 	};
 	
 	//-----------------------------------------

@@ -6,6 +6,8 @@
 #include "util.hh"
 
 #include "ui/constants.h"
+#include "ui/icons.hh"
+
 #include "text/text-position.hh"
 #include "graphics.hh"
 
@@ -79,20 +81,21 @@ void EditorAutocomplete::Update() {
 		if (i == selectedItem) {
 			deviceContext->FillRectangle(
 				MakeRect(position.x, position.y + offsety, width, settings.fontEditor.lineHeight),
-				settings.GetBrushSelection());
+				settings.colors.UseSelection());
 		}
 		
 		// draw iocn
-		ID2D1Bitmap* icon = item.type == Item::Type_Unknown
-			? settings.icons.unknown
-			: *(&settings.icons.editorAutocompleteText + item.type - 1);
+		int icon = (item.type == Item::Type_Unknown)
+			? ICON_UNKNOWN
+			: ICON_EDITORAUTOCOMPLETE_TEXT + (item.type - 1);
 		
-		deviceContext->DrawBitmap(icon,
-			D2D1_RECT_F {
-				.left   = position.x + PADDING,
-				.top    = position.y + offsety,
-				.right  = position.x + PADDING + settings.fontEditor.lineHeight,
-				.bottom = position.y + offsety + settings.fontEditor.lineHeight});		
+		icons.DrawIcon(
+			deviceContext,
+			icon,
+			D2D_POINT_2F {
+				.x = position.x + PADDING,
+				.y = position.y + offsety},
+			settings.fontEditor.lineHeight);
 		
 		const f32 textPosX = position.x + PADDING_X2 + settings.fontEditor.lineHeight;
 		const f32 textPosY = position.y + offsety;
@@ -111,20 +114,20 @@ void EditorAutocomplete::Update() {
 				    .top    = textPosY,
 				    .right  = textPosX + offsetTo,
 				    .bottom = textPosY + settings.fontUi.lineHeight},
-				settings.GetBrushUiSearchResult());
+				settings.colors.UseSearchResult());
 		}
 		
 		runLabel.Draw(deviceContext,
 			textPosX,
 			textPosY,
 			settings.fontEditor,
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 		
 		runDetails.Draw(deviceContext,
 			textPosX + PADDING + runLabel.width,
 			textPosY,
 			settings.fontEditor,
-			settings.GetBrushUiText(false));
+			settings.colors.UseUiText(false));
 	}
 	
 	// draw signature help if active

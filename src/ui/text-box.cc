@@ -58,12 +58,12 @@ void TextBox::Update() {
 	// fill background
 	//
 	{
-		ID2D1SolidColorBrush* brush = nullptr;
-		if      (invalid)  brush = settings.GetBrushUiBackgroundInvalid();
-		else if (inactive) brush = settings.GetBrushUiBackground(false);
-		else               brush = settings.GetBrushUiBackground(true);
+		Color backgroundColor;
+		if      (invalid)  backgroundColor = settings.colors.uiBackgroundInvalid;
+		else if (inactive) backgroundColor = settings.colors.uiBackgroundInactive;
+		else               backgroundColor = settings.colors.uiBackground;
 		
-		deviceContext->FillRoundedRectangle(ToRounded(area), brush);
+		deviceContext->FillRoundedRectangle(ToRounded(area), UseColor(backgroundColor));
 	}
 
 	//
@@ -75,7 +75,7 @@ void TextBox::Update() {
 			position.x + PADDING,
 			position.y + PADDING,
 			*font,
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 	
 	} else {
 		staticGlyphRun.ShapeAndDraw(deviceContext,
@@ -83,7 +83,7 @@ void TextBox::Update() {
 			position.x + PADDING,
 			position.y + PADDING,
 			*font,
-			settings.GetBrushUiText(false));
+			settings.colors.UseUiText(false));
 	}
 
 	// draw cursor
@@ -98,7 +98,7 @@ void TextBox::Update() {
 				.top    = position.y + PADDING,
 				.right  = position.x + PADDING + offsetCursor + 2.0f,
 				.bottom = position.y + PADDING + font->lineHeight},
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 	}
 
 	// draw selection
@@ -116,7 +116,7 @@ void TextBox::Update() {
 				.top    = position.y + PADDING,
 				.right  = position.x + PADDING + offsetEnd,
 				.bottom = position.y + PADDING + font->lineHeight},
-			settings.GetBrushSelection(!inactive));
+			settings.colors.UseSelection(!inactive));
 	}	
 }
 

@@ -9,6 +9,7 @@
 #include "ui/constants.h"
 #include "ui/window.hh"
 #include "ui/animation.hh"
+#include "ui/icons.hh"
 
 #include <string>
 #include <algorithm>
@@ -821,14 +822,14 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 			
 			ID2D1Brush* brush = nullptr;
 			if (isActiveItemOrRenamed) {
-				brush = settings.GetBrushDropShadow();
+				brush = settings.colors.UseDropShadow();
 				brush->SetOpacity(AnimationCycling::Value(self->activeItemAnimationValue, 0.4f));
 				DEFER(brush->SetOpacity(1.0));
 				
 				deviceContext->FillRectangle(itemArea, brush);
 			
 			} else {
-				deviceContext->FillRectangle(itemArea, settings.GetBrushUiBackground());
+				deviceContext->FillRectangle(itemArea, settings.colors.UseUiBackground());
 			}
 		}
 		
@@ -837,11 +838,11 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		//
 		{
 			if (item.isSelected)
-				deviceContext->FillRoundedRectangle(ToRounded(itemArea), settings.GetBrushSelection());
+				deviceContext->FillRoundedRectangle(ToRounded(itemArea), settings.colors.UseSelection());
 				
 			if (item.flags & Explorer::Item::Flag_Inserted) {
 					
-				ID2D1SolidColorBrush* insertAnimBrush = settings.GetBrushSelection();
+				ID2D1SolidColorBrush* insertAnimBrush = settings.colors.UseSelection();
 				insertAnimBrush->SetOpacity(1.0f - AnimationLinear::Value(self->insertAnimationValue));
 				DEFER(insertAnimBrush->SetOpacity(1.0f));
 				
@@ -853,7 +854,7 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 			
 			if (item.flags & Explorer::Item::Flag_Copied) {
 				
-				ID2D1SolidColorBrush* copyAnimBrush = settings.GetBrushSelection();
+				ID2D1SolidColorBrush* copyAnimBrush = settings.colors.UseSelection();
 				copyAnimBrush->SetOpacity(AnimationPulse::Value(self->copyAnimationValue));
 				DEFER(copyAnimBrush->SetOpacity(1.0f));
 				
@@ -868,25 +869,26 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		// icon + text
 		//
 		{
-			ID2D1Bitmap* icon = settings.icons.unknown;
+			int icon = ICON_UNKNOWN;
 			if (item.type == Explorer::Item::Type_Directory) {
 				icon = (&item == panel->activeItem && !isActivePanel)
-			 		? settings.icons.explorerFolderOpen
-					: settings.icons.explorerFolderClosed;
+					? ICON_EXPLORER_FOLDEROPEN
+					: ICON_EXPLORER_FOLDERCLOSED;
 						
 			} else if (item.type == Explorer::Item::Type_File) {
-				icon = settings.icons.explorerFile;
+				icon = ICON_EXPLORER_FILE;
 			
 			} else {
-				icon = settings.icons.noItems;
+				icon = ICON_NOITEMS;
 			}
 			
-			deviceContext->DrawBitmap(icon,
-				D2D_RECT_F {
-					.left   = panel->area.left + MARGIN,
-					.top    = itemArea.top,
-					.right  = panel->area.left + MARGIN + settings.fontUi.lineHeight,
-					.bottom = itemArea.bottom});
+			icons.DrawIcon(
+				deviceContext,
+				icon,
+				D2D_POINT_2F {
+					.x = panel->area.left + MARGIN,
+					.y = itemArea.top},
+				settings.fontUi.lineHeight);
 			
 			const bool isCut = (item.flags & Explorer::Item::Flag_Cut);
 			staticGlyphRun.Shape(item.filename, settings.fontUi);
@@ -894,7 +896,7 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 				panel->area.left + MARGIN + settings.fontUi.lineHeight + MARGIN,
 				itemArea.top,
 				settings.fontUi,
-				settings.GetBrushUiText(!isCut));
+				settings.colors.UseUiText(!isCut));
 		}
 		
 		//
@@ -960,7 +962,7 @@ void Explorer::Update() {
 			newItemDialog->area.left + MARGIN,
 			newItemDialog->area.top + MARGIN,
 			settings.fontUi,
-			settings.GetBrushUiText());
+			settings.colors.UseUiText());
 		
 		newItemDialog->textbox.Update();
 		
@@ -970,7 +972,7 @@ void Explorer::Update() {
 				newItemDialog->area.left + MARGIN,
 				newItemDialog->textbox.position.y + newItemDialog->textbox.Height() + MARGIN,
 				settings.fontUi,
-				settings.GetBrushUiText());
+				settings.colors.UseUiText());
 		}
 	}
 }

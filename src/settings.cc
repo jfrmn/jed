@@ -30,7 +30,7 @@ static constexpr std::string_view colorNames[] {
 	"selection",
 	"selection-inactive",
 	"ui-hover",
-	"ui-pressed",
+	"ui-hover-pressed",
 	"ui-toggled",
 	"editor-text",
 	"editor-background",
@@ -44,59 +44,6 @@ static constexpr std::string_view colorNames[] {
 };
 
 static_assert(STATIC_ARRAY_SIZE(colorNames) == Settings::NUM_COLORS);
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static constexpr std::string_view iconNames[] {
-	"unknown",
-	"waiting",
-	"error",
-	"noitems",
-	"tabs-modified-hovered",
-	"tabs-modified",
-	"tabs-hovered",
-	"editor-diagnostics-error",
-	"editor-diagnostics-warning",
-	"editor-diagnostics-info",
-	"editor-diagnostics-hint",
-	"editor-autocomplete-text",
-	"editor-autocomplete-method",
-	"editor-autocomplete-function",
-	"editor-autocomplete-constructor",
-	"editor-autocomplete-field",
-	"editor-autocomplete-variable",
-	"editor-autocomplete-class",
-	"editor-autocomplete-interface",
-	"editor-autocomplete-module",
-	"editor-autocomplete-property",
-	"editor-autocomplete-unit",
-	"editor-autocomplete-value",
-	"editor-autocomplete-enum",
-	"editor-autocomplete-keyword",
-	"editor-autocomplete-snippet",
-	"editor-autocomplete-color",
-	"editor-autocomplete-file",
-	"editor-autocomplete-reference",
-	"editor-autocomplete-folder",
-	"editor-autocomplete-enum-member",
-	"editor-autocomplete-constant",
-	"editor-autocomplete-struct",
-	"editor-autocomplete-event",
-	"editor-autocomplete-operator",
-	"editor-autocomplete-type-parameter",
-	"editor-search-resultsclosed",
-	"editor-search-resultsopened",
-	"explorer-folder-open",
-	"explorer-folder-closed",
-	"explorer-file",
-	"lsp-standby",
-	"lsp-initializing",
-	"lsp-running",
-	"lsp-shuttingDown",
-	"lsp-exited",
-	"lsp-crashed"
-};
-
-static_assert(STATIC_ARRAY_SIZE(iconNames) == Settings::NUM_ICONS);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
@@ -300,7 +247,6 @@ static constexpr u64 MakeKey(u64 vkcode, u64 kmods) {
 }
 
 Settings settings {
-	.icons = {},
 	
 	.colors = {
 		.unknown              = {1.0f, 0.0f, 0.1f, 1.0f},
@@ -309,11 +255,11 @@ Settings settings {
 		.selection            = {0.0f, 1.0f, 1.0f, 0.3f},
 		.selectionInactive    = {1.0f, 1.0f, 1.0f, 0.3f},
 		.hover                = {1.0f, 1.0f, 1.0f, 0.5f},
-		.pressed              = {0.8f, 0.8f, 0.8f, 0.5f},
+		.hoverPressed         = {0.8f, 0.8f, 0.8f, 0.5f},
 		.toggled              = {0.8f, 0.8f, 0.8f, 0.5f},
 		.editorText           = {1.0f, 1.0f, 1.0f, 1.0f},
 		.editorBackground     = {0.1f, 0.1f, 0.1f, 1.0f},
-		.editorMultiCaretEdit = {1.0f, 0.0f, 1.0f, 1.0f},
+		.editorMultiCaret     = {1.0f, 0.0f, 1.0f, 1.0f},
 		.uiText               = {1.0f, 1.0f, 1.0f, 1.0f},
 		.uiTextInactive       = {0.6f, 0.6f, 0.6f, 1.0f},
 		.uiSearchResult       = {1.0f, 1.0f, 0.0f, 0.3f},
@@ -388,7 +334,7 @@ Settings settings {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// Brush Function
+// Functions
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -405,69 +351,17 @@ bool Settings::LookupKeyBind(const Event& ev, /*out*/ Command* command) {
 	return true;
 }
 
-ID2D1SolidColorBrush* Settings::GetBrushDropShadow() {
-	brush->SetColor(colors.dropShadow.ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushSelection(bool active /*= true*/) {
-	brush->SetColor((active
-		? colors.selection
-		: colors.selectionInactive).ToD2D());
-	
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushUiSearchResult() {
-	brush->SetColor(colors.uiSearchResult.ToD2D());	
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushEditorText() {
-	brush->SetColor(colors.editorText.ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushEditorBackground() {
-	brush->SetColor(colors.editorBackground.ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushEditorMultiCaretEdit() {
-	brush->SetColor(colors.editorMultiCaretEdit.ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushUiText(bool active /*= true*/) {
-	brush->SetColor((active
-		? colors.uiText
-		: colors.uiTextInactive).ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushUiBackground(bool active /*= true*/) {
-	brush->SetColor((active
-		? colors.uiBackground
-		: colors.uiBackgroundInactive).ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushUiBackgroundInvalid() {
-	brush->SetColor(colors.uiBackgroundInvalid.ToD2D());
-	return brush;
-}
-
-ID2D1SolidColorBrush* Settings::GetBrushHover(bool pressed /*= false*/) {
-	brush->SetColor((pressed
-		? colors.pressed
-		: colors.hover).ToD2D());
-	return brush;
-}
-	
-ID2D1SolidColorBrush* Settings::GetBrushToggled() {
-	brush->SetColor(colors.toggled.ToD2D());
-	return brush;
-}
+ID2D1SolidColorBrush* Settings::Colors::UseDropShadow() const              { return UseColor(dropShadow); }
+ID2D1SolidColorBrush* Settings::Colors::UseSelection(bool active) const    { return UseColor(active ? selection : selectionInactive); }
+ID2D1SolidColorBrush* Settings::Colors::UseHover(bool pressed) const       { return UseColor(pressed ? hoverPressed : hover); }
+ID2D1SolidColorBrush* Settings::Colors::UseToggle() const                  { return UseColor(toggled); }
+ID2D1SolidColorBrush* Settings::Colors::UseEditorText() const              { return UseColor(editorText); }
+ID2D1SolidColorBrush* Settings::Colors::UseEditorBackground() const        { return UseColor(editorBackground); }
+ID2D1SolidColorBrush* Settings::Colors::UseEditorMultiCaret() const        { return UseColor(editorMultiCaret); }
+ID2D1SolidColorBrush* Settings::Colors::UseUiText(bool active) const       { return UseColor(active ? uiText : uiTextInactive); }
+ID2D1SolidColorBrush* Settings::Colors::UseSearchResult(bool active) const { return UseColor(uiSearchResult); }
+ID2D1SolidColorBrush* Settings::Colors::UseUiBackground(bool active) const { return UseColor(active ? uiBackground : uiBackgroundInactive); }
+ID2D1SolidColorBrush* Settings::Colors::UseUiBackgroundInvalid() const     { return UseColor(uiBackgroundInvalid); }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
@@ -723,25 +617,6 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	
 	//
-	// load default icon
-	//	
-	ID2D1Bitmap* dummyIcon = CreateDummyIcon(deviceContext);
-	DEFER(dummyIcon->Release());
-	for (u64 i = 0u; i < NUM_ICONS; i++) {
-		char buffer[MAX_PATH] {0};
-		const int len = sprintf_s(buffer, "./assets/%.*s.png", SIZE_AND_DATA(iconNames[i]));
-		ASSERT(len > 0);
-		
-		const bool ok = LoadIcon(std::string_view {buffer, static_cast<u64>(len)}, deviceContext, &iconArray[i]);
-		
-		// set to dummy icon if loading fail
-		if (!ok) {
-			iconArray[i] = dummyIcon;
-			dummyIcon->AddRef();
-		}
-	}
-	
-	//
 	// load fallback font
 	//
 	if (!fontEditor.Init(Font::Description {
@@ -791,17 +666,6 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	}
 
 	//
-	// load icons
-	//
-	if (const toml::table* tblIcons = table.get_as<toml::table>("Icons")) {
-		for (u64 i = 0u; i < NUM_ICONS; i++) {
-			const toml::node* nodeIcon = tblIcons->get(iconNames[i]);
-			if (!nodeIcon) continue;
-			LoadIcon(nodeIcon, deviceContext, &iconArray[i]);
-		}
-	}
-	
-	//
 	// load fonts
 	//
 	if (toml::table* tblFonts = table.get_as<toml::table>("Font")) {
@@ -834,12 +698,5 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	}
 	
 	return true;
-}
-	
-Settings::~Settings() noexcept {
-	for (int i = 0; i < NUM_ICONS; i++) {
-		if (iconArray[i])
-			iconArray[i]->Release();
-	}
 }
 

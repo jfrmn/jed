@@ -65,6 +65,10 @@ set_target_properties(jed PROPERTIES CXX_STANDARD 20)
 
 target_include_directories (jed PRIVATE "src")
 
+# Make the icon.rc depend on all the .pngs
+file (GLOB_RECURSE ICONS "assets/*.png")
+set_source_files_properties ("src/ui/icons.rc" PROPERTIES OBJECT_DEPENDS "${ICONS}")
+
 file (GLOB_RECURSE SOURCES "src/*")
 target_sources (jed PRIVATE ${SOURCES})
 

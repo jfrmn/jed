@@ -71,8 +71,8 @@ void EditorSelectGotoType::Update() {
 	// draw header
 	//
 	{
-		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, settings.fontUi.lineHeight), settings.GetBrushUiBackground());
-		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, settings.fontUi, settings.GetBrushUiText());
+		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, settings.fontUi.lineHeight), settings.colors.UseUiBackground());
+		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, settings.fontUi, settings.colors.UseUiText());
 	}
 	
 	//
@@ -82,9 +82,9 @@ void EditorSelectGotoType::Update() {
 		
 		const f32 posY = position.y + (settings.fontUi.lineHeight * (i + 1));
 		if (i == selectedItem)
-			deviceContext->FillRectangle(MakeRect(position.x, posY, width, settings.fontUi.lineHeight), settings.GetBrushSelection());
+			deviceContext->FillRectangle(MakeRect(position.x, posY, width, settings.fontUi.lineHeight), settings.colors.UseSelection());
 	
-		runItems[i].Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.GetBrushUiText());
+		runItems[i].Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.colors.UseUiText());
 	}			
 }
 

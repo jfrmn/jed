@@ -11,3 +11,5 @@
 
 #define SCROLLBAR_WIDTH_WIDE   15.0f
 #define SCROLLBAR_WIDTH_NARROW  5.0f
+
+#define ICON_MAX_SIZE 32

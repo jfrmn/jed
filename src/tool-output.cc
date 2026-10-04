@@ -4,13 +4,16 @@
 #include "logging.hh"
 #include "tools.hh"
 #include "app.hh"
+#include "graphics.hh"
 
-#include "util/diagnostics.hh"
+
 #include "ui/constants.h"
 #include "ui/window.hh"
+#include "ui/icons.hh"
 #include "ui/animation.hh"
-#include "graphics.hh"
+
 #include "editor/editor.hh"
+#include "util/diagnostics.hh"
 
 #include <charconv>
 #include <algorithm>
@@ -604,7 +607,7 @@ void ToolOutput::Update() {
 						.top    = area.top  + toolbarHeight + (settings.fontEditor.lineHeight * ln)     - scrollarea.vpY,
 						.right  = area.left + PADDING + offsetTo,
 						.bottom = area.top  + toolbarHeight + (settings.fontEditor.lineHeight * (ln+1)) - scrollarea.vpY},
-					settings.GetBrushSelection());
+					settings.colors.UseSelection());
 			});
 		}
 	}
@@ -711,7 +714,7 @@ void ToolOutput::Update() {
 			.right  = animatedArea.right,
 			.bottom = animatedArea.top + toolbarHeight};
 		
-		deviceContext->FillRectangle(toolbarArea, settings.GetBrushUiBackground());
+		deviceContext->FillRectangle(toolbarArea, settings.colors.UseUiBackground());
 	
 		if (tool) {
 			f32 offsetX = 0.0f;
@@ -719,7 +722,7 @@ void ToolOutput::Update() {
 			// draw tool name
 			{
 				staticGlyphRun.Shape(tool->name, settings.fontUi);
-				staticGlyphRun.Draw(deviceContext, animatedArea.left + MARGIN, animatedArea.top + MARGIN, settings.fontUi, settings.GetBrushUiText());
+				staticGlyphRun.Draw(deviceContext, animatedArea.left + MARGIN, animatedArea.top + MARGIN, settings.fontUi, settings.colors.UseUiText());
 				
 				offsetX = staticGlyphRun.width + MARGIN_X2;
 				
@@ -746,11 +749,11 @@ void ToolOutput::Update() {
 				
 				deviceContext->DrawRoundedRectangle(ToRounded(
 					progressArea),
-					settings.GetBrushUiText());
+					settings.colors.UseUiText());
 			} else {
 				deviceContext->FillRoundedRectangle(ToRounded(
 					progressArea),
-					settings.GetBrushUiBackground(false));
+					settings.colors.UseUiBackground((false)));
 			}
 				
 			// draw prgress text
@@ -786,7 +789,7 @@ void ToolOutput::Update() {
 				}
 				
 				if (mouse.Hittest(progressArea, this, onClickFunc)) {
-					deviceContext->FillRoundedRectangle(ToRounded(progressArea), settings.GetBrushHover(mouse.isDown));
+					deviceContext->FillRoundedRectangle(ToRounded(progressArea), settings.colors.UseHover(mouse.isDown));
 					
 					brush->SetColor(hoverLabelColor.ToD2D());
 					staticGlyphRun.Shape(hoverLabel, settings.fontUi);
@@ -810,9 +813,13 @@ void ToolOutput::Update() {
 					.right  = toolbarArea.left + offsetX + settings.fontUi.lineHeight + PADDING_X2,
 					.bottom = toolbarArea.bottom - MARGIN + PADDING};
 				
-				deviceContext->DrawBitmap(
-					settings.icons.editorDiagnosticsWarning,
-					MakeRect(areaWarningIcon.left + PADDING, areaWarningIcon.top + PADDING, settings.fontUi.lineHeight, settings.fontUi.lineHeight));
+				icons.DrawIcon(
+					deviceContext,
+					ICON_EDITORDIAGNOSTICS_WARNING,
+					D2D_POINT_2F {
+						.x = areaWarningIcon.left + PADDING,
+						.y = areaWarningIcon.top + PADDING},
+					settings.fontUi.lineHeight);
 					
 				if (mouse.Hittest(areaWarningIcon, this, OnClickToolDiagnostics)) {
 					
@@ -847,7 +854,12 @@ void ToolOutput::Update() {
 		// no tool
 		} else {
 			staticGlyphRun.Shape("No tool run yet.", settings.fontUi);
-			staticGlyphRun.Draw(deviceContext, animatedArea.left + MARGIN, animatedArea.top + MARGIN, settings.fontUi, settings.GetBrushUiText(false));
+			staticGlyphRun.Draw(
+				deviceContext,
+				animatedArea.left + MARGIN,
+				animatedArea.top + MARGIN,
+				settings.fontUi,
+				settings.colors.UseUiText(false));
 		}
 	}
 }
@@ -880,19 +892,33 @@ void ToolOutput::OnMouseWheel(f32 distance) {
 }
 
 bool ToolOutput::HandleEvent(const Event& event) {
-	if (event.type == Event::Type_KeyPress && event.keypress.vkc == VK_RETURN) {
-		if (selectedDiagnosticsRecord == U64_MAX) return true;
+	if (event.type == Event::Type_KeyPress) {
+		if (event.keypress.vkc == VK_RETURN) {
+			if (selectedDiagnosticsRecord == U64_MAX) return false;
 		
-		const EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
-		if (record.file.empty()) return true;
+			const EditorDiagnosticsRecord& record = diagnosticsRecords[selectedDiagnosticsRecord];
+			if (record.file.empty()) return true;
+			
+			const App::OpenBehavior openBehav = OpenBehaviorFromModifiers(event.keypress.mods);
+			Editor* editor = app.OpenEditor(record.file, openBehav);
+			
+			if (record.line != 0u) {
+				editor->ScrollToLine(record.line);
+				// @TODO: set cursor
+			}
+			
+			return true;
 		
-		const App::OpenBehavior openBehav = OpenBehaviorFromModifiers(event.keypress.mods);
-		Editor* editor = app.OpenEditor(record.file, openBehav);
+		} else if (event.keypress.vkc == VK_HOME && event.keypress.mods == KM_Ctrl) {
+			scrollarea.vpY = 0.0f;
+			return true;
+	
+		} else if (event.keypress.vkc == VK_END && event.keypress.mods == KM_Ctrl) {
+			scrollarea.vpY = scrollarea.GetMaxPositionY();
+			return true;
+		}
 		
-		if (record.line != 0u)
-			editor->ScrollToLine(record.line);
-		
-		return true;
+		return false;
 	
 	} else if (event.type == Event::Type_Command) {
 	

@@ -256,7 +256,7 @@ namespace LanguageServerProtocol {
 		 CompletionItemKind_Event = 23,
 		 CompletionItemKind_Operator = 24,
 		 CompletionItemKind_TypeParameter = 25,
-		 CompletionItemKind_TypeParameter_MAX
+		 CompletionItemKind_TypeParameter_COUNT
 	};
 
 	struct CompletionClientCapabilities {
@@ -272,7 +272,7 @@ namespace LanguageServerProtocol {
 		};
 
 		struct ItemKinds {
-			std::array<int, CompletionItemKind_TypeParameter_MAX> valueSet = {
+			std::array<int, CompletionItemKind_TypeParameter_COUNT> valueSet = {
 				CompletionItemKind_Text, CompletionItemKind_Method, CompletionItemKind_Function, CompletionItemKind_Constructor, CompletionItemKind_Field, CompletionItemKind_Variable, CompletionItemKind_Class, CompletionItemKind_Interface, CompletionItemKind_Module, CompletionItemKind_Property, CompletionItemKind_Unit, CompletionItemKind_Value, CompletionItemKind_Enum, CompletionItemKind_Keyword, CompletionItemKind_Snippet, CompletionItemKind_Color, CompletionItemKind_File, CompletionItemKind_Reference, CompletionItemKind_Folder, CompletionItemKind_EnumMember, CompletionItemKind_Constant, CompletionItemKind_Struct, CompletionItemKind_Event, CompletionItemKind_Operator, CompletionItemKind_TypeParameter };
 		};
 
@@ -423,13 +423,13 @@ namespace LanguageServerProtocol {
 		SymbolInformationKind_Event = 24,
 		SymbolInformationKind_Operator = 25,
 		SymbolInformationKind_TypeParameter = 26,
-		SymbolInformationKind_MAX
+		SymbolInformationKind_COUNT
 	};
 
 	struct DocumentSymbolClientCapabilities {
 		
 		struct SymbolKinds {
-			std::array<int, SymbolInformationKind_MAX> valueSet = {
+			std::array<int, SymbolInformationKind_COUNT> valueSet = {
 				SymbolInformationKind_File, SymbolInformationKind_Module, SymbolInformationKind_Namespace, SymbolInformationKind_Package, SymbolInformationKind_Class, SymbolInformationKind_Method, SymbolInformationKind_Property, SymbolInformationKind_Field, SymbolInformationKind_Constructor, SymbolInformationKind_Enum, SymbolInformationKind_Interface, SymbolInformationKind_Function, SymbolInformationKind_Variable, SymbolInformationKind_Constant, SymbolInformationKind_String, SymbolInformationKind_Number, SymbolInformationKind_Boolean, SymbolInformationKind_Array, SymbolInformationKind_Object, SymbolInformationKind_Key, SymbolInformationKind_Null, SymbolInformationKind_EnumMember, SymbolInformationKind_Struct, SymbolInformationKind_Event, SymbolInformationKind_Operator, SymbolInformationKind_TypeParameter
 			};
 		};
