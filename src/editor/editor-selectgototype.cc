@@ -43,21 +43,21 @@ void EditorSelectGotoType::Update() {
 	const D2D1_POINT_2F curPos = owner->GetCaretLocation();
 	const D2D1_POINT_2F position {
 		.x = curPos.x,
-		.y = curPos.y + settings.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+		.y = curPos.y + fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 	
-	staticGlyphRun.Shape("Goto...", settings.fontUi);
+	staticGlyphRun.Shape("Goto...", fontUi);
 	
 	f32 width = .0f;
 	GlyphRun runItems[ITEM_COUNT];
 	for (u64 i = 0u; i < ITEM_COUNT; i++) {
-		runItems[i].Shape(ITEMS[i].label, settings.fontUi);
+		runItems[i].Shape(ITEMS[i].label, fontUi);
 		
 		const f32 currentWidth = runItems[i].width + PADDING_X2;
 		if (width < currentWidth)
 			width = currentWidth;
 	}
 	
-	const f32 height = (ITEM_COUNT + 1) * settings.fontUi.lineHeight;
+	const f32 height = (ITEM_COUNT + 1) * fontUi.lineHeight;
 	
 	//
 	// draw background
@@ -71,8 +71,8 @@ void EditorSelectGotoType::Update() {
 	// draw header
 	//
 	{
-		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, settings.fontUi.lineHeight), settings.colors.UseUiBackground());
-		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, settings.fontUi, settings.colors.UseUiText());
+		deviceContext->FillRectangle(MakeRect(position.x, position.y, width, fontUi.lineHeight), settings.colors.UseUiBackground());
+		staticGlyphRun.Draw(deviceContext, position.x + PADDING, position.y, fontUi, settings.colors.UseUiText());
 	}
 	
 	//
@@ -80,11 +80,11 @@ void EditorSelectGotoType::Update() {
 	//
 	for (u64 i = 0u; i < ITEM_COUNT; i++) {
 		
-		const f32 posY = position.y + (settings.fontUi.lineHeight * (i + 1));
+		const f32 posY = position.y + (fontUi.lineHeight * (i + 1));
 		if (i == selectedItem)
-			deviceContext->FillRectangle(MakeRect(position.x, posY, width, settings.fontUi.lineHeight), settings.colors.UseSelection());
+			deviceContext->FillRectangle(MakeRect(position.x, posY, width, fontUi.lineHeight), settings.colors.UseSelection());
 	
-		runItems[i].Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.colors.UseUiText());
+		runItems[i].Draw(deviceContext, position.x + PADDING, posY, fontUi, settings.colors.UseUiText());
 	}			
 }
 

@@ -3,9 +3,8 @@
 #include "logging.hh"
 
 #define TOML_ABI_NAMESPACES 0
-#define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
-#define TOML_IMPLEMENTATION 1
+#define TOML_HEADER_ONLY 0
 #include <toml++/toml.hpp>
 
 #define NOMINMAX

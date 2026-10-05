@@ -132,7 +132,7 @@ static bool LoadFile(Editor* self) {
 	// prepare glyph runs
 	//
 	self->glyphRuns.resize(self->textController.buffer.LineCount());
-	if (!GlyphRun::ShapeBatch(self->textController.buffer, settings.fontEditor, self->glyphRuns)) {
+	if (!GlyphRun::ShapeBatch(self->textController.buffer, fontEditor, self->glyphRuns)) {
 		LogError("initial shaping failed!");
 		return false;
 	}
@@ -262,7 +262,7 @@ void Editor::ScrollToLine(u64 line) {
 	}
 
 	// scroll so that the target line roughly in the middle
-	scrollTargetPosition = (settings.fontEditor.lineHeight * line) - (scrollarea.vpSize.height * 0.4f);
+	scrollTargetPosition = (fontEditor.lineHeight * line) - (scrollarea.vpSize.height * 0.4f);
 	scrollTargetPosition = std::clamp(scrollTargetPosition, 0.0f, scrollarea.GetMaxPositionY());
 	
 	scrollSpeed = (scrollTargetPosition - scrollarea.vpY) / 30.0f;
@@ -305,10 +305,10 @@ void Editor::ProcessTextChange(const TextChange* change) {
 	if (needsFullReshape) {
 		TextBuffer& buffer = GetBuffer();
 		glyphRuns.resize(buffer.LineCount());
-		GlyphRun::ShapeBatch(buffer, settings.fontEditor, glyphRuns);
+		GlyphRun::ShapeBatch(buffer, fontEditor, glyphRuns);
 	} else {
 		const u64 line = change->operations[0].start.line;	
- 		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), settings.fontEditor);
+ 		glyphRuns[line].Shape(GetBuffer().GetLineAt(line).GetText(), fontEditor);
 	}
 
 	if (language)
@@ -316,7 +316,7 @@ void Editor::ProcessTextChange(const TextChange* change) {
 }
 
 static float GetLineNumberWidth() {
-	return std::ceil((settings.fontEditor.spaceAdvance * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
+	return std::ceil((fontEditor.spaceAdvance * LINENUMBERS_MAX_DIGITS) + PADDING_X4);
 }
 
 static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition& position) {
@@ -325,7 +325,7 @@ static D2D_POINT_2F TranslateTextPosition(const Editor* self, const TextPosition
 
 	return D2D_POINT_2F {
 		.x = self->area.left + self->scrollarea.vpX + GetLineNumberWidth() + run.MeasureOffset(position.character),
-		.y = self->area.top  - self->scrollarea.vpY + (position.line * settings.fontEditor.lineHeight) };
+		.y = self->area.top  - self->scrollarea.vpY + (position.line * fontEditor.lineHeight) };
 }
 
 D2D_POINT_2F Editor::GetCaretLocation() const {
@@ -339,12 +339,12 @@ TextBuffer& Editor::GetBuffer() {
 void Editor::GetVisibleLines(/*out*/ u64* pfirst, /*out*/ u64* plast) const {
 	
 	if (pfirst) {
-		const f32 first = (scrollarea.vpY) / settings.fontEditor.lineHeight;
+		const f32 first = (scrollarea.vpY) / fontEditor.lineHeight;
 		*pfirst = static_cast<u64>(std::max(0.0f, first));
 	}
 
 	if (plast) {
-		const f32 last = (scrollarea.vpY + scrollarea.vpSize.height) / settings.fontEditor.lineHeight;
+		const f32 last = (scrollarea.vpY + scrollarea.vpSize.height) / fontEditor.lineHeight;
 		const f32 max = static_cast<f32>(textController.buffer.GetMaxLine());
 		*plast = static_cast<u64>(std::min(max, last));
 	}
@@ -383,7 +383,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 		float offsetFrom, offsetTo;
 		glyphRun.MeasureOffsetRange(from.character, to.character, &offsetFrom, &offsetTo);
 		
-		const float offsetY = y + (settings.fontEditor.lineHeight * line);
+		const float offsetY = y + (fontEditor.lineHeight * line);
 		
 		funcAction(offsetY, x + offsetFrom, x + offsetTo);
 				
@@ -396,7 +396,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 
 			const float offsetFrom = x + glyphRun.MeasureOffset(from.character);
 			const float offsetTo   = x + std::max(glyphRun.width, 2.0f);
-			const float offsetY    = y + (settings.fontEditor.lineHeight * from.line);
+			const float offsetY    = y + (fontEditor.lineHeight * from.line);
 
 			funcAction(offsetY, offsetFrom, offsetTo);
 		}
@@ -408,7 +408,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 			
 			const float offsetFrom = x + 0.0f;
 			const float offsetTo   = x + std::max(run.width, 2.0f);
-			const float offsetY    = y + (settings.fontEditor.lineHeight * i);
+			const float offsetY    = y + (fontEditor.lineHeight * i);
 			
 			funcAction(offsetY, offsetFrom, offsetTo);
 		}
@@ -419,7 +419,7 @@ static void IterateGlyphRange(const Editor* self, TextPosition from, TextPositio
 
 			const float offsetFrom = x + 0.f;
 			const float offsetTo   = x + std::max(glyphRun.MeasureOffset(to.character), 2.0f);
-			const float offsetY    = y + (settings.fontEditor.lineHeight * to.line);
+			const float offsetY    = y + (fontEditor.lineHeight * to.line);
 
 			funcAction(offsetY, offsetFrom, offsetTo);
 		}
@@ -433,7 +433,7 @@ static void HighlightTextRange(f32 y, f32 from, f32 to) {
 				.left   = from,
 				.top    = y,
 				.right  = to,
-				.bottom = y + settings.fontEditor.lineHeight },
+				.bottom = y + fontEditor.lineHeight },
 			.radiusX = 2.f,
 			.radiusY = 2.f },
 		brush);
@@ -441,7 +441,7 @@ static void HighlightTextRange(f32 y, f32 from, f32 to) {
 
 static void DrawScrollbarMarker(Editor* self, ID2D1DeviceContext* deviceContext, u64 line, f32 stroke, ID2D1SolidColorBrush* brush) {
 	
-	const f32 scrollbarPosY = self->area.top + (line * settings.fontEditor.lineHeight) * self->scrollarea.GetRatio();
+	const f32 scrollbarPosY = self->area.top + (line * fontEditor.lineHeight) * self->scrollarea.GetRatio();
 	
 	deviceContext->DrawLine(
 		D2D1_POINT_2F {
@@ -462,24 +462,24 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	GlyphRun runCode {};
 	GlyphRunMultiline runMessage {};
 	
-	runCode.Shape(record.code, settings.fontEditor);
-	runMessage.Shape(record.message, settings.fontUi);
+	runCode.Shape(record.code, fontEditor);
+	runMessage.Shape(record.message, fontUi);
 	
 	//
 	// measure the width and height
 	//
 	f32 width = PADDING_X2 + std::max(
-		runCode.width + settings.fontEditor.lineHeight + PADDING,
+		runCode.width + fontEditor.lineHeight + PADDING,
 		runMessage.GetWidth());
 		
 	if (isScrollbarTooltip)
 		width = std::max(width, RectWidth(self->area) * 0.3f);
 		
-	f32 height = PADDING_X2 + settings.fontEditor.lineHeight
-			   + PADDING_X2 + (settings.fontUi.lineHeight * runMessage.LineCount());
+	f32 height = PADDING_X2 + fontEditor.lineHeight
+			   + PADDING_X2 + (fontUi.lineHeight * runMessage.LineCount());
 			   
 	if (isScrollbarTooltip)
-		height += PADDING_X2 + (settings.fontEditor.lineHeight * 5);
+		height += PADDING_X2 + (fontEditor.lineHeight * 5);
 	
 	D2D1_POINT_2F position;
 	
@@ -487,12 +487,12 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		const D2D1_POINT_2F curPos = self->GetCaretLocation();
 		position = D2D_POINT_2F {
 			.x = curPos.x,
-			.y = curPos.y + settings.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+			.y = curPos.y + fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 	
 	} else {		
 		position = D2D_POINT_2F {
 			.x = self->area.right - SCROLLBAR_WIDTH_WIDE - width - 15.0f,
-			.y = self->area.top + (record.from.line * settings.fontEditor.lineHeight * self->scrollarea.GetRatio()) - (height / 2.0f)};
+			.y = self->area.top + (record.from.line * fontEditor.lineHeight * self->scrollarea.GetRatio()) - (height / 2.0f)};
 	}
 	
 	const D2D_RECT_F area = MakeRect(position.x, position.y, width, height);	
@@ -522,7 +522,7 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 				position.x,
 				position.y,
 		    	width,
-		    	settings.fontEditor.lineHeight + PADDING_X2),
+		    	fontEditor.lineHeight + PADDING_X2),
 			settings.colors.UseUiBackground());
 		
 		icons.DrawIcon(
@@ -531,13 +531,13 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			D2D_POINT_2F {
 				.x = position.x + PADDING,
 				.y = position.y + PADDING},
-		    settings.fontEditor.lineHeight,
+		    fontEditor.lineHeight,
 		    Diagnostics::COLORS[record.severity]);
 				
 		runCode.Draw(deviceContext,
-			position.x + PADDING_X2 + settings.fontEditor.lineHeight,
+			position.x + PADDING_X2 + fontEditor.lineHeight,
 			position.y + PADDING,
-			settings.fontEditor,
+			fontEditor,
 			settings.colors.UseUiText());
 	}
 	
@@ -548,10 +548,10 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = position.x,
-				.y = position.y + PADDING_X2 + settings.fontEditor.lineHeight},
+				.y = position.y + PADDING_X2 + fontEditor.lineHeight},
 			D2D1_POINT_2F {
 				.x = position.x + width,
-				.y = position.y + PADDING_X2 + settings.fontEditor.lineHeight},
+				.y = position.y + PADDING_X2 + fontEditor.lineHeight},
 			Diagnostics::GetServerityBrush(record.severity));
 	}
 	
@@ -561,8 +561,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	{
 		runMessage.Draw(deviceContext,
 			position.x + PADDING,
-			position.y + PADDING_X3 + settings.fontEditor.lineHeight,
-			settings.fontUi,
+			position.y + PADDING_X3 + fontEditor.lineHeight,
+			fontUi,
 			settings.colors.UseUiText());
 	}
 		
@@ -572,8 +572,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 	if (isScrollbarTooltip) {
 	
 		const f32 contextStartY = position.y + PADDING_X4
-		                        + settings.fontEditor.lineHeight
-                                + (settings.fontUi.lineHeight * runMessage.LineCount());
+		                        + fontEditor.lineHeight
+                                + (fontUi.lineHeight * runMessage.LineCount());
 		
 		// draw 2nd seperator
 		deviceContext->DrawLine(
@@ -593,8 +593,8 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			self->glyphRuns[i].Draw(
 				deviceContext,
 				position.x + PADDING,
-				contextStartY + (settings.fontEditor.lineHeight * (i - sFrom)),
-				settings.fontEditor,
+				contextStartY + (fontEditor.lineHeight * (i - sFrom)),
+				fontEditor,
 				settings.colors.UseEditorText());
 		}
 				
@@ -609,10 +609,10 @@ static void DrawDiagnosticsTooltip(Editor* self, ID2D1DeviceContext* deviceConte
 			deviceContext->DrawLine(
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetFrom,
-					.y = contextStartY + settings.fontEditor.lineHeight + settings.fontEditor.underlineOffset},
+					.y = contextStartY + fontEditor.lineHeight + fontEditor.underlineOffset},
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetTo,
-					.y = contextStartY + settings.fontEditor.lineHeight + settings.fontEditor.underlineOffset},
+					.y = contextStartY + fontEditor.lineHeight + fontEditor.underlineOffset},
 				Diagnostics::GetServerityBrush(record.severity));
 		}
 	}	
@@ -625,7 +625,7 @@ static TextPosition Hittest(Editor* self, f32 x, f32 y) {
 	ASSERT(absoluteY >= .0f);
 	
 	const u64 line = std::clamp(
-		static_cast<u64>(absoluteY / settings.fontEditor.lineHeight),
+		static_cast<u64>(absoluteY / fontEditor.lineHeight),
 		0ull,
 		self->textController.buffer.GetMaxLine());
 
@@ -660,7 +660,7 @@ void Editor::Update() {
 	// reshape glyphs
 	//
 	{
-		scrollarea.totalSize.height = glyphRuns.size() * settings.fontEditor.lineHeight;
+		scrollarea.totalSize.height = glyphRuns.size() * fontEditor.lineHeight;
 		
 		if (mouse.Hittest(area, this)) {
 			if (mainWindow.event.type == Event::Type_MouseDown) {
@@ -723,7 +723,7 @@ void Editor::Update() {
 		{
 			const auto digitChars = reinterpret_cast<const u32*>(U"0123456789");
 			
-			const HRESULT hr = settings.fontEditor.fontFace->GetGlyphIndices(digitChars, 10, digitGlyphIndicies);
+			const HRESULT hr = fontEditor.fontFace->GetGlyphIndices(digitChars, 10, digitGlyphIndicies);
 			if (hr != S_OK) {
 				LogError("failed render line numbers. GetGlyphIndices() failed. HRESULT: %", StrHr(hr));
 				return;
@@ -737,7 +737,7 @@ void Editor::Update() {
 		for (u64 i = firstVisible; i <= lastVisible; i++) {
 	
 			u16 glyphsToRender[LINENUMBERS_MAX_DIGITS];
-			std::fill_n(glyphsToRender, LINENUMBERS_MAX_DIGITS, settings.fontEditor.glyphIndexSpace);
+			std::fill_n(glyphsToRender, LINENUMBERS_MAX_DIGITS, fontEditor.glyphIndexSpace);
 
 			// get glyphs to render
 			{
@@ -762,8 +762,8 @@ void Editor::Update() {
 			// draw the glyphs
 			{
 				DWRITE_GLYPH_RUN glyphRun {};
-				glyphRun.fontFace = settings.fontEditor.fontFace;
-				glyphRun.fontEmSize = settings.fontEditor.size;
+				glyphRun.fontFace = fontEditor.fontFace;
+				glyphRun.fontEmSize = fontEditor.size;
 				glyphRun.glyphCount = LINENUMBERS_MAX_DIGITS;
 				glyphRun.glyphIndices = glyphsToRender;
 				
@@ -779,7 +779,7 @@ void Editor::Update() {
 				deviceContext->DrawGlyphRun(
 					D2D_POINT_2F {
 						.x = area.left,
-						.y = area.top + (settings.fontEditor.lineHeight * i) - scrollarea.vpY + settings.fontEditor.baselineOffset },
+						.y = area.top + (fontEditor.lineHeight * i) - scrollarea.vpY + fontEditor.baselineOffset },
 					&glyphRun,
 					UseColor(color));
 			}
@@ -811,9 +811,9 @@ void Editor::Update() {
 			for (u64 i = firstVisible; i <= lastVisible; i++) {
 				const GlyphRun& glyphRun = glyphRuns[i];
 				
-				const f32 offsetY = (i * settings.fontEditor.lineHeight);
+				const f32 offsetY = (i * fontEditor.lineHeight);
 
-				glyphRun.Draw(renderTargetText, 0.0f, offsetY, settings.fontEditor, alphaMaskBrush);
+				glyphRun.Draw(renderTargetText, 0.0f, offsetY, fontEditor, alphaMaskBrush);
 			}
 			
 			if (HRESULT hr = renderTargetText->EndDraw(); hr != S_OK) {
@@ -869,8 +869,8 @@ void Editor::Update() {
 			fillingOpacity = AnimationCycling::Value(cursorBlinkAnimationValue, 0.5f, -(F32_PI / 2.0f));
 		
 		const D2D_SIZE_F caretSize {
-			.width  = settings.fontEditor.spaceAdvance,
-			.height = settings.fontEditor.lineHeight};
+			.width  = fontEditor.spaceAdvance,
+			.height = fontEditor.lineHeight};
 		
 		for (const TextController::Caret& caret : textController.carets) {
 			
@@ -939,9 +939,9 @@ void Editor::Update() {
 				deviceContext->DrawRectangle(
 					D2D1_RECT_F {
 						.left   = offsetX + run.MeasureOffset(result.from.character),
-						.top    = offsetY + result.from.line * settings.fontEditor.lineHeight,
+						.top    = offsetY + result.from.line * fontEditor.lineHeight,
 						.right  = offsetX + run.MeasureOffset(result.to.character),
-						.bottom = offsetY + (result.from.line + 1) * settings.fontEditor.lineHeight },
+						.bottom = offsetY + (result.from.line + 1) * fontEditor.lineHeight },
 					settings.colors.UseEditorText());
 			}
 		}
@@ -987,10 +987,10 @@ void Editor::Update() {
 				deviceContext->DrawLine(
 					D2D_POINT_2F {
 						.x = offsetFrom,
-						.y = offsetY + settings.fontEditor.underlineOffset},
+						.y = offsetY + fontEditor.underlineOffset},
 					D2D_POINT_2F { 
 						.x = offsetTo,
-						.y = offsetY + settings.fontEditor.underlineOffset},
+						.y = offsetY + fontEditor.underlineOffset},
 					brush,
 					2.0f,
 					nullptr);
@@ -1027,7 +1027,7 @@ void Editor::Update() {
 			for (u64 i = 0; i < editorDiagnostics.RecordCount(); i++) {
 				const EditorDiagnostics::Record& record = editorDiagnostics.records[i];
 				
-				const f32 scrollbarPosY = area.top + (record.from.line * settings.fontEditor.lineHeight) * scrollarea.GetRatio();
+				const f32 scrollbarPosY = area.top + (record.from.line * fontEditor.lineHeight) * scrollarea.GetRatio();
 				
 				const f32 distanceToMouse = std::abs(mouse.y - scrollbarPosY);
 				
@@ -1073,7 +1073,7 @@ void Editor::OnResize(const D2D1_RECT_F& newArea) {
 
 void Editor::OnMouseWheel(f32 distance) {
 	// @TODO(settings) scroll distance
-	scrollarea.ScrollVertical(distance * settings.fontEditor.lineHeight * 5.0f);
+	scrollarea.ScrollVertical(distance * fontEditor.lineHeight * 5.0f);
 }
 
 void Editor::OnFileChange(const FileChangeRecord* fileChangeRecord) {
@@ -1305,13 +1305,13 @@ bool Editor::HandleEvent(const Event& event) {
 			return true;
 		
 		} else if (event.cmd.id == Command::Id_Editor_ScrollUp) {
-			scrollarea.vpY -= (settings.fontEditor.lineHeight * 2);
+			scrollarea.vpY -= (fontEditor.lineHeight * 2);
 			if (scrollarea.vpY < 0.0f)
 				scrollarea.vpY = 0.0f;
 			return true;
 		
 		} else if (event.cmd.id == Command::Id_Editor_ScrollDown) {
-			scrollarea.vpY += (settings.fontEditor.lineHeight * 2);
+			scrollarea.vpY += (fontEditor.lineHeight * 2);
 			if (scrollarea.vpY >= scrollarea.GetMaxPositionY())
 				scrollarea.vpY  = scrollarea.GetMaxPositionY();
 			return true;

@@ -74,19 +74,19 @@ void EditorDiagnosticsList::Update() {
 			const EditorDiagnostics::Record& record = owner->editorDiagnostics.records[i];
 			
 			// shape
-			item.code.Shape(record.code, settings.fontEditor);
-			item.message.Shape(record.message, settings.fontUi);
+			item.code.Shape(record.code, fontEditor);
+			item.message.Shape(record.message, fontUi);
 			
 			// set severity
 			item.severity = record.severity;
 			
 			// measure the width and height
 			item.width = std::max(
-				item.code.width + settings.fontEditor.lineHeight + PADDING_X3,
+				item.code.width + fontEditor.lineHeight + PADDING_X3,
 				item.message.GetWidth() + PADDING_X2);
 			
-			item.height = PADDING_X2 + settings.fontEditor.lineHeight
-	                    + (settings.fontUi.lineHeight * item.message.LineCount());	
+			item.height = PADDING_X2 + fontEditor.lineHeight
+	                    + (fontUi.lineHeight * item.message.LineCount());	
 		}
 		
 		selectedItem = std::min(selectedItem, items.size()-1u);
@@ -98,7 +98,7 @@ void EditorDiagnosticsList::Update() {
 	//
 	const f32 maxWidth = RectWidth(owner->area) - MARGIN_X2;
 	f32 totalWidth = RectWidth(owner->area) * 0.3f + PADDING + MARGIN_X2;
-	f32 totalHeight = settings.fontUi.lineHeight + MARGIN_X2;	
+	f32 totalHeight = fontUi.lineHeight + MARGIN_X2;	
 	
 	for (const Item& item : items) {
 		if (totalWidth < item.width)
@@ -131,17 +131,17 @@ void EditorDiagnosticsList::Update() {
 	// draw header
 	//
 	{
-		staticGlyphRun.Shape("Diagnostics", settings.fontUi);
-		staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, settings.fontUi, settings.colors.UseUiText());
+		staticGlyphRun.Shape("Diagnostics", fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN, area.top + MARGIN, fontUi, settings.colors.UseUiText());
 		
 		// underline
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN,
-				.y = area.top  + MARGIN + settings.fontUi.underlineOffset },
+				.y = area.top  + MARGIN + fontUi.underlineOffset },
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN + staticGlyphRun.width,
-				.y = area.top  + MARGIN + settings.fontUi.underlineOffset },
+				.y = area.top  + MARGIN + fontUi.underlineOffset },
 			settings.colors.UseUiText());
 		
 		
@@ -151,14 +151,14 @@ void EditorDiagnosticsList::Update() {
 		const int size = sprintf_s(buffer, "%zu records", items.size());
 		ASSERT_SOFT(size > 0);
 		
-		staticGlyphRun.Shape({buffer, static_cast<u64>(size)}, settings.fontUi);
-		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, settings.fontUi, settings.colors.UseUiText(false));
+		staticGlyphRun.Shape({buffer, static_cast<u64>(size)}, fontUi);
+		staticGlyphRun.Draw(deviceContext, area.left + MARGIN + offset, area.top + MARGIN, fontUi, settings.colors.UseUiText(false));
 	}
 	
 	//
 	// draw records
 	//
-	f32 posY = area.top + settings.fontUi.lineHeight + MARGIN_X2;
+	f32 posY = area.top + fontUi.lineHeight + MARGIN_X2;
 	for (u64 i = 0u; i < items.size(); i++) {
 		
 		Item& item = items[i];
@@ -181,19 +181,19 @@ void EditorDiagnosticsList::Update() {
 			D2D_POINT_2F {
 				.x = itemArea.left + PADDING,
 				.y = itemArea.top + PADDING},
-	    	settings.fontEditor.lineHeight,
+	    	fontEditor.lineHeight,
 		    Diagnostics::COLORS[item.severity]);
 				
 		item.code.Draw(deviceContext,
-			itemArea.left + PADDING_X2 + settings.fontEditor.lineHeight,
+			itemArea.left + PADDING_X2 + fontEditor.lineHeight,
 			itemArea.top + PADDING,
-			settings.fontEditor,
+			fontEditor,
 			settings.colors.UseUiText());
 		
 		item.message.Draw(deviceContext,
 			itemArea.left + PADDING,
-			itemArea.top + PADDING + settings.fontEditor.lineHeight,
-			settings.fontUi,
+			itemArea.top + PADDING + fontEditor.lineHeight,
+			fontUi,
 			settings.colors.UseUiText(false));
 		
 		if (mouse.Hittest(itemArea, this, OnClickItem, i)) {

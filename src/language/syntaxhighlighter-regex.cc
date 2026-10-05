@@ -9,9 +9,8 @@
 #include "text/text-buffer.hh"
 
 #define TOML_ABI_NAMESPACES 0
-#define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
-#define TOML_IMPLEMENTATION 0
+#define TOML_HEADER_ONLY 0
 #include <toml++/toml.hpp>
 
 bool SyntaxHighlighterRegex::FromToml(toml::node* toml) {
@@ -100,9 +99,9 @@ void SyntaxHighlighterRegex::Highlight(Editor* editor, ID2D1RenderTarget* render
 					renderTarget->FillRectangle(
 						D2D_RECT_F {
 							.left   = offsetStart,
-							.top    = (settings.fontEditor.lineHeight * ln),
+							.top    = (fontEditor.lineHeight * ln),
 							.right  = offsetEnd,
-							.bottom = (settings.fontEditor.lineHeight * (ln+1)) },
+							.bottom = (fontEditor.lineHeight * (ln+1)) },
 						brush);
 				}
 			}

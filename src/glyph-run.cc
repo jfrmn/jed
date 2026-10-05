@@ -2,6 +2,7 @@
 #include "graphics.hh"
 #include "logging.hh"
 #include "util.hh"
+#include "settings.hh"
 #include "text/text-buffer.hh"
 
 #include <atomic>
@@ -162,6 +163,22 @@ Font::~Font() noexcept {
 		fontFace->Release();
 }
 
+Font fontUi {};
+Font fontEditor {};
+
+bool InitFonts() {
+	if (!fontUi.Init(settings.fontUi)) {
+		LogError("failed to load default font '%.*s' %dpt", SIZE_AND_DATA(settings.fontUi.name), fontUi.size);
+		return false;
+	}
+	
+	if (!fontEditor.Init(settings.fontEditor)) {
+		LogError("failed to load default font '%.*s' %dpt", SIZE_AND_DATA(settings.fontEditor.name), fontUi.size);
+		return false;
+	}
+	
+	return true;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //

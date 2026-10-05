@@ -5,9 +5,8 @@
 #include "tools.hh"
 
 #define TOML_ABI_NAMESPACES 0
-#define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
-#define TOML_IMPLEMENTATION 1
+#define TOML_HEADER_ONLY 0
 #include <toml++/toml.hpp>
 
 #define WIN32_LEAN_AND_MEAN
@@ -16,6 +15,7 @@
 #include <wincodec.h>
 #include <dwrite_1.h> // @FIXME only needed to release font face - handle that in Font 
 #include <Windows.h>
+#include <ShlObj.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // 
@@ -369,33 +369,6 @@ ID2D1SolidColorBrush* Settings::Colors::UseUiBackgroundInvalid() const     { ret
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static ID2D1Bitmap* CreateDummyIcon(ID2D1DeviceContext* deviceContext) {
-	
-	ID2D1BitmapRenderTarget* bitmapRenderTarget = nullptr;
-	if (HRESULT hr = deviceContext->CreateCompatibleRenderTarget({32.0f, 32.0f}, &bitmapRenderTarget); hr != S_OK) {
-		LogError("CreateCompatibleRenderTarget() failed. HRESULT: %s", StrHr(hr));
-		return nullptr;
-	}
-	
-	DEFER(bitmapRenderTarget->Release());
-			
-	bitmapRenderTarget->BeginDraw();
-	bitmapRenderTarget->Clear(D2D1_COLOR_F {1.0f, 0.0f, 1.0f, 1.0f});
-		
-	if (HRESULT hr = bitmapRenderTarget->EndDraw(); hr != S_OK) {
-		LogError("EndDraw() failed. HRESULT: %s", StrHr(hr));
-		return nullptr;
-	}
-		
-	ID2D1Bitmap* dummyIcon = nullptr;
-	if (HRESULT hr = bitmapRenderTarget->GetBitmap(&dummyIcon); hr != S_OK) {
-		LogError("GetBitmap() failed. HRESULT: %s", StrHr(hr));
-		return nullptr;
-	}
-	
-	return dummyIcon;
-}
-
 static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 	
 	if (node->is_array()) {
@@ -472,83 +445,7 @@ static bool ToColor(const toml::node* node, /*out*/ Color* color) {
 	return true;	
 }
 
-static bool LoadIcon(std::string_view utf8Path, ID2D1DeviceContext* deviceContext, /*out*/ ID2D1Bitmap** icon) {
-	
-	wchar filePath[MAX_PATH + 1];
-	u64 length = 0;
-	ToUtf16(utf8Path, filePath, &length);
-	filePath[length] = '\0';
-
-	if (GetFileAttributesW(filePath) == INVALID_FILE_ATTRIBUTES) {
-		LogError("file does not exists: '%.*s'", SIZE_AND_DATA(utf8Path));
-		return false;
-	}
-
-	IWICBitmapDecoder* decoder = nullptr;
-	if (HRESULT hr = wicFactory->CreateDecoderFromFilename(filePath, NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder); hr != S_OK) {
-		LogError("CreateDecoderFromFilename() failed");
-		return false;
-	}
-	DEFER(decoder->Release());
-
-	IWICBitmapFrameDecode* frameDecode = nullptr;
-	if (HRESULT hr = decoder->GetFrame(0, &frameDecode); hr != S_OK) {
-		LogError("failed to decode frame. HRESULT: %s", StrHr(hr));
-		return false;
-	}
-	DEFER(frameDecode->Release());
-	
-	IWICFormatConverter* converter = nullptr;
-	if (HRESULT hr = wicFactory->CreateFormatConverter(&converter); hr != S_OK) {
-		LogError("CreateFormatConverter() failed. HRESULT: %s", StrHr(hr));
-		return false;
-	}
-	DEFER(converter->Release());
-	
-	if (HRESULT hr = converter->Initialize(
-			frameDecode,
-			GUID_WICPixelFormat32bppPRGBA,
-			WICBitmapDitherTypeNone,
-			nullptr,
-			0.0f,
-			WICBitmapPaletteTypeMedianCut); hr != S_OK) {
-		LogError("failed to initialize converter. HRESULT: %s", StrHr(hr));
-		return false;
-	}
-
-	IWICBitmap* wicBitmap = nullptr;
-	if (HRESULT hr = wicFactory->CreateBitmapFromSource(converter, WICBitmapCreateCacheOption::WICBitmapNoCache, &wicBitmap); hr != S_OK) {
-		LogError("CreateBitmapFromSource() failed. HRESULT: %s", StrHr(hr));
-		return false;
-	}
-	DEFER(wicBitmap->Release());
-	
-	ID2D1Bitmap* bitmap = nullptr;
-	if (HRESULT hr = deviceContext->CreateBitmapFromWicBitmap(wicBitmap, &bitmap); hr != S_OK) {
-		LogError("failed to create ID2D1Bitmap from IWICBitmap. HRESULT: %s", StrHr(hr));
-		return false;
-	}
-	
-	if (*icon)
-	   (*icon)->Release();
-	
-	*icon = bitmap;
-	return true;
-}
-
-static bool LoadIcon(const toml::node* node, ID2D1DeviceContext* deviceContext, /*out*/ ID2D1Bitmap** icon) {
-	
-	const toml::value<std::string>* value = node->as_string();
-	if (!value) {
-		LogError("%s: expected a string", Str(node->source()));
-		return false;
-	}
-	
-	return LoadIcon(value->get(), deviceContext, icon);
-}
-
-static bool LoadFont(toml::node* node, /*out*/ Font* font) {
-	Font::Description fontDescription {};
+static bool ToFontDescription(toml::node* node, /*out*/ Font::Description* fontDescription) {
 	
 	toml::table* table = node->as_table();
 	if (!table) {
@@ -560,7 +457,7 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	// name
 	//
 	if (toml::value<std::string>* valName = table->get_as<std::string>("name")) {
-		fontDescription.name = std::move(valName->get());
+		fontDescription->name = std::move(valName->get());
 	} else {
 		LogError("%s: expected entry 'name' as string", Str(table->source()));
 		return false;
@@ -577,9 +474,9 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 		}
 		
 		if (const auto* value = node->as_floating_point()) {
-			fontDescription.size = static_cast<f32>(value->get());
+			fontDescription->size = static_cast<f32>(value->get());
 		} else if (const auto* value = node->as_integer()) {
-			fontDescription.size = static_cast<f32>(value->get());
+			fontDescription->size = static_cast<f32>(value->get());
 		} else {
 			LogError("%s: expected a float or int", Str(node->source()));
 			return false;
@@ -591,64 +488,39 @@ static bool LoadFont(toml::node* node, /*out*/ Font* font) {
 	//
 	{
 		if (const auto node = table->get_as<s64>("weight"))
-			fontDescription.weight = node->get();
+			fontDescription->weight = node->get();
 		
 		if (const auto node = table->get_as<s64>("style"))
-			fontDescription.style = node->get();
+			fontDescription->style = node->get();
 		
 		if (const auto node = table->get_as<s64>("stretch"))
-			fontDescription.stretch = node->get();
+			fontDescription->stretch = node->get();
 	}
 	
-	Font newFont {};
-	if (!newFont.Init(fontDescription)) {
-		LogError("failed to load font");
-		return false;
-	}
-	
-	if (font->fontFace)
-		font->fontFace->Release();
-	
-	*font = newFont;
-	newFont.fontFace = nullptr;
 	return true;
 }
 
-bool Settings::Init(ID2D1DeviceContext* deviceContext) {
+static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 	
 	//
-	// load fallback font
+	// check if file exists
 	//
-	if (!fontEditor.Init(Font::Description {
-		.name = "Consolas",
-		.size = 12.0f})) {
-		LogFatal("failed to load fallback font 'Consolas' 12pt");
-		return false;
+	const DWORD fileattr = GetFileAttributesA(filepath.data());
+	if (fileattr == INVALID_FILE_ATTRIBUTES || (fileattr & FILE_ATTRIBUTE_DIRECTORY)) {
+		LogTrace("no settings file in %.*s", SIZE_AND_DATA(filepath));
+		return true;
 	}
-	if (!fontEditor.Init(Font::Description {
-		.name = "Arial",
-		.size = 12.0f})) {
-		LogFatal("failed to load fallback font 'Arial' 12pt");
-		return false;
-	}
-	
-	const std::string settingsFilepath = 
-#ifdef _DEBUG
-	 ".\\settings.toml";
-#else
-	FormatString("%s\\settings.toml", GetProcessDirectory());
-#endif
 	
 	//
 	// parse file
 	//
-	LogInfo("loading settings from '%s'", settingsFilepath.c_str());
+	LogInfo("loading settings from '%.*s'", SIZE_AND_DATA(filepath));
 	
-	toml::parse_result result = toml::parse_file(settingsFilepath);
+	toml::parse_result result = toml::parse_file(filepath);
 	
 	if (result.failed()) {
 		const toml::parse_error& error = result.error();
-		LogError("file parse settings file '%s'\nerror: %.*s at %s", settingsFilepath.c_str(), SIZE_AND_DATA(error.description()), Str(error.source()));
+		LogError("file parse settings file '%.*s'\nerror: %.*s at %s", SIZE_AND_DATA(filepath), SIZE_AND_DATA(error.description()), Str(error.source()));
 		return false;
 	}
 
@@ -658,10 +530,10 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	// load colors
 	//
 	if (const toml::table* tblColors = table.get_as<toml::table>("Colors")) {
-		for (u64 i = 0; i < NUM_COLORS; i++) {
+		for (u64 i = 0; i < Settings::NUM_COLORS; i++) {
 			const toml::node* nodeColor = tblColors->get(colorNames[i]);
 			if (!nodeColor) continue;
-			ToColor(nodeColor, &colorArray[i]);
+			ToColor(nodeColor, &self->colorArray[i]);
 		}
 	}
 
@@ -670,22 +542,22 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 	//
 	if (toml::table* tblFonts = table.get_as<toml::table>("Font")) {
 		if (toml::node* nodeFontEditor = tblFonts->get("editor"))
-			LoadFont(nodeFontEditor, &fontEditor);
+			ToFontDescription(nodeFontEditor, &self->fontEditor);
 		if (toml::node* nodeFontUi = tblFonts->get("ui"))
-			LoadFont(nodeFontUi, &fontUi);
+			ToFontDescription(nodeFontUi, &self->fontUi);
 	}
 	
 	//
 	// load tools
 	//
 	if (toml::node* nodeTools = table.get("Tools"))
-		Tool::FromToml(nodeTools, &tools);
+		Tool::FromToml(nodeTools, &self->tools);
 		
 	//
 	// syntax colors
 	//
 	if (auto tblSynColors = table.get_as<toml::table>("Syntax-Colors")) {
-		syntaxColors.Reserve(tblSynColors->size());
+		self->syntaxColors.Reserve(tblSynColors->size());
 		for (auto nodeColor : *tblSynColors) {
 			Color color {};
 			if (!Color::FromToml(nodeColor.second, &color)) {
@@ -693,8 +565,73 @@ bool Settings::Init(ID2D1DeviceContext* deviceContext) {
 				continue;
 			}
 			
-			syntaxColors.Upsert(std::string {nodeColor.first}, color);
+			self->syntaxColors.Upsert(std::string {nodeColor.first}, color);
 		}
+	}
+	
+	return true;
+}
+
+bool Settings::Init() {
+	
+	char buffer[_MAX_PATH];
+	const std::string_view dotFolderAndFilename = "\\.jed\\settings.toml";
+	
+	//
+	// read the file in the home directory first
+	//
+	{
+		wchar* wHomeDirectory = nullptr;
+		if (HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &wHomeDirectory); hr != S_OK) {
+			LogError("Failed to obain users home directory. HRESULT: %s", StrHr(hr));
+			return false;
+		}
+		
+		u64 bufferFilled;
+		ToUtf8(wHomeDirectory, buffer, &bufferFilled);
+		
+		// Note:
+		// the path returned from SHGetKnownFolderPath does NOT have a trailing slash
+		// we also need one more for the null terminator
+		
+		if (sizeof(buffer) - bufferFilled < dotFolderAndFilename.size() + 1u) {
+			LogError("filename too long: %S\\%*.s", wHomeDirectory, SIZE_AND_DATA(dotFolderAndFilename));
+			return false;
+		}
+		
+		memcpy_s(buffer + bufferFilled, sizeof(buffer) - bufferFilled, dotFolderAndFilename.data(), dotFolderAndFilename.size());
+		bufferFilled += dotFolderAndFilename.size();
+		
+		buffer[bufferFilled] = '\0';
+		bufferFilled += 1;
+		
+		const std::string_view fileInHomeDirectory {buffer, bufferFilled};
+		
+		if (!ReadSettingsFile(this, fileInHomeDirectory)) 
+			return false;
+	
+		memset(buffer, 0, sizeof(buffer));
+	}
+		
+	//
+	// read file in the current working directory
+	//
+	{
+		memset(buffer, 0, sizeof(buffer));
+		
+		const std::string_view cwd = GetWorkingDirectory();
+		if (sizeof(buffer) < cwd.size() + dotFolderAndFilename.size() + 1u) {
+			LogError("filename too long: %*.s%*.s", SIZE_AND_DATA(cwd), SIZE_AND_DATA(dotFolderAndFilename));
+			return false;
+		}
+		
+		memcpy_s(buffer, sizeof(buffer), cwd.data(), cwd.size());
+		memcpy_s(buffer + cwd.size(), sizeof(buffer) - cwd.size(), dotFolderAndFilename.data(), dotFolderAndFilename.size());
+		buffer[cwd.size() + dotFolderAndFilename.size()] = '\0';
+		
+		const std::string_view fileInCwd {buffer, cwd.size() + dotFolderAndFilename.size()};
+		if (!ReadSettingsFile(this, fileInCwd))
+			return false;
 	}
 	
 	return true;

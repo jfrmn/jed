@@ -242,7 +242,7 @@ LRESULT __stdcall WindowProc(HWND hWnd, UINT nMSG, WPARAM wParam, LPARAM lParam)
 			
 			if (!ToUtf8(std::wstring_view {&wch, 1u}, self->event.text.data, &self->event.text.len)) {
 				LogWarning("failed to convert input to utf-8");
-				return false;
+				return -1l;
 			}
 		
 			self->event.type = Event::Type_Text;

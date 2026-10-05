@@ -162,7 +162,7 @@ bool FilePreview::Load(const LoadArgs& args) {
 			GlyphRun& run = lines.emplace_back();
 			const TextBuffer::Line& line = textBuffer.GetLineAt(i);
 			
-			run.Shape(line.GetText(), settings.fontEditor);
+			run.Shape(line.GetText(), fontEditor);
 			
 			const f32 runWidth = run.width + PADDING_X2;
 			if (width < runWidth)
@@ -259,7 +259,7 @@ void FilePreview::OnUpdate() {
 	// lines
 	for (u64 i = 0u; i < lines.size(); i++) {
 		const GlyphRun& run = lines[i];
-		run.Draw(deviceContext, x + PADDING, y + (i * settings.fontEditor.lineHeight) + PADDING, settings.fontEditor, settings.colors.UseEditorText());
+		run.Draw(deviceContext, x + PADDING, y + (i * fontEditor.lineHeight) + PADDING, fontEditor, settings.colors.UseEditorText());
 	}
 	
 	if (highlightMode != HighlightMode_None) {
@@ -276,13 +276,13 @@ void FilePreview::OnUpdate() {
 				deviceContext->FillRectangle(
 					D2D_RECT_F {
 						.left   = x + PADDING + from,
-						.top    = y + (settings.fontEditor.lineHeight * line),
+						.top    = y + (fontEditor.lineHeight * line),
 						.right  = x + PADDING + to,
-						.bottom = y + (settings.fontEditor.lineHeight * (line+1u))},
+						.bottom = y + (fontEditor.lineHeight * (line+1u))},
 					brush);
 			
 			} else if (highlightMode == HighlightMode_Underline) {
-				const f32 y = this->y + PADDING + (settings.fontEditor.lineHeight * line) + settings.fontEditor.underlineOffset;
+				const f32 y = this->y + PADDING + (fontEditor.lineHeight * line) + fontEditor.underlineOffset;
 				deviceContext->DrawLine(
 					D2D_POINT_2F {x + PADDING + from, y},
 					D2D_POINT_2F {x + PADDING + to,   y},
@@ -297,6 +297,6 @@ void FilePreview::OnUpdate() {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 D2D_RECT_F FilePreview::GetArea() const {
-	const f32 height = lines.size() * settings.fontEditor.lineHeight + PADDING_X2;
+	const f32 height = lines.size() * fontEditor.lineHeight + PADDING_X2;
 	return MakeRect(x, y, width, height);
 }

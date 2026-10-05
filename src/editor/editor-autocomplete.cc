@@ -45,16 +45,16 @@ void EditorAutocomplete::Update() {
 	DEFER(delete[] glyphRuns);
 	
 	f32 width = .0f;
-	f32 height = itemCount * settings.fontEditor.lineHeight;
+	f32 height = itemCount * fontEditor.lineHeight;
 	{
 		for (u64 i = 0u; i < itemCount; i++) {
 			GlyphRun& runLabel    = glyphRuns[i].first;
 			GlyphRun& runDetails  = glyphRuns[i].second;
 			
-			runLabel.Shape(items[i].label, settings.fontEditor);
-			runDetails.Shape(items[i].details, settings.fontEditor);
+			runLabel.Shape(items[i].label, fontEditor);
+			runDetails.Shape(items[i].details, fontEditor);
 			
-			const f32 currentWidth = (PADDING_X2 + settings.fontEditor.spaceAdvance) + runLabel.width + runDetails.width + PADDING_X3;
+			const f32 currentWidth = (PADDING_X2 + fontEditor.spaceAdvance) + runLabel.width + runDetails.width + PADDING_X3;
 			if (width < currentWidth)
 				width = currentWidth;
 		}
@@ -76,11 +76,11 @@ void EditorAutocomplete::Update() {
 		const GlyphRun& runLabel = glyphRuns[i].first;
 		const GlyphRun& runDetails  = glyphRuns[i].second;
 		
-		const f32 offsety = (settings.fontEditor.lineHeight * i);
+		const f32 offsety = (fontEditor.lineHeight * i);
 		
 		if (i == selectedItem) {
 			deviceContext->FillRectangle(
-				MakeRect(position.x, position.y + offsety, width, settings.fontEditor.lineHeight),
+				MakeRect(position.x, position.y + offsety, width, fontEditor.lineHeight),
 				settings.colors.UseSelection());
 		}
 		
@@ -95,9 +95,9 @@ void EditorAutocomplete::Update() {
 			D2D_POINT_2F {
 				.x = position.x + PADDING,
 				.y = position.y + offsety},
-			settings.fontEditor.lineHeight);
+			fontEditor.lineHeight);
 		
-		const f32 textPosX = position.x + PADDING_X2 + settings.fontEditor.lineHeight;
+		const f32 textPosX = position.x + PADDING_X2 + fontEditor.lineHeight;
 		const f32 textPosY = position.y + offsety;
 		
 		// draw match result
@@ -113,20 +113,20 @@ void EditorAutocomplete::Update() {
 					.left   = textPosX + offsetFrom,
 				    .top    = textPosY,
 				    .right  = textPosX + offsetTo,
-				    .bottom = textPosY + settings.fontUi.lineHeight},
+				    .bottom = textPosY + fontUi.lineHeight},
 				settings.colors.UseSearchResult());
 		}
 		
 		runLabel.Draw(deviceContext,
 			textPosX,
 			textPosY,
-			settings.fontEditor,
+			fontEditor,
 			settings.colors.UseUiText());
 		
 		runDetails.Draw(deviceContext,
 			textPosX + PADDING + runLabel.width,
 			textPosY,
-			settings.fontEditor,
+			fontEditor,
 			settings.colors.UseUiText(false));
 	}
 	

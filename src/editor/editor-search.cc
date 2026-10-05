@@ -37,7 +37,7 @@ EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 	self->owner = editor;
 
 	// shape headline
-	if (!self->glyphRunHeadline.Shape("Find & Replace", settings.fontUi)) {
+	if (!self->glyphRunHeadline.Shape("Find & Replace", fontUi)) {
 		LogError("failed to shape headline");
 		return nullptr;
 	}
@@ -61,12 +61,12 @@ EditorSearch* EditorSearch::Make(Editor* editor, bool showReplace) {
 			StartNewSearch(self.get(), initText);
 		}
 
-		if (!self->textboxSearch.Init(&settings.fontEditor, "Search", std::move(initText))) {
+		if (!self->textboxSearch.Init(&fontEditor, "Search", std::move(initText))) {
 			LogError("init search textbox failed");
 			return nullptr;
 		}
 
-		if (!self->textboxReplace.Init(&settings.fontEditor, "Replace")) {
+		if (!self->textboxReplace.Init(&fontEditor, "Replace")) {
 			LogError("init replace textbox failed");
 			return nullptr;
 		}
@@ -157,17 +157,17 @@ bool EditorSearch::IsSearch() const {
 static D2D_RECT_F GetResultListButtonArea(const EditorSearch* self) {
 	return D2D_RECT_F {
 		.left   = self->area.left,
-		.top    = self->area.bottom - settings.fontUi.lineHeight - PADDING_X2,
+		.top    = self->area.bottom - fontUi.lineHeight - PADDING_X2,
 		.right  = self->area.right,
 		.bottom = self->area.bottom };
 }
 
 static D2D_RECT_F GetSearchModifierButtonArea(const EditorSearch* self, int buttonIndex) {
 	return D2D_RECT_F {
-		.left   = self->area.right  - (MARGIN * (buttonIndex+1)) - (settings.fontUi.lineHeight * (buttonIndex+1)),
+		.left   = self->area.right  - (MARGIN * (buttonIndex+1)) - (fontUi.lineHeight * (buttonIndex+1)),
 		.top    = self->area.top    +  MARGIN,
-		.right  = self->area.right  - (MARGIN * (buttonIndex+1)) - (settings.fontUi.lineHeight * (buttonIndex)),
-		.bottom = self->area.top    +  MARGIN + settings.fontUi.lineHeight};
+		.right  = self->area.right  - (MARGIN * (buttonIndex+1)) - (fontUi.lineHeight * (buttonIndex)),
+		.bottom = self->area.top    +  MARGIN + fontUi.lineHeight};
 }
 
 static void OnClickToggleResultList(void* ud, u64) {
@@ -193,7 +193,7 @@ void EditorSearch::Update() {
 	// calc size
 	//
 	{
-		const float headlineHeight = settings.fontUi.lineHeight;
+		const float headlineHeight = fontUi.lineHeight;
 		
 		const float totalWidth = (RectWidth(owner->area) * 0.3f);
 		float totalHeight = MARGIN + headlineHeight + MARGIN + textboxSearch.Height() + MARGIN;
@@ -202,7 +202,7 @@ void EditorSearch::Update() {
 			totalHeight += textboxReplace.Height() + PADDING;
 			
 		if (threadData)
-			totalHeight += settings.fontUi.lineHeight + PADDING_X2;
+			totalHeight += fontUi.lineHeight + PADDING_X2;
 		
 		area = MakeRect(
 			owner->area.right - SCROLLBAR_WIDTH_WIDE - totalWidth - MARGIN,
@@ -243,16 +243,16 @@ void EditorSearch::Update() {
 		glyphRunHeadline.Draw(deviceContext,
 			area.left + MARGIN,
 			area.top  + MARGIN,
-			settings.fontUi,
+			fontUi,
 			settings.colors.UseUiText());
 			
 		deviceContext->DrawLine(
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN,
-				.y = area.top  + MARGIN + settings.fontUi.lineHeight },
+				.y = area.top  + MARGIN + fontUi.lineHeight },
 			D2D1_POINT_2F {
 				.x = area.left + MARGIN + glyphRunHeadline.width,
-				.y = area.top  + MARGIN + settings.fontUi.lineHeight },
+				.y = area.top  + MARGIN + fontUi.lineHeight },
 			settings.colors.UseUiText());
 	}
 
@@ -274,8 +274,8 @@ void EditorSearch::Update() {
 					: ICON_EDITORSEARCHRESULTS_CLOSED, 
 				D2D_POINT_2F {
 					.x = area.left   + PADDING_X2,
-					.y = area.bottom - PADDING - settings.fontUi.lineHeight},
-				settings.fontUi.lineHeight);
+					.y = area.bottom - PADDING - fontUi.lineHeight},
+				fontUi.lineHeight);
 
 			char textBuffer[32] {0};
 			if (!threadData->isComplete) {
@@ -286,14 +286,14 @@ void EditorSearch::Update() {
 			
 			staticGlyphRun.ShapeAndDraw(deviceContext,
 				std::string_view {textBuffer},
-				area.left   + settings.fontUi.lineHeight + PADDING_X2 + settings.fontUi.spaceAdvance,
-				area.bottom - settings.fontUi.lineHeight - PADDING,
-				settings.fontUi,
+				area.left   + fontUi.lineHeight + PADDING_X2 + fontUi.spaceAdvance,
+				area.bottom - fontUi.lineHeight - PADDING,
+				fontUi,
 				settings.colors.UseUiText());
 			
 			const D2D_RECT_F resultListButtonArea {
 				.left   = area.left,
-				.top    = area.bottom - settings.fontUi.lineHeight - PADDING_X2,
+				.top    = area.bottom - fontUi.lineHeight - PADDING_X2,
 				.right  = area.right,
 				.bottom = area.bottom};
 			
@@ -319,11 +319,11 @@ void EditorSearch::Update() {
 				if (maxLocationLength < locationBufferLen)
 					maxLocationLength = locationBufferLen;
 				
-				staticGlyphRun.Shape(locationBuffer, settings.fontEditor);
+				staticGlyphRun.Shape(locationBuffer, fontEditor);
 				staticGlyphRun.Draw(deviceContext,
 					area.left,
-					area.bottom + (i * settings.fontEditor.lineHeight),
-					settings.fontEditor,
+					area.bottom + (i * fontEditor.lineHeight),
+					fontEditor,
 					settings.colors.UseUiBackground());
 			}
 			
@@ -346,44 +346,44 @@ void EditorSearch::Update() {
 						deviceContext->DrawRectangle(
 							D2D1_RECT_F {
 								.left   = area.left,
-								.top    = area.bottom + (settings.fontEditor.lineHeight * i),
+								.top    = area.bottom + (fontEditor.lineHeight * i),
 								.right  = area.right,
-								.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))},
+								.bottom = area.bottom + (fontEditor.lineHeight * (i+1))},
 							settings.colors.UseUiText(false));
 						break;
 					}
 				}
 				
-				staticGlyphRun.Shape(lineText, settings.fontEditor);
+				staticGlyphRun.Shape(lineText, fontEditor);
 
-				const float locationOffset = settings.fontEditor.spaceAdvance * maxLocationLength;
+				const float locationOffset = fontEditor.spaceAdvance * maxLocationLength;
 				deviceContext->FillRectangle(
 					D2D1_RECT_F {
 						.left   = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.from.character - numSkippedCharacters),
-						.top    = area.bottom + (settings.fontEditor.lineHeight * i),
+						.top    = area.bottom + (fontEditor.lineHeight * i),
 						.right  = area.left   + locationOffset + staticGlyphRun.MeasureOffset(result.to.character - numSkippedCharacters),
-						.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1)) },
+						.bottom = area.bottom + (fontEditor.lineHeight * (i+1)) },
 					settings.colors.UseSearchResult());
 
 				staticGlyphRun.Draw(deviceContext,
 					area.left + locationOffset,
-					area.bottom + (i * settings.fontEditor.lineHeight),
-					settings.fontEditor,
+					area.bottom + (i * fontEditor.lineHeight),
+					fontEditor,
 					settings.colors.UseUiText());
 				
 				const D2D1_RECT_F itemRect {
 					.left   = area.left,
-					.top    = area.bottom + (settings.fontEditor.lineHeight * i),
+					.top    = area.bottom + (fontEditor.lineHeight * i),
 					.right  = area.right,
-					.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))};
+					.bottom = area.bottom + (fontEditor.lineHeight * (i+1))};
 				
 				if (mouse.Hittest(itemRect, this, OnClickResultItem, i)) {
 					deviceContext->FillRectangle(
 						D2D1_RECT_F {
 							.left   = area.left,
-							.top    = area.bottom + (settings.fontEditor.lineHeight * i),
+							.top    = area.bottom + (fontEditor.lineHeight * i),
 							.right  = area.right,
-							.bottom = area.bottom + (settings.fontEditor.lineHeight * (i+1))},
+							.bottom = area.bottom + (fontEditor.lineHeight * (i+1))},
 						settings.colors.UseHover());
 				}
 			}

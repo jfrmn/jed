@@ -74,8 +74,13 @@ struct Settings {
 	Hashtable<Color> syntaxColors = {};	
 	std::vector<Tool> tools = {};
 		
-	Font fontUi = {};
-	Font fontEditor = {};
+	Font::Description fontUi = {
+		.name = "Segoe UI",
+		.size = 12.0f};
+		
+	Font::Description fontEditor = {
+		.name = "Consolas",
+		.size = 12.0f};
 	
 	f32 scrollbarMarkerHoverDistance = 10.0f;
 	bool backupFileBeforeSaving = false; // @TODO not implemented
@@ -87,7 +92,7 @@ struct Settings {
 	// functions
 	//-----------------------------------------------------
 	
-	bool Init(ID2D1DeviceContext* deviceContext);
+	bool Init();
 		
 	bool LookupKeyBind(const Event& event, /*out*/ Command* command);
 };

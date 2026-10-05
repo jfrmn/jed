@@ -59,15 +59,15 @@ void EditorTextLocationList::Update() {
 		
 		const std::string_view directory = GetDirectoryFromPath(item.targetPath);
 		
-		runLabel.Shape(label, settings.fontUi);
-		runFullPath.Shape(directory, settings.fontUi);
+		runLabel.Shape(label, fontUi);
+		runFullPath.Shape(directory, fontUi);
 		
 		const f32 currentItemWidth = PADDING_X3 + runLabel.width + runFullPath.width;
 		if (width < currentItemWidth)
 			width = currentItemWidth;
 	}
 	
-	const f32 height = settings.fontUi.lineHeight * itemCount;
+	const f32 height = fontUi.lineHeight * itemCount;
 	const D2D_POINT_2F position = GetPosition();	
 	
 	//
@@ -82,7 +82,7 @@ void EditorTextLocationList::Update() {
 		GlyphRun& runLabel    = glyphRuns[i].first;
 		GlyphRun& runFullPath = glyphRuns[i].second;
 		
-		const f32 posY = position.y + (settings.fontUi.lineHeight * i);
+		const f32 posY = position.y + (fontUi.lineHeight * i);
 		
 		if (i == selectedItem) {
 			deviceContext->FillRectangle(
@@ -90,12 +90,12 @@ void EditorTextLocationList::Update() {
 					.left   = position.x,
 					.top    = posY,
 					.right  = position.x + width, //runLabel.GetTotalAdvance() + runFullPath.GetTotalAdvance() + PADDING_X3,
-					.bottom = position.y + settings.fontUi.lineHeight},
+					.bottom = position.y + fontUi.lineHeight},
 				settings.colors.UseSelection());
 		}
 		
-		runLabel.Draw(deviceContext, position.x + PADDING, posY, settings.fontUi, settings.colors.UseUiText());
-		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (settings.fontUi.lineHeight * i), settings.fontUi, settings.colors.UseUiText(false));
+		runLabel.Draw(deviceContext, position.x + PADDING, posY, fontUi, settings.colors.UseUiText());
+		runFullPath.Draw(deviceContext, position.x + PADDING_X2 + runLabel.width, position.y + (fontUi.lineHeight * i), fontUi, settings.colors.UseUiText(false));
 	}
 	
 	//
@@ -103,7 +103,7 @@ void EditorTextLocationList::Update() {
 	//
 	{
 		filePreview.x = position.x + width;
-		filePreview.y = position.y + (selectedItem * settings.fontUi.lineHeight);
+		filePreview.y = position.y + (selectedItem * fontUi.lineHeight);
 		filePreview.OnUpdate();
 	}
 }
@@ -164,8 +164,8 @@ bool EditorTextLocationList::HandleEvent(const Event& event) {
 			} else {
 				// The scrollarea.totalSize is not set yet. Right now, it gets updated every frame but no frame has been rendered yet
 				// Therefore scrollarea.GetMaxPositionY() does not work correctly and we need to calc the max. position manually here
-				const f32 maxPosition = (openedEditor->textController.buffer.LineCount() * settings.fontEditor.lineHeight) - openedEditor->scrollarea.vpSize.height;
-				const f32 targetPostion = (settings.fontEditor.lineHeight * item.selectionRange.start.line) - (openedEditor->scrollarea.vpSize.height * 0.4f);
+				const f32 maxPosition = (openedEditor->textController.buffer.LineCount() * fontEditor.lineHeight) - openedEditor->scrollarea.vpSize.height;
+				const f32 targetPostion = (fontEditor.lineHeight * item.selectionRange.start.line) - (openedEditor->scrollarea.vpSize.height * 0.4f);
 				
 				openedEditor->scrollarea.vpY = std::clamp(targetPostion, 0.0f, maxPosition);
 			}

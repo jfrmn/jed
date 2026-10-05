@@ -19,7 +19,16 @@ set(CACHE{DEPS_DIR} TYPE PATH VALUE "deps")
 #
 # toml++
 #
-target_include_directories (jed PRIVATE "${DEPS_DIR}/tomlplusplus/include")
+add_subdirectory ("${DEPS_DIR}/tomlplusplus" "${CMAKE_CURRENT_BINARY_DIR}/deps/tomlplusplus")
+add_library (tomlplusplus-static STATIC "${DEPS_DIR}/tomlplusplus/src/toml.cpp")
+target_link_libraries (tomlplusplus-static PUBLIC tomlplusplus::tomlplusplus)
+target_compile_definitions (tomlplusplus-static PUBLIC
+	TOML_ENABLE_UNRELEASED_FEATURES=1  #need for nested tables
+	TOML_HEADER_ONLY=0
+	TOML_ABI_NAMESPACES=0
+	TOML_EXCEPTIONS=0)
+target_link_libraries (jed tomlplusplus-static)
+
 
 #
 # pearl regex lib

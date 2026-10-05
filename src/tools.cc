@@ -6,16 +6,15 @@
 #include <d2d1.h>
 
 #define TOML_ABI_NAMESPACES 0
-#define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
-#define TOML_IMPLEMENTATION 0
+#define TOML_HEADER_ONLY 0
 #include <toml++/toml.hpp>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static void ReadRegexCaptureGroup(const toml::table* table, const Regex& regex, std::string_view key, /*out*/ u32* captureGroup) {
 	auto valGroup = table->get_as<s64>(key);
 	if (!valGroup) return;
-	if (valGroup->get() >= regex.TotalCaptureGroupCount() || valGroup->get() < 0u) {
+	if (valGroup->get() >= static_cast<s64>(regex.TotalCaptureGroupCount()) || valGroup->get() < 0) {
 		LogWarning("%s: value is out of range. regex only provides %u groups", Str(valGroup->source()), regex.TotalCaptureGroupCount());
 		return;
 	}

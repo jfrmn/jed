@@ -142,11 +142,11 @@ static void RelinkPanelsAndTabs(App* self) {
 }
 
 static float TabHeight() {
-	return settings.fontUi.lineHeight + PADDING_X2;
+	return fontUi.lineHeight + PADDING_X2;
 }
 
 static float StatusBarHeight() {
-	return settings.fontUi.lineHeight + PADDING_X2;
+	return fontUi.lineHeight + PADDING_X2;
 }
 
 static void ChangeTabOfFocusedPanel(App* self, u64 tabIndexToDisplay) {
@@ -246,7 +246,7 @@ Editor* App::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBeha
 			}
 			
 			const std::string_view title = GetFilenameFromPath(currentTab.editor->path);	
-			currentTab.title.Shape(title, settings.fontUi);
+			currentTab.title.Shape(title, fontUi);
 			
 			fileWatcher.SubscribeDirectoryOfFile(currentTab.editor->path);
 			
@@ -264,7 +264,7 @@ Editor* App::OpenEditor(std::string path, OpenBehavior openBehavior /*= OpenBeha
 			App::Tab& newTab = tabs.emplace_back();
 			
 			const std::string_view title = GetFilenameFromPath(editor->path);	
-			newTab.title.Shape(title, settings.fontUi);
+			newTab.title.Shape(title, fontUi);
 			newTab.editor = editor.release();
 			
 			fileWatcher.SubscribeDirectoryOfFile(newTab.editor->path);
@@ -518,7 +518,7 @@ void App::Update() {
 		for (u64 i = 0u; i < tabs.size(); i++) {
 			const Tab& tab = tabs[i];
 			
-			const f32 tabWidth = tab.title.width + settings.fontUi.lineHeight + PADDING_X4;
+			const f32 tabWidth = tab.title.width + fontUi.lineHeight + PADDING_X4;
 			const D2D1_RECT_F tabRect {
 				.left   = offsetX,
 				.top    = 0.0f,
@@ -531,12 +531,12 @@ void App::Update() {
 			else if (tab.panelIndex != U64_MAX)
 				deviceContext->FillRectangle(tabRect, settings.colors.UseUiBackground(false));
 			
-			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, settings.fontUi, settings.colors.UseUiText());
+			tab.title.Draw(deviceContext, PADDING + offsetX, PADDING, fontUi, settings.colors.UseUiText());
 			
 			if (tab.editor->fileRemoved) {
 				deviceContext->DrawLine(
-					D2D_POINT_2F {PADDING + offsetX,                   PADDING + settings.fontUi.strikethroughOffset},
-					D2D_POINT_2F {PADDING + offsetX + tab.title.width, PADDING + settings.fontUi.strikethroughOffset},
+					D2D_POINT_2F {PADDING + offsetX,                   PADDING + fontUi.strikethroughOffset},
+					D2D_POINT_2F {PADDING + offsetX + tab.title.width, PADDING + fontUi.strikethroughOffset},
 					settings.colors.UseUiText());
 			}
 			
@@ -561,7 +561,7 @@ void App::Update() {
 						const s64 toLine =   std::min(static_cast<s64>(caret.line) + 2,
 													  static_cast<s64>(tab.editor->textController.buffer.GetMaxLine()));
 						
-						staticGlyphRun.Shape(tab.editor->path, settings.fontUi);
+						staticGlyphRun.Shape(tab.editor->path, fontUi);
 						
 						const u64 lineCount = (toLine - fromLine + 1);
 						const f32 width = std::max(300.0f, staticGlyphRun.width + PADDING_X2);
@@ -570,7 +570,7 @@ void App::Update() {
 							.left = areaTitle.left,
 							.top = areaTitle.bottom,
 							.right = areaTitle.left + width,
-							.bottom = areaTitle.bottom + settings.fontUi.lineHeight + PADDING_X4 + (lineCount * settings.fontEditor.lineHeight)};
+							.bottom = areaTitle.bottom + fontUi.lineHeight + PADDING_X4 + (lineCount * fontEditor.lineHeight)};
 						
 						// blur background
 						BlurArea(deviceContext, previewPanelArea);
@@ -579,17 +579,17 @@ void App::Update() {
 						
 						// draw header						
 						deviceContext->FillRoundedRectangle(ToRounded(
-							MakeRect(previewPanelArea.left, previewPanelArea.top, width, settings.fontUi.lineHeight + PADDING_X2)),
+							MakeRect(previewPanelArea.left, previewPanelArea.top, width, fontUi.lineHeight + PADDING_X2)),
 							settings.colors.UseUiBackground());
 						
 						staticGlyphRun.Draw(deviceContext,
 							previewPanelArea.left + PADDING,
 							previewPanelArea.top + PADDING,
-							settings.fontUi,
+							fontUi,
 							settings.colors.UseUiText(false));
 						
 						auto GetYOffsetForLine = [fromLine] (u64 ln) {
-							return PADDING_X3 + settings.fontUi.lineHeight + (settings.fontEditor.lineHeight * (ln-fromLine));
+							return PADDING_X3 + fontUi.lineHeight + (fontEditor.lineHeight * (ln-fromLine));
 						};
 						
 						// draw lines
@@ -597,7 +597,7 @@ void App::Update() {
 							tab.editor->glyphRuns[i].Draw(deviceContext,
 								previewPanelArea.left + PADDING,
 								previewPanelArea.top + GetYOffsetForLine(i),
-								settings.fontEditor,
+								fontEditor,
 								settings.colors.UseEditorText());
 						}
 						
@@ -610,8 +610,8 @@ void App::Update() {
 								D2D_RECT_F {
 									.left = previewPanelArea.left + offsetX,
 									.top = previewPanelArea.top + offsetY,
-									.right = previewPanelArea.left + offsetX + settings.fontEditor.spaceAdvance,
-									.bottom = previewPanelArea.top + offsetY + settings.fontUi.lineHeight},
+									.right = previewPanelArea.left + offsetX + fontEditor.spaceAdvance,
+									.bottom = previewPanelArea.top + offsetY + fontUi.lineHeight},
 								settings.colors.UseEditorText());
 						}
 						
@@ -637,8 +637,8 @@ void App::Update() {
 				const D2D1_RECT_F areaIcon {
 					.left   = PADDING + offsetX + tab.title.width + PADDING,
 					.top    = 0.0f,
-					.right  = PADDING + offsetX + tab.title.width + settings.fontUi.lineHeight + PADDING_X3,
-					.bottom = PADDING_X2 + settings.fontUi.lineHeight};
+					.right  = PADDING + offsetX + tab.title.width + fontUi.lineHeight + PADDING_X3,
+					.bottom = PADDING_X2 + fontUi.lineHeight};
 			
 				const bool isHovered = mouse.Hittest(areaIcon, this, OnCloseTab, i);
 				
@@ -683,10 +683,10 @@ void App::Update() {
 		static_assert(STATIC_ARRAY_SIZE(buttonTexts) == BUTTON_COUNT);
 		static_assert(STATIC_ARRAY_SIZE(buttonRuns) == BUTTON_COUNT);
 		
-		GlyphRun::ShapeBatch(buttonTexts, settings.fontUi, buttonRuns);
+		GlyphRun::ShapeBatch(buttonTexts, fontUi, buttonRuns);
 		
 		const f32 buttonWidth = std::max_element(buttonRuns, buttonRuns + BUTTON_COUNT, [] (const auto& lhs, const auto& rhs) { return lhs.width < rhs.width; })->width + PADDING_X2;
-		const f32 totalHeight = ((settings.fontUi.lineHeight + PADDING_X2) * BUTTON_COUNT) + (MARGIN_X2 * BUTTON_COUNT-1);
+		const f32 totalHeight = ((fontUi.lineHeight + PADDING_X2) * BUTTON_COUNT) + (MARGIN_X2 * BUTTON_COUNT-1);
 		
 		f32 offsetY = 0.0f;
 		for (u64 i = 0u; i < BUTTON_COUNT; i++) {
@@ -695,19 +695,19 @@ void App::Update() {
 				.left   = (mainWindow.width  / 2.0f) - (buttonWidth / 2.0f),
 				.top    = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY,
 				.right  = (mainWindow.width  / 2.0f) - (buttonWidth / 2.0f) + buttonWidth,
-				.bottom = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY + (settings.fontUi.lineHeight + PADDING_X2)};
+				.bottom = (mainWindow.height / 2.0f) - (totalHeight / 2.0f) + offsetY + (fontUi.lineHeight + PADDING_X2)};
 			
 			deviceContext->DrawRoundedRectangle(ToRounded(buttonRect), settings.colors.UseUiBackground());
 			
 			if ((i == 0 && searchBar) || i == 1 && explorer)
 				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.colors.UseUiBackground());
 			
-			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, settings.fontUi, settings.colors.UseUiText());
+			buttonRuns[i].DrawCenter(deviceContext, buttonRect.left, buttonRect.top + PADDING, buttonWidth, fontUi, settings.colors.UseUiText());
 			
 			if (mouse.Hittest(buttonRect, this, OnClickStartPage, i))
 				deviceContext->FillRoundedRectangle(ToRounded(buttonRect), settings.colors.UseHover(mouse.isDown));
 			
-			offsetY += settings.fontUi.lineHeight + PADDING_X2 + MARGIN_X2;
+			offsetY += fontUi.lineHeight + PADDING_X2 + MARGIN_X2;
 		}
 	}
 	
@@ -1029,7 +1029,7 @@ static void OnFileChanged(App* self, FileChangedEvent* fileChangedEvent) {
 			renamedTab->editor->OnFileChange(&record);
 			
 			const std::string_view newTitle = GetFilenameFromPath(recordFilepath);
-			renamedTab->title.Shape(newTitle, settings.fontUi);
+			renamedTab->title.Shape(newTitle, fontUi);
 			
 			renamedTab = nullptr;
 		

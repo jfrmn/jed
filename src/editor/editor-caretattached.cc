@@ -48,9 +48,9 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 		ASSERT_UNREACHABLE;
 	}
 	
-	staticGlyphRun.Shape(text, settings.fontEditor);
+	staticGlyphRun.Shape(text, fontEditor);
 	
-	const f32 width = PADDING_X3 + settings.fontEditor.lineHeight + staticGlyphRun.width;
+	const f32 width = PADDING_X3 + fontEditor.lineHeight + staticGlyphRun.width;
 	
 	// background
 	BlurArea(
@@ -59,7 +59,7 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 			.left   = position.x,
 			.top    = position.y,
 			.right  = position.x + width,
-			.bottom = position.y + settings.fontEditor.lineHeight});
+			.bottom = position.y + fontEditor.lineHeight});
 
 	// icon
 	icons.DrawIcon(deviceContext,
@@ -67,13 +67,13 @@ bool EditorCaretAttached::DrawIncompleteState(ID2D1DeviceContext* deviceContext,
 		D2D_POINT_2F {
 			.x = position.x + PADDING,
 			.y = position.y},
-		settings.fontEditor.lineHeight);
+		fontEditor.lineHeight);
 
 	// text
 	staticGlyphRun.Draw(deviceContext,
-		position.x + PADDING_X2 + settings.fontEditor.lineHeight,
+		position.x + PADDING_X2 + fontEditor.lineHeight,
 		position.y,
-		settings.fontEditor,
+		fontEditor,
 		settings.colors.UseUiText());
 	
 	return true;
@@ -83,5 +83,5 @@ D2D_POINT_2F EditorCaretAttached::GetPosition() const {
 	const D2D1_POINT_2F cursorPosition = owner->GetCaretLocation();
 	return D2D_POINT_2F {
 		.x = cursorPosition.x,
-		.y = cursorPosition.y + settings.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
+		.y = cursorPosition.y + fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y };
 }

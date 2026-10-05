@@ -28,8 +28,8 @@ void EditorSignatureHelp::Update() {
 	GlyphRun runLabel {};
 	GlyphRunMultiline runDocumentation {};
 	
-	runLabel.Shape(signature->label, settings.fontEditor);
-	runDocumentation.Shape(signature->documentation, settings.fontUi);
+	runLabel.Shape(signature->label, fontEditor);
+	runDocumentation.Shape(signature->documentation, fontUi);
 		
 	const Parameter* parameter = nullptr;
 	
@@ -52,9 +52,9 @@ void EditorSignatureHelp::Update() {
 		runLabel.width,
 		runDocumentation.GetWidth());
 	
-	const f32 height = PADDING_X2 + settings.fontEditor.lineHeight +
+	const f32 height = PADDING_X2 + fontEditor.lineHeight +
 		(runDocumentation.LineCount() > 0u || signatureCount > 1u
-			? settings.fontUi.lineHeight * std::max<u64>(1u, runDocumentation.LineCount())
+			? fontUi.lineHeight * std::max<u64>(1u, runDocumentation.LineCount())
 			: 0.0f);
 	
 	//
@@ -65,7 +65,7 @@ void EditorSignatureHelp::Update() {
 		.x = caretPosition.x,
 		.y = autocompleteIsActive
 			? caretPosition.y - TOOLTIP_CURSOR_EXTRA_OFFSET_Y - height
-			: caretPosition.y + settings.fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y};
+			: caretPosition.y + fontEditor.lineHeight + TOOLTIP_CURSOR_EXTRA_OFFSET_Y};
 	
 	//
 	// draw background
@@ -78,7 +78,7 @@ void EditorSignatureHelp::Update() {
 	// draw signature
 	//
 	{
-		runLabel.Draw(deviceContext, position.x + PADDING, position.y + PADDING, settings.fontEditor, settings.colors.UseUiText());
+		runLabel.Draw(deviceContext, position.x + PADDING, position.y + PADDING, fontEditor, settings.colors.UseUiText());
 		
 		if (parameter && parameter->labelIsSubstring) {
 			
@@ -88,26 +88,26 @@ void EditorSignatureHelp::Update() {
 			deviceContext->DrawLine(
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetFrom,
-					.y = position.y + settings.fontEditor.underlineOffset},
+					.y = position.y + fontEditor.underlineOffset},
 				D2D1_POINT_2F {
 					.x = position.x + PADDING + offsetTo,
-					.y = position.y + settings.fontEditor.underlineOffset},
+					.y = position.y + fontEditor.underlineOffset},
 				settings.colors.UseUiText());
 		}
 				
 		runDocumentation.Draw(
 			deviceContext,
 			position.x + PADDING,
-			position.y + PADDING + settings.fontEditor.lineHeight,
-			settings.fontUi,
+			position.y + PADDING + fontEditor.lineHeight,
+			fontUi,
 			settings.colors.UseUiText(false));
 		
 		if (signatureCount > 1u) {
 			const std::string text = FormatString("%u/%u", activeSignature + 1u, signatureCount);
 			
 			GlyphRun runSignatureIndex {};
-			runSignatureIndex.Shape(text, settings.fontUi);
-			runSignatureIndex.Draw(deviceContext, position.x + width - PADDING - runSignatureIndex.width, position.y + PADDING + settings.fontEditor.lineHeight, settings.fontUi, settings.colors.UseUiText());
+			runSignatureIndex.Shape(text, fontUi);
+			runSignatureIndex.Draw(deviceContext, position.x + width - PADDING - runSignatureIndex.width, position.y + PADDING + fontEditor.lineHeight, fontUi, settings.colors.UseUiText());
 		}
 	}
 }

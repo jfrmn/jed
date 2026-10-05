@@ -58,8 +58,13 @@ bool Init() {
 		return false;
 	}
 	
-	if (!settings.Init(mainWindow.deviceContext)) {
+	if (!settings.Init()) {
 		LogWarning("failed to load settings");
+	}
+	
+	if (!InitFonts()) {
+		LogFatal("failed to init fonts");
+		return false;
 	}
 	
 	if (!InitGraphics(mainWindow.deviceContext)) {

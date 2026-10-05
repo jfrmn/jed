@@ -48,7 +48,7 @@ bool InitEditor(std::string_view title, std::string_view text, /*out*/ Editor** 
 	tab.editor = newEditor;
 	tab.editor->Init();
 	tab.panelIndex = 0u;
-	tab.title.Shape(title, settings.fontUi);
+	tab.title.Shape(title, fontUi);
 	
 	App::Panel& panel = app.panels.emplace_back();
 	panel.editor = tab.editor;
@@ -63,7 +63,7 @@ bool InitEditor(std::string_view title, std::string_view text, /*out*/ Editor** 
 	tab.editor->textController.Reset();
 	
 	newEditor->glyphRuns.resize(newEditor->textController.buffer.LineCount());
-	return GlyphRun::ShapeBatch(newEditor->textController.buffer, settings.fontEditor, newEditor->glyphRuns);	
+	return GlyphRun::ShapeBatch(newEditor->textController.buffer, fontEditor, newEditor->glyphRuns);	
 };
 
 bool CloseEditor() {
@@ -84,7 +84,7 @@ void SetEditorText(Editor* editor, std::string_view text) {
 	editor->textController.buffer.RecreateLines();
 	editor->textController.Reset();
 	editor->glyphRuns.resize(editor->textController.buffer.LineCount());
-	REQUIRE_TRUE(GlyphRun::ShapeBatch(editor->textController.buffer, settings.fontEditor, editor->glyphRuns));
+	REQUIRE_TRUE(GlyphRun::ShapeBatch(editor->textController.buffer, fontEditor, editor->glyphRuns));
 }
 
 void PushEvent(const Event& event) {

@@ -27,7 +27,7 @@
 
 void SearchBar::Init(std::string_view placeholderText) {
 	
-	textBox.Init(&settings.fontUi, placeholderText);
+	textBox.Init(&fontUi, placeholderText);
 	
 	scrollarea.vpX = 0.0f;	
 	scrollarea.vpY = 0.0f;
@@ -43,7 +43,7 @@ SearchBar::~SearchBar() noexcept {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static f32 ItemHeight() {
-	return MARGIN_X2 + (settings.fontUi.lineHeight * 2);
+	return MARGIN_X2 + (fontUi.lineHeight * 2);
 }
 
 static void OnClickItem(void* ud, u64 i) {
@@ -157,12 +157,12 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 			params.prefix,
 			MARGIN + itemArea.left,
 			MARGIN + itemArea.top,
-			settings.fontUi,
+			fontUi,
 			settings.colors.UseEditorMultiCaret());
 		prefixOffset = staticGlyphRun.width + PADDING;
 	}
 	
-	staticGlyphRun.Shape(params.text, settings.fontUi);
+	staticGlyphRun.Shape(params.text, fontUi);
 	
 	f32 offsetFrom, offsetTo;
 	staticGlyphRun.MeasureOffsetRange(
@@ -175,20 +175,20 @@ void SearchBar::UpdateItem(u64 i, const SearchBar::UpdateItemParams& params) {
 			.left   = MARGIN + itemArea.left + prefixOffset + offsetFrom,
 		    .top    = MARGIN + itemArea.top,
 		    .right  = MARGIN + itemArea.left + prefixOffset + offsetTo,
-		    .bottom = MARGIN + itemArea.top + settings.fontUi.lineHeight},
+		    .bottom = MARGIN + itemArea.top + fontUi.lineHeight},
 		settings.colors.UseSearchResult());
 
 	staticGlyphRun.Draw(deviceContext,
 		MARGIN + itemArea.left + prefixOffset,
 	    MARGIN + itemArea.top,
-		settings.fontUi,
+		fontUi,
 		settings.colors.UseUiText());
 		
 	staticGlyphRun.ShapeAndDraw(deviceContext, 
 		params.subText,
 		MARGIN + itemArea.left,
-	    MARGIN + itemArea.top + settings.fontUi.lineHeight,
-		settings.fontUi,
+	    MARGIN + itemArea.top + fontUi.lineHeight,
+		fontUi,
 		settings.colors.UseUiText(false));
 	
 	if (mouse.Hittest(itemArea, this, OnClickItem))
@@ -201,13 +201,13 @@ void SearchBar::SetItemCount(u64 newItemCount) {
 		scrollarea.totalSize.height = itemCount * ItemHeight();
 		area.bottom = std::min(
 			area.top + (itemCount * ItemHeight()),
-			mainWindow.height - PADDING_X2 - settings.fontUi.lineHeight - MARGIN);
+			mainWindow.height - PADDING_X2 - fontUi.lineHeight - MARGIN);
 	}
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void SearchBar::OnResize() {
- 	const f32 offsetFromTop = (PADDING_X2 + settings.fontUi.lineHeight) + MARGIN;
+ 	const f32 offsetFromTop = (PADDING_X2 + fontUi.lineHeight) + MARGIN;
  	const f32 itemAreaTop = offsetFromTop + MARGIN_X2 + textBox.Height();
 	 	
  	area = D2D_RECT_F {
@@ -216,7 +216,7 @@ void SearchBar::OnResize() {
 		.right  = mainWindow.width * 0.7f,
 		.bottom = std::min(
 			itemAreaTop + (itemCount * ItemHeight()),
-			mainWindow.height - PADDING_X2 - settings.fontUi.lineHeight - MARGIN)};
+			mainWindow.height - PADDING_X2 - fontUi.lineHeight - MARGIN)};
 	
 	textBox.position = D2D_POINT_2F {
 		.x = area.left + MARGIN,
@@ -274,7 +274,7 @@ bool SearchBar::HandleEvent(const Event& event) {
 
 void SearchBar::OnMouseWheel(f32 distance) {
 	if (parameterConfigurator) return;
-	scrollarea.ScrollVertical(distance * settings.fontUi.lineHeight * 5);
+	scrollarea.ScrollVertical(distance * fontUi.lineHeight * 5);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////

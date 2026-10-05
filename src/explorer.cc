@@ -122,11 +122,11 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 		
 		ASSERT(itMaxItem != panel->items.end());
 		
-		staticGlyphRun.Shape(itMaxItem->filename, settings.fontUi);
+		staticGlyphRun.Shape(itMaxItem->filename, fontUi);
 		const float textWidth = staticGlyphRun.width;
 		
-  		const float width  = MARGIN_X2 + settings.fontUi.lineHeight + textWidth + MARGIN;
-		const float height = panel->items.size() * settings.fontUi.lineHeight;
+  		const float width  = MARGIN_X2 + fontUi.lineHeight + textWidth + MARGIN;
+		const float height = panel->items.size() * fontUi.lineHeight;
 		
 		panel->area.right = panel->area.left + width;
 		panel->area.bottom = panel->area.top + height;	
@@ -138,19 +138,19 @@ static bool RefreshPanelItems(Explorer::Panel* panel, const std::string& directo
 static Explorer::NewItemDialog* CreateTextboxPanel(D2D_POINT_2F spawnPoint, std::string_view placeholderText, std::string initialText) {
 	auto tbPanel = std::make_unique<Explorer::NewItemDialog>();
 		
-	if (!tbPanel->textbox.Init(&settings.fontUi, placeholderText, std::move(initialText)))
+	if (!tbPanel->textbox.Init(&fontUi, placeholderText, std::move(initialText)))
 		return nullptr;
 	
 	tbPanel->textbox.position = D2D_POINT_2F {
 		.x = spawnPoint.x + MARGIN,
-		.y = spawnPoint.y + MARGIN + settings.fontUi.lineHeight + MARGIN};
+		.y = spawnPoint.y + MARGIN + fontUi.lineHeight + MARGIN};
 	tbPanel->textbox.width = TEXTBOX_PANEL_WIDTH - MARGIN_X2;
 	
 	tbPanel->area = D2D_RECT_F {
 		.left   = spawnPoint.x,
 		.top    = spawnPoint.y,
 		.right  = spawnPoint.x + TEXTBOX_PANEL_WIDTH,
-		.bottom = spawnPoint.y + MARGIN + settings.fontUi.lineHeight + MARGIN + tbPanel->textbox.Height() + MARGIN};
+		.bottom = spawnPoint.y + MARGIN + fontUi.lineHeight + MARGIN + tbPanel->textbox.Height() + MARGIN};
 	
 	return tbPanel.release();
 }
@@ -162,7 +162,7 @@ Explorer* Explorer::Make() {
 
 	auto panel = std::make_unique<Explorer::Panel>();	
 	panel->area.left = 0u;
-	panel->area.top = settings.fontUi.lineHeight + PADDING_X2;
+	panel->area.top = fontUi.lineHeight + PADDING_X2;
 	panel->parent = nullptr;
 	panel->directoryName = ".";
 	panel->fullPathLength = 1u;
@@ -607,7 +607,7 @@ static void CommandNewItem(Explorer* self, Explorer::Item::Type type) {
 	self->newItemDialog = CreateTextboxPanel(
 		D2D_POINT_2F {
 			.x = self->activePanel->area.right,
-			.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)},
+			.y = self->activePanel->area.top + (activeItemIndex * fontUi.lineHeight)},
 		type == Explorer::Item::Type_File ? "File name" : "Folder name",
 		std::string {});
 	self->newItemDialog->itemType = type;
@@ -621,7 +621,7 @@ static void CommandRenameItem(Explorer* self) {
 	self->newItemDialog = CreateTextboxPanel(
 		D2D_POINT_2F {
 			.x = self->activePanel->area.right,
-			.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)},
+			.y = self->activePanel->area.top + (activeItemIndex * fontUi.lineHeight)},
 		self->activePanel->activeItem->type  == Explorer::Item::Type_File ? "Rename file" : "Rename folder",
 		self->activePanel->activeItem->filename);
 	self->newItemDialog->itemType = self->activePanel->activeItem->type;
@@ -686,7 +686,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				
 				self->newItemDialog->errorText = comError.ErrorMessage();
-				self->newItemDialog->area.bottom += MARGIN + settings.fontUi.lineHeight;
+				self->newItemDialog->area.bottom += MARGIN + fontUi.lineHeight;
 				self->newItemDialog->textbox.invalid = true;
 				return;
 			}
@@ -704,7 +704,7 @@ static void ActionConfirmTextboxPanel(Explorer* self) {
 				const _com_error comError {HRESULT_FROM_WIN32(lastErr)};
 				
 				self->newItemDialog->errorText = comError.ErrorMessage();
-				self->newItemDialog->area.bottom += MARGIN + settings.fontUi.lineHeight;
+				self->newItemDialog->area.bottom += MARGIN + fontUi.lineHeight;
 				self->newItemDialog->textbox.invalid = true;
 				return;
 			}
@@ -728,7 +728,7 @@ static void ActionOpenDirectory(Explorer* self) {
 	const u64 activeItemIndex = (self->activePanel->activeItem - self->activePanel->items.data());
 	const D2D_POINT_2F spawnPos {
 		.x = self->activePanel->area.right,
-		.y = self->activePanel->area.top + (activeItemIndex * settings.fontUi.lineHeight)};
+		.y = self->activePanel->area.top + (activeItemIndex * fontUi.lineHeight)};
 			
 	auto newPanel = std::make_unique<Explorer::Panel>();	
 	newPanel->area.left = spawnPos.x;
@@ -813,9 +813,9 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 		
 		const D2D_RECT_F itemArea {
 			.left   = panel->area.left,
-			.top    = panel->area.top  + (iItem * (settings.fontUi.lineHeight)),
+			.top    = panel->area.top  + (iItem * (fontUi.lineHeight)),
 			.right  = panel->area.right,
-			.bottom = panel->area.top  + (iItem * (settings.fontUi.lineHeight)) + settings.fontUi.lineHeight};
+			.bottom = panel->area.top  + (iItem * (fontUi.lineHeight)) + fontUi.lineHeight};
 				
 		if (&item == panel->activeItem) {
 			const bool isActiveItemOrRenamed = (isActivePanel && (!self->newItemDialog || self->newItemDialog->isRename));
@@ -888,14 +888,14 @@ static void UpdatePanel(Explorer* self, Explorer::Panel* panel) {
 				D2D_POINT_2F {
 					.x = panel->area.left + MARGIN,
 					.y = itemArea.top},
-				settings.fontUi.lineHeight);
+				fontUi.lineHeight);
 			
 			const bool isCut = (item.flags & Explorer::Item::Flag_Cut);
-			staticGlyphRun.Shape(item.filename, settings.fontUi);
+			staticGlyphRun.Shape(item.filename, fontUi);
 			staticGlyphRun.Draw(deviceContext,
-				panel->area.left + MARGIN + settings.fontUi.lineHeight + MARGIN,
+				panel->area.left + MARGIN + fontUi.lineHeight + MARGIN,
 				itemArea.top,
-				settings.fontUi,
+				fontUi,
 				settings.colors.UseUiText(!isCut));
 		}
 		
@@ -961,7 +961,7 @@ void Explorer::Update() {
 			labelText,
 			newItemDialog->area.left + MARGIN,
 			newItemDialog->area.top + MARGIN,
-			settings.fontUi,
+			fontUi,
 			settings.colors.UseUiText());
 		
 		newItemDialog->textbox.Update();
@@ -971,7 +971,7 @@ void Explorer::Update() {
 				newItemDialog->errorText,
 				newItemDialog->area.left + MARGIN,
 				newItemDialog->textbox.position.y + newItemDialog->textbox.Height() + MARGIN,
-				settings.fontUi,
+				fontUi,
 				settings.colors.UseUiText());
 		}
 	}

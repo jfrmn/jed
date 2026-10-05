@@ -8,9 +8,8 @@
 #include <tree_sitter/api.h>
 
 #define TOML_ABI_NAMESPACES 0
-#define TOML_ENABLE_UNRELEASED_FEATURES 1
 #define TOML_EXCEPTIONS 0
-#define TOML_IMPLEMENTATION 0
+#define TOML_HEADER_ONLY 0
 #include <toml++/toml.hpp>
 
 #define WIN32_LEAN_AND_MEAN
@@ -293,9 +292,9 @@ void SyntaxHighlighterTreeSitter::Highlight(Editor* editor, ID2D1RenderTarget* r
 		renderTarget->FillRectangle(
 			D2D_RECT_F {
 				.left   = offsetStart,
-				.top    = (settings.fontEditor.lineHeight * start.row),
+				.top    = (fontEditor.lineHeight * start.row),
 				.right  = offsetEnd,
-				.bottom = (settings.fontEditor.lineHeight * (start.row+1)) },
+				.bottom = (fontEditor.lineHeight * (start.row+1)) },
 			brush);
 	}
 }
