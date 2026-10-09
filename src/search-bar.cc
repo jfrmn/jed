@@ -200,7 +200,7 @@ void SearchBar::SetItemCount(u64 newItemCount) {
 		itemCount = newItemCount;
 		scrollarea.totalSize.height = itemCount * ItemHeight();
 		area.bottom = std::min(
-			area.top + (itemCount * ItemHeight()),
+			area.top + MARGIN_X2 + textBox.Height() + (itemCount * ItemHeight()),
 			mainWindow.height - PADDING_X2 - fontUi.lineHeight - MARGIN);
 	}
 }
