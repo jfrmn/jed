@@ -84,6 +84,10 @@ int CompareFuzzyMatchResults(const FuzzyMatchResult& lhs, const FuzzyMatchResult
 
 struct _FILETIME;
 
+// checks the given path exists and is a file
+// path needs to be null terminated!
+bool FileExists(std::string_view path);
+
 // read an entire file
 // optionally also gets the last write time of the file
 bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer, /*out*/ _FILETIME* lastWriteTime = nullptr);
@@ -135,6 +139,7 @@ struct DirectoryIterator {
 	bool IsDirectory() const;
 	bool IsFile() const;
 	std::string_view GetSearchPath() const;
+	void GetFullFilePath(std::string* buffer) const;
 
 	DirectoryIterator() noexcept;
 	explicit DirectoryIterator(std::string_view directoryPath) noexcept;

@@ -3,7 +3,7 @@ project (jed)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set (CMAKE_CXX_STANDARD_LIBRARIES "kernel32.lib user32.lib gdi32.lib")
+set (CMAKE_CXX_STANDARD_LIBRARIES "kernel32.lib user32.lib gdi32.lib shlwapi.lib")
 set (CMAKE_CXX_FLAGS "/DWIN32 /D_WINDOWS /Zi /W3 /Zc:preprocessor")
 set (CMAKE_CXX_FLAGS_DEBUG   "/MDd /Ob0 /Od /DDEBUG /EHsc /RTC1")
 set (CMAKE_CXX_FLAGS_RELEASE "/MD  /Ob2 /O2 /DRELEASE")
@@ -14,7 +14,7 @@ add_executable (jed)
 # dependencies
 
 set (BUILD_SHARED_LIBS OFF)
-set(CACHE{DEPS_DIR} TYPE PATH VALUE "deps")
+set (CACHE{DEPS_DIR} TYPE PATH VALUE "deps")
 
 #
 # toml++
@@ -56,7 +56,6 @@ target_include_directories (jed PRIVATE "${DEPS_DIR}/tree-sitter/lib/include")
 # cJSON
 #
 set (CJSON_BUILD_SHARED_LIBS OFF)
-
 add_subdirectory ("${DEPS_DIR}/cJSON" ${CMAKE_CURRENT_BINARY_DIR}/deps/cJSON)
 target_link_libraries(jed cjson)
 target_include_directories (jed PRIVATE "${DEPS_DIR}/cJSON")

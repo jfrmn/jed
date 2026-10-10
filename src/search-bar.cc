@@ -19,6 +19,10 @@
 
 #include <algorithm>
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <shlwapi.h>
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // SearchBar
@@ -341,21 +345,28 @@ static bool CompareItems(const SearchBarFiles::Item& litem, const SearchBarFiles
 	return litem.fullPath < ritem.fullPath;
 }
 
-static void IndexDirectory(SearchBarFiles* self, DirectoryIterator& iterator, u64 parent, SearchBarFiles::Page*& currentPage, u64& occupied) {
-		
+static void IndexDirectory(SearchBarFiles* self, std::span<std::string_view> excludePatterns, std::string& pathBuffer, u64 parent, SearchBarFiles::Page*& currentPage, u64& occupied) {
+	
+	DirectoryIterator iterator {pathBuffer};
 	while (iterator.Next()) {
 		
 		if (self->cancel)
 			return;
 		
+		// @CHECK i am unsure if this should be applied to all directory items or only files...
+		iterator.GetFullFilePath(&pathBuffer);
+		for (std::string_view pattern : excludePatterns) {
+			if (PathMatchSpecA(pathBuffer.c_str(), pattern.data())) 
+				goto next;
+		}
+		
 		if (occupied + iterator.filename.size() >= SearchBarFiles::Page::SIZE) {
-			
+				
 			if (currentPage->next) {
 				SearchBarFiles::Page* nextPage = currentPage->next;
-				// NOTE: do not memset the whole page, because the page may also have next page
-				// the whould get lost!
+				// NOTE: do not memset the whole page, because the page may also have a next page that would get lost!
 				memset(nextPage->data, 0, sizeof(nextPage->data));
-				currentPage = nextPage;	
+				currentPage = nextPage;
 			
 			} else {
 				auto newPage = new SearchBarFiles::Page;
@@ -379,27 +390,11 @@ static void IndexDirectory(SearchBarFiles* self, DirectoryIterator& iterator, u6
 			.isDirectory = iterator.IsDirectory()});
 		
 		occupied += iterator.filename.size();
+			
+		if (iterator.IsDirectory())
+			IndexDirectory(self, excludePatterns, pathBuffer, self->index.size()-1u, currentPage, occupied);
 		
-		if (iterator.IsDirectory()) {
-			
-			DirectoryIterator subDirIterator;
-			strcpy_s(subDirIterator.searchPath, iterator.searchPath);
-			char* searchPathTail = strrchr(subDirIterator.searchPath, '*');
-			ASSERT(searchPathTail);
-			
-			u64 remainingSize = sizeof(DirectoryIterator::searchPath) - (searchPathTail - subDirIterator.searchPath);
-			
-			memcpy_s(searchPathTail, remainingSize, iterator.filename.data(), iterator.filename.size());
-			searchPathTail += iterator.filename.size();
-			remainingSize  -= iterator.filename.size();
-			
-			ASSERT(remainingSize >= 3u);
-			*searchPathTail++ = '\\';
-			*searchPathTail++ = '*';
-			*searchPathTail++ = '\0'; // the debug version of strcpy_s fills the buffer with 0xfe before copying			
-			
-			IndexDirectory(self, subDirIterator, self->index.size()-1u, currentPage, occupied);
-		}
+	next: __noop;		
 	}
 		
 	if (iterator.Failed())
@@ -413,9 +408,48 @@ static DWORD WINAPI ThreadProc(LPVOID param) {
 		 self->head = new SearchBarFiles::Page {.next = nullptr};
 	memset(self->head->data, 0, sizeof(self->head->data));
 	u64 occupied = 0u;
+	
+	std::vector<std::string_view> excludePatterns = {};
+	excludePatterns.reserve(settings.searchExclude.size());
+	
+	for (std::string_view pattern : settings.searchExclude)
+		excludePatterns.push_back(pattern);
 		
-	DirectoryIterator iter {"."};
-	IndexDirectory(self, iter, U64_MAX, self->head, occupied);
+	std::string gitignoreContent {};
+	if (settings.searchRespectGitignore && FileExists(".gitignore")) {
+		
+		if (!ReadEntireFile(".gitignore", &gitignoreContent))
+			LogWarning("failed to read .gitignore");
+		
+		u64 startPos = 0u;
+		while (startPos < gitignoreContent.size()) {
+			const u64 foundPos = gitignoreContent.find_first_of("\r\n", startPos);
+			const u64 safeFoundPos = std::min(gitignoreContent.size(), foundPos);
+			
+			const std::string_view line {
+				gitignoreContent.begin() + startPos,
+				gitignoreContent.begin() + safeFoundPos};
+			
+			if (!line.empty())
+				excludePatterns.push_back(line);
+				
+			for (u64 i = startPos; i < safeFoundPos; i++) {
+				if (gitignoreContent[i] == '/')
+					gitignoreContent[i] = '\\';
+			}
+			
+			if (foundPos == std::string_view::npos)
+				break;
+			
+			// wildmatch expects null terminated strings
+			// we just patch the original buffer instead of doing a bunch of dynamic allocations
+			gitignoreContent[foundPos] = '\0';
+			startPos = foundPos + 1u;
+		}
+	}
+	
+	std::string pathBuffer {};
+	IndexDirectory(self, excludePatterns, pathBuffer, U64_MAX, self->head, occupied);
 	
 	LogTrace("Building index is complete. Size: %zu", self->index.size());
 	return 0;
@@ -455,7 +489,6 @@ void SearchBarFiles::FilterItems(std::string_view searchText) {
 		// Keep the existing minimum number of matched characters behavior.
 		if (matchResult.matchedCount < 3)
 			continue;
-		
 		
 		std::string fullPath {indexEntry.filename};
 		

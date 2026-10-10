@@ -261,6 +261,11 @@ int CompareFuzzyMatchResults(const FuzzyMatchResult& lhs, const FuzzyMatchResult
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+bool FileExists(std::string_view path) {
+	const DWORD fileattr = GetFileAttributesA(path.data());
+	return (fileattr != INVALID_FILE_ATTRIBUTES && (fileattr & FILE_ATTRIBUTE_DIRECTORY) == 0);
+}
+
 bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer, /*out*/ FILETIME* lastWriteTime) {
 
 	HANDLE hFile = CreateFileA(path.data(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
@@ -547,13 +552,26 @@ std::string_view DirectoryIterator::GetSearchPath() const {
 	return std::string_view {searchPath, len >= 2 ? len-2 : len};
 }
 
+void DirectoryIterator::GetFullFilePath(std::string* buffer) const {
+	const u64 searchPathLength = strnlen_s(searchPath, sizeof(searchPath));
+	
+	// -1 because we want to skip the *
+	ASSERT(searchPathLength > 0);
+	const std::string_view path {searchPath, searchPathLength - 1u};
+	
+	buffer->clear();
+	buffer->reserve(path.size() + filename.size());
+	buffer->append(path);
+	buffer->append(filename);
+}
+
 DirectoryIterator::DirectoryIterator() noexcept {}
 
 DirectoryIterator::DirectoryIterator(std::string_view directoryPath) noexcept {
 	memcpy(searchPath, directoryPath.data(), directoryPath.size());
 	
 	char* tail = searchPath + directoryPath.size();
-	if (!directoryPath.ends_with('\\'))
+	if (!directoryPath.empty() && !directoryPath.ends_with('\\'))
 		*tail++ = '\\';
 	*tail++ = '*';
 }

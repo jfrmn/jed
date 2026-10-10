@@ -505,8 +505,7 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 	//
 	// check if file exists
 	//
-	const DWORD fileattr = GetFileAttributesA(filepath.data());
-	if (fileattr == INVALID_FILE_ATTRIBUTES || (fileattr & FILE_ATTRIBUTE_DIRECTORY)) {
+	if (!FileExists(filepath)) {
 		LogTrace("no settings file in %.*s", SIZE_AND_DATA(filepath));
 		return true;
 	}
@@ -529,7 +528,7 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 	//
 	// load colors
 	//
-	if (const toml::table* tblColors = table.get_as<toml::table>("Colors")) {
+	if (const toml::table* tblColors = table.get_as<toml::table>("colors")) {
 		for (u64 i = 0; i < Settings::NUM_COLORS; i++) {
 			const toml::node* nodeColor = tblColors->get(colorNames[i]);
 			if (!nodeColor) continue;
@@ -540,7 +539,7 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 	//
 	// load fonts
 	//
-	if (toml::table* tblFonts = table.get_as<toml::table>("Font")) {
+	if (toml::table* tblFonts = table.get_as<toml::table>("font")) {
 		if (toml::node* nodeFontEditor = tblFonts->get("editor"))
 			ToFontDescription(nodeFontEditor, &self->fontEditor);
 		if (toml::node* nodeFontUi = tblFonts->get("ui"))
@@ -550,13 +549,13 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 	//
 	// load tools
 	//
-	if (toml::node* nodeTools = table.get("Tools"))
+	if (toml::node* nodeTools = table.get("tools"))
 		Tool::FromToml(nodeTools, &self->tools);
 		
 	//
 	// syntax colors
 	//
-	if (auto tblSynColors = table.get_as<toml::table>("Syntax-Colors")) {
+	if (auto tblSynColors = table.get_as<toml::table>("syntax-colors")) {
 		self->syntaxColors.Reserve(tblSynColors->size());
 		for (auto nodeColor : *tblSynColors) {
 			Color color {};
@@ -569,6 +568,24 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 		}
 	}
 	
+	//
+	// other settings
+	//
+	{
+		if (auto arrSearchExclude = table.get_as<toml::array>("search-exclude")) {
+			self->searchExclude.reserve(arrSearchExclude->size());
+			for (auto& nodePattern : *arrSearchExclude) {
+				auto strPattern = nodePattern.as_string();
+				if (!strPattern) continue;
+				
+				self->searchExclude.push_back(std::move(strPattern->get()));
+			}
+		}
+		
+		if (auto nodeSearchRespectGitignore = table.get_as<toml::value<bool>>("search-respect-gitignore")) {
+			self->searchRespectGitignore = nodeSearchRespectGitignore->get();
+		}
+	}
 	return true;
 }
 

@@ -238,7 +238,7 @@ bool ToolOutput::StartProcess() {
 		.application = {},
 		.commandLine = std::move(commandLine),
 		.environment = tool->environment,
-		.flags = tool->flags};
+		.flags       = tool->flags};
 	
 	ASSERT(!process);
 	process = new Process();

@@ -82,6 +82,9 @@ struct Settings {
 		.name = "Consolas",
 		.size = 12.0f};
 	
+	std::vector<std::string> searchExclude = {};
+	bool searchRespectGitignore = false;
+	
 	f32 scrollbarMarkerHoverDistance = 10.0f;
 	bool backupFileBeforeSaving = false; // @TODO not implemented
 	
