@@ -109,3 +109,7 @@ _D3DCOLORVALUE Color::ToD2D() const {
 		.b = this->b,
 		.a = this->a};
 }
+
+Color::Color(float r /*= 0.0f*/, float g /*= 0.0f*/, float b /*= 0.0f*/, float a /*= 0.0f*/) noexcept
+	: r(r), g(g), b(b), a(a) {}
+	

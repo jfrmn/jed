@@ -7,21 +7,29 @@ union Color {
 	
 	//-----------------------------------------------------
 	// data
+	//-----------------------------------------------------
 	
-	float array[4] {0.0f, 0.0f, 0.0f, 1.0f};
 	struct {
 		float r;
 		float g;
 		float b;
 		float a;
 	};
+	float array[4];
 	
 	//-----------------------------------------------------
 	// functions
+	//-----------------------------------------------------
 	
 	static Color FromKnown(int d2dIndex);
 	static bool FromToml(const toml::node& node, /*out*/ Color* color);
 	_D3DCOLORVALUE ToD2D() const;
+	
+	Color(float r = 0.0f, float g = 0.0f, float b = 0.0f, float a = 1.0f) noexcept;
+	
+	//-----------------------------------------------------
+	// Constants
+	//-----------------------------------------------------
 };
 
 extern const Color COLOR_TRANSPARENT;
@@ -33,4 +41,3 @@ extern const Color COLOR_YELLOW;
 extern const Color COLOR_MAGENTA;
 extern const Color COLOR_WHITE;
 extern const Color COLOR_BLACK;
-
