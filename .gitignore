@@ -1,5 +1,14 @@
 .vs/**
 .vscode/**
-.worktrees/**
+.alta/**
+.jed/**
+.clangd
+.raddbg
 archive/**
 out/**
+assets/pdn/**
+assets/unused/**
+*.diff
+
+# ignore for now - add later
+langs/**
