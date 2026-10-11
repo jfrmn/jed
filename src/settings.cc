@@ -500,20 +500,21 @@ static bool ToFontDescription(toml::node* node, /*out*/ Font::Description* fontD
 	return true;
 }
 
-static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
+static bool ReadSettingsFile(Settings* self, std::string& filepath) {
+	filepath.append("\\settings.toml");
 	
 	//
 	// check if file exists
 	//
 	if (!FileExists(filepath)) {
-		LogTrace("no settings file in %.*s", SIZE_AND_DATA(filepath));
+		LogTrace("no settings file in '%.*s'", SIZE_AND_DATA(filepath));
 		return true;
 	}
 	
 	//
 	// parse file
 	//
-	LogInfo("loading settings from '%.*s'", SIZE_AND_DATA(filepath));
+	LogInfo("reading settings from '%.*s'", SIZE_AND_DATA(filepath));
 	
 	toml::parse_result result = toml::parse_file(filepath);
 	
@@ -590,67 +591,13 @@ static bool ReadSettingsFile(Settings* self, std::string_view filepath) {
 }
 
 bool Settings::Init() {
-	
-	char buffer[_MAX_PATH];
-	const std::string_view dotFolderAndFilename = "\\.jed\\settings.toml";
-	
-	//
-	// read the file in the home directory first
-	//
-	{
-		wchar* wHomeDirectory = nullptr;
-		if (HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &wHomeDirectory); hr != S_OK) {
-			LogError("Failed to obain users home directory. HRESULT: %s", StrHr(hr));
-			return false;
-		}
-		
-		u64 bufferFilled;
-		ToUtf8(wHomeDirectory, buffer, &bufferFilled);
-		
-		// Note:
-		// the path returned from SHGetKnownFolderPath does NOT have a trailing slash
-		// we also need one more for the null terminator
-		
-		if (sizeof(buffer) - bufferFilled < dotFolderAndFilename.size() + 1u) {
-			LogError("filename too long: %S\\%*.s", wHomeDirectory, SIZE_AND_DATA(dotFolderAndFilename));
-			return false;
-		}
-		
-		memcpy_s(buffer + bufferFilled, sizeof(buffer) - bufferFilled, dotFolderAndFilename.data(), dotFolderAndFilename.size());
-		bufferFilled += dotFolderAndFilename.size();
-		
-		buffer[bufferFilled] = '\0';
-		bufferFilled += 1;
-		
-		const std::string_view fileInHomeDirectory {buffer, bufferFilled};
-		
-		if (!ReadSettingsFile(this, fileInHomeDirectory)) 
-			return false;
-	
-		memset(buffer, 0, sizeof(buffer));
-	}
-		
-	//
-	// read file in the current working directory
-	//
-	{
-		memset(buffer, 0, sizeof(buffer));
-		
-		const std::string_view cwd = GetWorkingDirectory();
-		if (sizeof(buffer) < cwd.size() + dotFolderAndFilename.size() + 1u) {
-			LogError("filename too long: %*.s%*.s", SIZE_AND_DATA(cwd), SIZE_AND_DATA(dotFolderAndFilename));
-			return false;
-		}
-		
-		memcpy_s(buffer, sizeof(buffer), cwd.data(), cwd.size());
-		memcpy_s(buffer + cwd.size(), sizeof(buffer) - cwd.size(), dotFolderAndFilename.data(), dotFolderAndFilename.size());
-		buffer[cwd.size() + dotFolderAndFilename.size()] = '\0';
-		
-		const std::string_view fileInCwd {buffer, cwd.size() + dotFolderAndFilename.size()};
-		if (!ReadSettingsFile(this, fileInCwd))
-			return false;
-	}
-	
+	std::string dotFolderBuffer {};
+	if (!GetInstallDirectory(&dotFolderBuffer)) return false;
+	if (!ReadSettingsFile(this, dotFolderBuffer)) return false;
+	if (!GetHomeDotDirectory(&dotFolderBuffer)) return false;
+	if (!ReadSettingsFile(this, dotFolderBuffer)) return false;
+	if (!GetWorkingDotDirectory(&dotFolderBuffer)) return false;
+	if (!ReadSettingsFile(this, dotFolderBuffer)) return false;
 	return true;
 }
 

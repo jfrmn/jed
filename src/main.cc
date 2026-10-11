@@ -77,7 +77,7 @@ bool Init() {
 		return false;
 	}
 	
-	if (!Language::LoadLanguages(".\\config\\languages"))
+	if (!Language::LoadLanguages())
 		LogError("failed to load languages");
 	
 	if (!fileWatcher.Init()) {

@@ -183,7 +183,7 @@ Editor::FileResult Editor::OpenFile(std::string path) {
 	//
 	// set language
 	//
-	language = Language::GetLanguage(GetExtensionFromPath(path));
+	language = Language::GetLanguage(path);
 	textDocumentIdentifier.uri = MakeUriFromPath(path);	
 	textDocumentIdentifier.version = 0;
 	this->path = std::move(path);

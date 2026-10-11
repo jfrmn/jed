@@ -18,6 +18,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d2d1.h>
+#include <Shlwapi.h>
 
 #define TOML_ABI_NAMESPACES 0
 #define TOML_EXCEPTIONS 0
@@ -27,124 +28,149 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 std::vector<Language*> Language::languages = {};
 
-bool Language::LoadLanguages(std::string_view directory) {
-	std::string fileBuffer = {};
+bool Language::LoadLanguages() {
+	std::string fileContentBuffer = {};
 	
-	DirectoryIterator iter {directory};	
-	while (iter.Next()) {
-
-		if (!iter.IsDirectory())
-			continue;
+	auto LoadLanguages = [&] (std::string& pathBuffer) {
 		
-		char pathBuffer[MAX_PATH] {};
-		const int pathLen = sprintf_s(pathBuffer, "%.*s\\%.*s\\language.toml", SIZE_AND_DATA(iter.GetSearchPath()), SIZE_AND_DATA(iter.filename));
-		ASSERT(pathLen >= 0)
+		// path buffer is initally filled with the path to the dot directroy
+		// after we constructed the dirIter we can reuse
+		pathBuffer.append("\\langs");
+		LogInfo("checking languages in '%.*s'", SIZE_AND_DATA(pathBuffer));
 		
-		const std::string_view path {pathBuffer, static_cast<u64>(pathLen)};
-		LogTrace("reading language: '%.*s'", SIZE_AND_DATA(path));
+		DirectoryIterator iter {pathBuffer};
 		
-		fileBuffer.clear();
-		if (!ReadEntireFile(path, &fileBuffer))
-			continue;
+		while (iter.Next()) {
+	
+			if (!iter.IsDirectory())
+				continue;
 			
-		toml::parse_result parseResult = toml::parse(fileBuffer, path);
-		if (parseResult.failed()) {
-			const toml::parse_error& error = parseResult.error();
-			LogError("failed to parse toml %s: %.*s. Ignoring language...", Str(error.source()), SIZE_AND_DATA(error.description()));
-			continue;
-		}
-		
-		toml::table& tblLanguage = parseResult.table();
-		
-		auto language = new Language();
-		if (auto valName = tblLanguage.get_as<std::string>("name"))
-			language->name = std::move(valName->get());
-		else
-			language->name = iter.filename;
-		
-		if (auto arrFileEndings = tblLanguage.get_as<toml::array>("file-endings")) {
-			for (toml::node& nodeEnding : *arrFileEndings) {
-				if (auto valEnding = nodeEnding.as<std::string>())
-					language->fileEndings.push_back(std::move(valEnding->get()));
-			}
-		}
-		
-		if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("Language-Server")) {
-			if (auto valCommand = nodeLanguageServer->get_as<std::string>("command")) {
-				language->serverStartInfo.commandLine = valCommand->get();
-			} else {
-				LogError("%s: expected entry 'command' as string", Str(nodeLanguageServer->source()));
-				language->serverStartup = Startup_Never;
-				goto skip_startup;
+			iter.GetFullFilePath(&pathBuffer);
+			pathBuffer.append("\\language.toml");
+			
+			LogTrace("reading language: '%.*s'", SIZE_AND_DATA(pathBuffer));
+			
+			fileContentBuffer.clear();
+			if (!ReadEntireFile(pathBuffer, &fileContentBuffer))
+				continue;
+				
+			toml::parse_result parseResult = toml::parse(fileContentBuffer, pathBuffer);
+			if (parseResult.failed()) {
+				const toml::parse_error& error = parseResult.error();
+				LogError("failed to parse toml %s: %.*s. Ignoring language...", Str(error.source()), SIZE_AND_DATA(error.description()));
+				continue;
 			}
 			
-			if (auto valStartup = nodeLanguageServer->get_as<std::string>("startup")) {
-				if      (valStartup->get() == "never") language->serverStartup = Startup_Never;
-				else if (valStartup->get() == "manual") language->serverStartup = Startup_Manual;
-				else if (valStartup->get() == "on-file-open") language->serverStartup = Startup_OnFileOpen;
-				else if (valStartup->get() == "on-app-start") language->serverStartup = Startup_OnAppStart;
-				else LogWarning("%s: unknwon startup value '%.*s'", Str(nodeLanguageServer->source()), SIZE_AND_DATA(valStartup->get()));
-			}
-		
-		skip_startup: __noop;
-		}
-		
-		if (auto valLineComment = tblLanguage.get_as<std::string>("line-comment"))
-			language->lineComment = std::move(valLineComment->get());
-		
-		if (auto arrBlockComment = tblLanguage.get_as<toml::array>("block-comment")) {
-			for (u64 i = 0u; i < std::min(2ull, arrBlockComment->size()); i++) {
-				if (toml::value<std::string>* valEnding = arrBlockComment->get_as<std::string>(i))
-					language->blockComment[i] = std::move(valEnding->get());
-				else
-					LogWarning("%s: expected a string", Str(valEnding->source()));
-			}
-		}
-		
-		if (auto tblSyntaxHighlight = tblLanguage.get_as<toml::table>("Syntax-Highlight")) {
+			toml::table& tblLanguage = parseResult.table();
 			
-			if (auto nodeRegex = tblSyntaxHighlight->get("regex")) {
-				const bool ok = language->syntaxHighlighterRegex.FromToml(nodeRegex);
-				if (ok) language->syntaxHighlighter = &language->syntaxHighlighterRegex;
-			}
+			auto language = new Language();
+			if (auto valName = tblLanguage.get_as<std::string>("name"))
+				language->name = std::move(valName->get());
+			else
+				language->name = iter.filename;
 			
-			if (auto nodeTreeSitter = tblSyntaxHighlight->get("tree-sitter")) {
-				const bool ok = language->syntaxHighlighterTreeSitter.FromToml(nodeTreeSitter);
-				if (ok)  language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
-			}
-			
-			if (auto nodeDefault = tblSyntaxHighlight->get_as<std::string>("default")) {
-				if      (nodeDefault->get() == "none")        language->syntaxHighlighter = nullptr;
-				else if (nodeDefault->get() == "regex")       language->syntaxHighlighter = &language->syntaxHighlighterRegex;
-				else if (nodeDefault->get() == "tree-sitter") language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
-				else LogWarning("%s: unknwon default-syntax-highlight value '%.*s'", Str(nodeDefault->source()), SIZE_AND_DATA(nodeDefault->get()));
-			}
-			
-			if (auto tblColors = tblSyntaxHighlight->get_as<toml::table>("colors")) {
-				language->syntaxColors.Reserve(tblColors->size());
-				for (auto nodeColor : *tblColors) {
-					Color color {};
-					if (!Color::FromToml(nodeColor.second, &color))
-						continue;
-					
-					language->syntaxColors.Upsert(std::string {nodeColor.first}, color);
+			if (auto arrFiles = tblLanguage.get_as<toml::array>("files")) {
+				for (toml::node& nodePattern : *arrFiles) {
+					if (auto valEnding = nodePattern.as_string())
+						language->filePatterns.push_back(std::move(valEnding->get()));
 				}
 			}
+			
+			if (auto nodeLanguageServer = tblLanguage.get_as<toml::table>("language-server")) {
+				if (auto valCommand = nodeLanguageServer->get_as<std::string>("command")) {
+					language->serverStartInfo.commandLine = valCommand->get();
+				} else {
+					LogError("%s: expected entry 'command' as string", Str(nodeLanguageServer->source()));
+					language->serverStartup = Startup_Never;
+					goto skip_startup;
+				}
+				
+				if (auto valStartup = nodeLanguageServer->get_as<std::string>("startup")) {
+					if      (valStartup->get() == "never") language->serverStartup = Startup_Never;
+					else if (valStartup->get() == "manual") language->serverStartup = Startup_Manual;
+					else if (valStartup->get() == "on-file-open") language->serverStartup = Startup_OnFileOpen;
+					else if (valStartup->get() == "on-app-start") language->serverStartup = Startup_OnAppStart;
+					else LogWarning("%s: unknwon startup value '%.*s'", Str(nodeLanguageServer->source()), SIZE_AND_DATA(valStartup->get()));
+				}
+			
+			skip_startup: __noop;
+			}
+			
+			if (auto valLineComment = tblLanguage.get_as<std::string>("line-comment"))
+				language->lineComment = std::move(valLineComment->get());
+			
+			if (auto arrBlockComment = tblLanguage.get_as<toml::array>("block-comment")) {
+				for (u64 i = 0u; i < std::min(2ull, arrBlockComment->size()); i++) {
+					if (toml::value<std::string>* valEnding = arrBlockComment->get_as<std::string>(i))
+						language->blockComment[i] = std::move(valEnding->get());
+					else
+						LogWarning("%s: expected a string", Str(valEnding->source()));
+				}
+			}
+			
+			if (auto tblSyntaxHighlight = tblLanguage.get_as<toml::table>("syntax-highlight")) {
+				
+				if (auto nodeRegex = tblSyntaxHighlight->get("regex")) {
+					const bool ok = language->syntaxHighlighterRegex.FromToml(nodeRegex);
+					if (ok) language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+				}
+				
+				if (auto nodeTreeSitter = tblSyntaxHighlight->get("tree-sitter")) {
+					const bool ok = language->syntaxHighlighterTreeSitter.FromToml(nodeTreeSitter);
+					if (ok)  language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
+				}
+				
+				if (auto nodeDefault = tblSyntaxHighlight->get_as<std::string>("default")) {
+					if      (nodeDefault->get() == "none")        language->syntaxHighlighter = nullptr;
+					else if (nodeDefault->get() == "regex")       language->syntaxHighlighter = &language->syntaxHighlighterRegex;
+					else if (nodeDefault->get() == "tree-sitter") language->syntaxHighlighter = &language->syntaxHighlighterTreeSitter;
+					else LogWarning("%s: unknwon default-syntax-highlight value '%.*s'", Str(nodeDefault->source()), SIZE_AND_DATA(nodeDefault->get()));
+				}
+				
+				if (auto tblColors = tblSyntaxHighlight->get_as<toml::table>("colors")) {
+					language->syntaxColors.Reserve(tblColors->size());
+					for (auto nodeColor : *tblColors) {
+						Color color {};
+						if (!Color::FromToml(nodeColor.second, &color))
+							continue;
+						
+						language->syntaxColors.Upsert(std::string {nodeColor.first}, color);
+					}
+				}
+			}
+			
+			if (auto nodeTools = tblLanguage.get("tools"))
+				Tool::FromToml(nodeTools, &language->tools);
+			
+			languages.push_back(std::move(language));
 		}
-		
-		if (auto nodeTools = tblLanguage.get("Tools"))
-			Tool::FromToml(nodeTools, &language->tools);
-		
-		languages.push_back(std::move(language));
-	}
+	};
 	
+	
+	
+	std::string dotFolderBuffer {};
+	if (!GetInstallDirectory(&dotFolderBuffer)) return false;
+	LoadLanguages(dotFolderBuffer);
+	if (!GetHomeDotDirectory(&dotFolderBuffer)) return false;
+	LoadLanguages(dotFolderBuffer);
+	if (!GetWorkingDotDirectory(&dotFolderBuffer)) return false;
+	LoadLanguages(dotFolderBuffer);
+
+// in debug mode we also read directly from the current working directory
+// so that the app finds the bundled languages
+#ifdef _DEBUG 
+	if (!GetWorkingDotDirectory(&dotFolderBuffer)) return false;
+	dotFolderBuffer.resize(dotFolderBuffer.size() - 5u);
+	LoadLanguages(dotFolderBuffer);	
+#endif
+
 	return true;
 }
 
-Language* Language::GetLanguage(std::string_view fileEnding) {
-	for (auto& language : languages) {	
-		for (const std::string& ending : language->fileEndings) {
-			if (ending == fileEnding)
+Language* Language::GetLanguage(std::string_view filepath) {
+	for (auto& language : languages) {
+		for (const std::string& pattern : language->filePatterns) {
+			if (PathMatchSpecA(filepath.data(), pattern.c_str()))
 				return language;
 		}
 	}

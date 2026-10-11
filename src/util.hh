@@ -103,11 +103,11 @@ std::string_view GetFilenameFromPath(std::string_view path);
 std::string_view GetExtensionFromPath(std::string_view path);
 std::string_view GetDirectoryFromPath(std::string_view path);
 
-// get the current working directory/path in which the current .exe resides
-// returned strings do have a null-terminator
-// WARNING! uses a static buffer to hold the data!
-std::string_view GetProcessDirectory();
-std::string_view GetWorkingDirectory();
+// get the path to a .jed- or the install-directory
+// returned strings do have a trailing slash
+bool GetInstallDirectory(std::string* buffer);
+bool GetHomeDotDirectory(std::string* buffer);
+bool GetWorkingDotDirectory(std::string* buffer);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //

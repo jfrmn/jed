@@ -5,6 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <d2d1.h>
+#include <ShlObj.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -277,7 +278,7 @@ bool ReadEntireFile(std::string_view path, /*out*/ std::string* buffer, /*out*/ 
 
 	s64 fileSize = 0; 
 	{
-		LARGE_INTEGER liFileSize {0};
+		LARGE_INTEGER liFileSize {{0}};
 		if (!GetFileSizeEx(hFile, &liFileSize)) {
 			LogError("failed to obtain file size of '%.*s'. LastError: %s", SIZE_AND_DATA(path), StrLastErr(GetLastError()));
 			return false;
@@ -466,20 +467,46 @@ std::string_view GetDirectoryFromPath(std::string_view path) {
 	return path.substr(0u, posDelimiter);
 }
 
-std::string_view GetProcessDirectory() {
-
-	static char buffer[_MAX_PATH];
-	const u32 len = GetModuleFileNameA(NULL, buffer, sizeof(buffer));
+bool GetInstallDirectory(std::string* buffer) {
+	char localBuffer[MAX_PATH] {0};
+	const u32 len = GetModuleFileNameA(NULL, localBuffer, sizeof(localBuffer));
 	ASSERT(len != ERROR_INSUFFICIENT_BUFFER);
-	
-	return std::string_view {buffer, len};
+	buffer->assign(GetDirectoryFromPath(localBuffer));
+	return true;
 }
 
-std::string_view GetWorkingDirectory() {
-	static char buffer[_MAX_PATH];
-	const u32 len = GetCurrentDirectoryA(sizeof(buffer), buffer);
+static constexpr std::string_view DOTFOLDER = "\\.jed";
+
+bool GetHomeDotDirectory(std::string* buffer) {
+	wchar* wHomeDirectory = nullptr;
+	if (HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &wHomeDirectory); hr != S_OK) {
+		LogError("Failed to obain users home directory. HRESULT: %s", StrHr(hr));
+		return false;
+	}
 	
-	return std::string_view {buffer, len};
+	u64 requiredSize = 0u;
+	ToUtf8(wHomeDirectory, {}, &requiredSize);
+	
+	buffer->reserve(requiredSize + DOTFOLDER.size());
+	buffer->resize(requiredSize, '\0');
+	ToUtf8(wHomeDirectory, *buffer, nullptr);
+	buffer->append(DOTFOLDER);
+	
+	return true;
+}
+
+bool GetWorkingDotDirectory(std::string* buffer) {
+	const u32 len = GetCurrentDirectoryA(0, nullptr);
+	buffer->reserve(len + DOTFOLDER.size() - 1u); // -1 because len includes the room the null-terminator which we don't need
+	buffer->resize(len);
+	const u32 res = GetCurrentDirectoryA(static_cast<u32>(buffer->size()), buffer->data());
+	if (res == 0u) {
+		LogError("Failed to obain current directory. Last Error: %s", StrLastErr(len));
+		return false;
+	}
+	buffer->pop_back(); // pop null-term
+	buffer->append(DOTFOLDER);
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

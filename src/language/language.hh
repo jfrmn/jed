@@ -24,11 +24,12 @@ struct Language : public LanguageServer::NotificationHandler {
 
 	static std::vector<Language*> languages;
 
-	static bool LoadLanguages(std::string_view directory);
-	static bool LoadLanguages2(std::string_view directory);
+	static bool LoadLanguages();
 	static void UnloadLanguages();
-	static Language* GetLanguage(std::string_view fileEnding);
-
+	
+	// needs to be null-terminated!
+	static Language* GetLanguage(std::string_view filepath);
+	 
 	//-----------------------------------------------------
 	// types
 	//-----------------------------------------------------
@@ -50,7 +51,7 @@ struct Language : public LanguageServer::NotificationHandler {
 	//-----------------------------------------------------
 
 	std::string name = {};
-	std::vector<std::string> fileEndings = {};
+	std::vector<std::string> filePatterns = {};
 
 	LanguageServerStartInfo serverStartInfo = {};
 	Startup                 serverStartup = Startup_Never;
