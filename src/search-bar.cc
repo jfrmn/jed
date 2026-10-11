@@ -430,7 +430,7 @@ static DWORD WINAPI ThreadProc(LPVOID param) {
 				gitignoreContent.begin() + startPos,
 				gitignoreContent.begin() + safeFoundPos};
 			
-			if (!line.empty())
+			if (!line.empty() && !line.starts_with("#"))
 				excludePatterns.push_back(line);
 				
 			for (u64 i = startPos; i < safeFoundPos; i++) {
